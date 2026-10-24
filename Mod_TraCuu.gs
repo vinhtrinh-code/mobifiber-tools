@@ -1,134 +1,214 @@
 /**
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
- * MODULE       : TRA CỨU THÔNG TIN THUÊ BAO (360°)
- * PHIÊN BẢN    : 2.2 (Sửa lỗi cú pháp Unexpected token '<', Tra cứu nhanh Mã KH / SĐT / CCCD)
- * NGÀY CẬP NHẬT: 20/09/2026 20:00:00 (GMT+7)
- * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
+ * FILE        : Mod_TraCuu.gs
+ * PHIÊN BẢN   : 3.0 (High-Performance Engine: In-Memory Multi-Field Search 360°)
+ * NGÀY TẠO    : 20/09/2026 16:30:00 (GMT+7)
+ * NGÀY CẬP NHẬT: 24/10/2026 19:55:00 (GMT+7)
+ * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
+ * MÔ TẢ       : Tra cứu hồ sơ thuê bao 360° siêu tốc theo Mã KH, Số điện thoại hoặc Serial ONT
  * ============================================================================
  */
 
 function showCustomerLookupDialog() {
-  const html = HtmlService.createHtmlOutput(getCustomerLookupHtml())
-    .setWidth(620)
-    .setHeight(540)
-    .setTitle('Tra cứu thông tin thuê bao MobiFiber');
-  SpreadsheetApp.getUi().showModalDialog(html, 'Tra cứu thuê bao');
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <base target="_top">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 18px; margin: 0; font-size: 13px; color: #202124; background: #fff; }
+        .search-box { display: flex; gap: 8px; margin-bottom: 14px; }
+        input[type="text"] { flex: 1; padding: 9px 12px; border: 1px solid #dadce0; border-radius: 6px; font-size: 14px; outline: none; }
+        input[type="text"]:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+        button { padding: 8px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; border: none; font-size: 13px; }
+        .btn-search { background: #1a73e8; color: #fff; }
+        .btn-search:disabled { background: #dadce0; cursor: not-allowed; }
+        .hint { font-size: 11px; color: #70757a; margin-top: -8px; margin-bottom: 12px; }
+        #resultContainer { max-height: 420px; overflow-y: auto; display: none; }
+        .card { border: 1px solid #dadce0; border-radius: 8px; padding: 14px; margin-bottom: 12px; background: #fafafa; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e8eaed; padding-bottom: 8px; margin-bottom: 10px; }
+        .cust-name { font-weight: bold; font-size: 15px; color: #1a73e8; }
+        .badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; }
+        .badge-active { background: #e6f4ea; color: #137333; }
+        .badge-inactive { background: #fce8e6; color: #c5221f; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; }
+        .info-item span:first-child { color: #5f6368; display: inline-block; width: 110px; }
+        .info-item span:last-child { font-weight: 600; color: #202124; }
+        .empty-msg { text-align: center; color: #70757a; padding: 20px; font-style: italic; }
+      </style>
+    </head>
+    <body>
+      <div class="search-box">
+        <input type="text" id="queryInput" placeholder="Nhập Mã KH, Số điện thoại hoặc Serial ONT..." onkeydown="handleKey(event)">
+        <button class="btn-search" id="btnSearch" onclick="doSearch()">Tra cứu</button>
+      </div>
+      <div class="hint">⚡ Tìm kiếm nhanh không phân biệt chữ hoa, chữ thường hoặc khoảng trắng thừa.</div>
+
+      <div id="loading" style="display:none; text-align:center; padding: 20px; color: #1a73e8; font-weight:600;">
+        ⏳ Đang quét cơ sở dữ liệu...
+      </div>
+
+      <div id="resultContainer"></div>
+
+      <script>
+        function handleKey(e) {
+          if (e.key === 'Enter') doSearch();
+        }
+
+        function doSearch() {
+          const q = document.getElementById('queryInput').value.trim();
+          if (!q) {
+            alert('Vui lòng nhập từ khóa cần tra cứu!');
+            return;
+          }
+
+          document.getElementById('btnSearch').disabled = true;
+          document.getElementById('loading').style.display = 'block';
+          document.getElementById('resultContainer').style.display = 'none';
+
+          google.script.run
+            .withSuccessHandler(function(results) {
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('btnSearch').disabled = false;
+              renderResults(results);
+            })
+            .withFailureHandler(function(err) {
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('btnSearch').disabled = false;
+              alert('Lỗi tra cứu: ' + err.message);
+            })
+            .searchSubscriber360(q);
+        }
+
+        function renderResults(list) {
+          const box = document.getElementById('resultContainer');
+          box.innerHTML = '';
+          box.style.display = 'block';
+
+          if (!list || list.length === 0) {
+            box.innerHTML = '<div class="empty-msg">❌ Không tìm thấy thuê bao nào khớp với từ khóa đã nhập.</div>';
+            return;
+          }
+
+          list.forEach(item => {
+            const isActive = !item.tinhTrangHD.toLowerCase().includes('hủy') && !item.tinhTrangHD.toLowerCase().includes('huy');
+            const badgeClass = isActive ? 'badge-active' : 'badge-inactive';
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = \`
+              <div class="card-header">
+                <span class="cust-name">\${item.tenTB || 'Chưa có tên'}</span>
+                <span class="badge \${badgeClass}">\${item.tinhTrangHD || 'Chưa rõ'}</span>
+              </div>
+              <div class="info-grid">
+                <div class="info-item"><span>Mã KH:</span> <span>\${item.maKH}</span></div>
+                <div class="info-item"><span>Số điện thoại:</span> <span>\${item.sdt || '---'}</span></div>
+                <div class="info-item"><span>Gói cước:</span> <span>\${item.goiCuoc || '---'}</span></div>
+                <div class="info-item"><span>Giá cước:</span> <span>\${Number(item.giaCuoc || 0).toLocaleString('vi-VN')} đ</span></div>
+                <div class="info-item"><span>Chu kỳ:</span> <span>\${item.chuKy || 1} tháng</span></div>
+                <div class="info-item"><span>DTPK:</span> <span>\${Number(item.dtpk || 0).toLocaleString('vi-VN')} đ</span></div>
+                <div class="info-item"><span>Bắt đầu gói:</span> <span>\${item.ngayBatDau || '---'}</span></div>
+                <div class="info-item"><span>Hết hạn gói:</span> <span>\${item.ngayKetThuc || '---'}</span></div>
+                <div class="info-item"><span>Tình trạng chặn:</span> <span>\${item.tinhTrangChan || 'Bình thường'}</span></div>
+                <div class="info-item"><span>Serial ONT:</span> <span>\${item.serial || '---'}</span></div>
+                <div class="info-item" style="grid-column: 1 / -1;"><span>Địa chỉ:</span> <span>\${item.diaChi || '---'}</span></div>
+                <div class="info-item" style="grid-column: 1 / -1;"><span>Phụ trách:</span> <span>\${item.tenNV || '---'} (\${item.tenCH || '---'})</span></div>
+              </div>
+            \`;
+            box.appendChild(card);
+          });
+        }
+      </script>
+    </body>
+    </html>
+  `;
+  const ui = HtmlService.createHtmlOutput(html).setWidth(600).setHeight(520);
+  SpreadsheetApp.getUi().showModalDialog(ui, '🔍 Tra cứu thông tin thuê bao 360°');
 }
 
-function searchCustomerRecord(keyword) {
+/**
+ * THUẬT TOÁN TÌM KIẾM SIÊU TỐC TRÊN RAM THEO ĐA TRƯỜNG
+ */
+function searchSubscriber360(keyword) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
-  if (!rawSheet) return { status: 'error', message: 'Không tìm thấy sheet raw_mobifiber!' };
+  if (!rawSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
 
   const lastRow = rawSheet.getLastRow();
   const lastCol = rawSheet.getLastColumn();
-  if (lastRow < CONFIG.DATA_START_ROW_TARGET) return { status: 'empty' };
+  if (lastRow < CONFIG.DATA_START_ROW_TARGET) return [];
 
-  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol)
-    .getValues()[0].map(h => normalizeHeader(h));
+  // Chuẩn hóa từ khóa tìm kiếm
+  const qClean = String(keyword || '').replace(/[\s\uFEFF\xA0]+/g, '').toLowerCase();
+  const qDigits = qClean.replace(/[^0-9]/g, '');
 
+  // Đọc dữ liệu vào RAM
+  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
   const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
-  const idxSDT  = headers.findIndex(h => h === 'sđt liên hệ');
-  const idxCCCD = headers.findIndex(h => h === 'số cmnd/cccd');
+  const idxTenTB = headers.findIndex(h => h === 'tên thuê bao');
+  const idxSDT = headers.findIndex(h => h === 'sđt liên hệ');
+  const idxDiaChi = headers.findIndex(h => h === 'địa chỉ lắp đặt');
+  const idxGoiCuoc = headers.findIndex(h => h === 'gói cước');
+  const idxGiaCuoc = headers.findIndex(h => h === 'giá cước');
+  const idxChuKy = headers.findIndex(h => h === 'chu kỳ sử dụng');
+  const idxDtpk = headers.findIndex(h => h === 'dtpk');
+  const idxNgayBatDau = headers.findIndex(h => h === 'ngày băt đầu gói cước' || h === 'ngày bắt đầu gói cước');
+  const idxNgayKetThuc = headers.findIndex(h => h === 'ngày kết thúc gói cước');
+  const idxTinhTrangHD = headers.findIndex(h => h === 'tình trạng hợp đồng');
+  const idxChanCat = headers.findIndex(h => h === 'tình trạng chặn cắt');
+  const idxSerial = headers.findIndex(h => h === 'serial ont');
+  const idxTenCH = headers.findIndex(h => h === 'tên cửa hàng');
+  const idxTenNV = headers.findIndex(h => h === 'tên nhân viên');
 
   const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
-  const cleanKw = String(keyword || '').trim().toLowerCase().replace(/^0+/, '');
+  const matched = [];
 
   for (let i = 0; i < rawData.length; i++) {
     const row = rawData[i];
-    const maKH = normalizeCustomerId(row[idxMaKH]);
-    const sdt  = String(row[idxSDT] || '').replace(/^0+/, '').trim();
-    const cccd = String(row[idxCCCD] || '').replace(/^0+/, '').trim();
 
-    if (maKH === cleanKw || sdt === cleanKw || cccd === cleanKw) {
-      const record = {};
-      headers.forEach((h, colIdx) => {
-        let val = row[colIdx];
-        if (val instanceof Date) {
-          val = Utilities.formatDate(val, 'Asia/Saigon', 'dd/MM/yyyy HH:mm:ss');
-        }
-        record[h] = val;
+    let maKHRaw = String(row[idxMaKH] || '').replace(/[\s\uFEFF\xA0]+/g, '').replace(/^'+/, '');
+    if (/^\d{8}$/.test(maKHRaw)) maKHRaw = '00' + maKHRaw;
+
+    const sdtRaw = String(row[idxSDT] || '').replace(/[^0-9]/g, '');
+    const serialRaw = String(row[idxSerial] || '').replace(/[\s\uFEFF\xA0]+/g, '').toLowerCase();
+
+    // Khớp 1 trong 3 tiêu chí: Mã KH, Số điện thoại hoặc Serial ONT
+    const matchMaKH = qDigits && maKHRaw.includes(qDigits);
+    const matchSDT = qDigits && sdtRaw.includes(qDigits);
+    const matchSerial = qClean && serialRaw.includes(qClean);
+
+    if (matchMaKH || matchSDT || matchSerial) {
+      const dBatDau = parseToDate(row[idxNgayBatDau]);
+      const dKetThuc = parseToDate(row[idxNgayKetThuc]);
+      const giaCuoc = parseCurrency(row[idxGiaCuoc]);
+      const chuKy = parseInt(row[idxChuKy], 10) || 1;
+      let dtpk = parseCurrency(row[idxDtpk]);
+      if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
+
+      matched.push({
+        maKH: maKHRaw,
+        tenTB: row[idxTenTB],
+        sdt: row[idxSDT],
+        diaChi: row[idxDiaChi],
+        goiCuoc: row[idxGoiCuoc],
+        giaCuoc: giaCuoc,
+        chuKy: chuKy,
+        dtpk: dtpk,
+        ngayBatDau: dBatDau ? Utilities.formatDate(dBatDau, 'Asia/Saigon', 'dd/MM/yyyy') : '',
+        ngayKetThuc: dKetThuc ? Utilities.formatDate(dKetThuc, 'Asia/Saigon', 'dd/MM/yyyy') : '',
+        tinhTrangHD: String(row[idxTinhTrangHD] || 'Đang hoạt động'),
+        tinhTrangChan: String(row[idxChanCat] || 'Bình thường'),
+        serial: row[idxSerial],
+        tenCH: row[idxTenCH],
+        tenNV: row[idxTenNV]
       });
-      return { status: 'found', data: record, rowNumber: CONFIG.DATA_START_ROW_TARGET + i };
+
+      // Giới hạn hiển thị 20 kết quả gần nhất để giao diện tải nhanh
+      if (matched.length >= 20) break;
     }
   }
-  return { status: 'not_found' };
-}
 
-function getCustomerLookupHtml() {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <base target="_top">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 14px; margin: 0; background: #f8f9fa; color: #202124; font-size: 13px; }
-    .search-box { display: flex; gap: 8px; margin-bottom: 12px; }
-    input { flex: 1; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; font-size: 13px; outline: none; }
-    input:focus { border-color: #1a73e8; }
-    button { background: #1a73e8; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-    button:hover { background: #1557b0; }
-    .card { background: white; border: 1px solid #dadce0; border-radius: 8px; padding: 14px; margin-top: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .row { display: flex; margin-bottom: 8px; font-size: 12px; }
-    .label { width: 140px; font-weight: 600; color: #5f6368; }
-    .value { flex: 1; font-weight: 500; color: #202124; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
-    .badge-success { background: #e6f4ea; color: #137333; }
-    .badge-danger { background: #fce8e6; color: #c5221f; }
-  </style>
-</head>
-<body>
-  <div class="search-box">
-    <input type="text" id="keyword" placeholder="Nhập Mã khách hàng, SĐT hoặc số CCCD..." onkeydown="if(event.key==='Enter') doSearch()">
-    <button type="button" onclick="doSearch()">Tìm kiếm</button>
-  </div>
-  <div id="result"></div>
-
-  <script>
-    window.onload = function() {
-      const inp = document.getElementById('keyword');
-      if (inp) inp.focus();
-    };
-
-    function doSearch() {
-      const kw = document.getElementById('keyword').value.trim();
-      if (!kw) return;
-      document.getElementById('result').innerHTML = '<div style="text-align:center; padding:20px; color:#666;">⏳ Đang tra cứu dữ liệu...</div>';
-
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (res.status === 'not_found' || res.status === 'empty') {
-            document.getElementById('result').innerHTML = '<div style="text-align:center; padding:20px; color:#c5221f;">❌ Không tìm thấy thông tin thuê bao khớp với từ khóa!</div>';
-            return;
-          }
-          const d = res.data;
-          const statusVal = String(d['tình trạng hợp đồng'] || '').toLowerCase();
-          const statusBadge = (statusVal.includes('hủy') || statusVal.includes('huy')) ? 
-            '<span class="badge badge-danger">Đã hủy</span>' : '<span class="badge badge-success">Đang hoạt động</span>';
-
-          const giaCuocFormatted = Number(d['giá cước'] || 0).toLocaleString('vi-VN');
-
-          document.getElementById('result').innerHTML = 
-            '<div class="card">' +
-              '<div style="font-size:15px; font-weight:bold; color:#1a73e8; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:6px;">' +
-                '👤 ' + (d['tên thuê bao'] || 'Chưa có tên') + ' ' + statusBadge +
-              '</div>' +
-              '<div class="row"><div class="label">Mã khách hàng:</div><div class="value" style="color:#c5221f; font-weight:bold;">' + (d['mã khách hàng'] || '') + '</div></div>' +
-              '<div class="row"><div class="label">Số điện thoại:</div><div class="value">' + (d['sđt liên hệ'] || '') + '</div></div>' +
-              '<div class="row"><div class="label">Địa chỉ lắp đặt:</div><div class="value">' + (d['địa chỉ lắp đặt'] || '') + '</div></div>' +
-              '<div class="row"><div class="label">Gói cước / Giá:</div><div class="value">' + (d['gói cước'] || '') + ' (Chu kỳ ' + (d['chu kỳ sử dụng'] || '') + 'T) - ' + giaCuocFormatted + ' đ</div></div>' +
-              '<div class="row"><div class="label">Hạn gói cước:</div><div class="value" style="color:#d93025; font-weight:bold;">' + (d['ngày kết thúc gói cước'] || '') + '</div></div>' +
-              '<div class="row"><div class="label">Tình trạng chặn cắt:</div><div class="value">' + (d['tình trạng chặn cắt'] || 'Bình thường') + '</div></div>' +
-              '<div class="row"><div class="label">Thiết bị ONT:</div><div class="value">' + (d['loại thiết bị ont'] || '') + ' (Serial: ' + (d['serial ont'] || 'Chưa có') + ')</div></div>' +
-              '<div class="row"><div class="label">Đơn vị quản lý:</div><div class="value">' + (d['tên cửa hàng'] || '') + ' - ' + (d['tên nhân viên'] || '') + '</div></div>' +
-            '</div>';
-        })
-        .withFailureHandler(function(err) {
-          document.getElementById('result').innerHTML = '<div style="text-align:center; padding:20px; color:#c5221f;">❌ Lỗi tra cứu: ' + err.message + '</div>';
-        })
-        .searchCustomerRecord(kw);
-    }
-  </script>
-</body>
-</html>`;
+  return matched;
 }
