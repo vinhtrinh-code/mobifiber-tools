@@ -1,251 +1,176 @@
 /**
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
- * MODULE       : QUẢN LÝ THAM SỐ CÀI ĐẶT & CHUẨN HÓA DANH MỤC
- * PHIÊN BẢN    : 1.0 (Tự động khởi tạo 4 Bảng tham số, quét Master Data thực tế)
- * NGÀY CẬP NHẬT: 20/09/2026 23:00:00 (GMT+7)
- * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
- * MÔ TẢ        : 
- *   - Bảng 1 (A-B): Chuẩn hóa Loại khách hàng
- *   - Bảng 2 (D-E): Chuẩn hóa Mô hình triển khai
- *   - Bảng 3 (G-H): Chuẩn hóa Tên cửa hàng
- *   - Bảng 4 (J-M): Phân bổ Khu vực, Mã CH, Mã NV, Tên NV phục vụ thống kê Cụm
+ * FILE        : Mod_ThamSo.gs
+ * PHIÊN BẢN   : 3.0 (Master Data Engine: Fast Init, Matrix Layout & O(1) Cache)
+ * NGÀY TẠO    : 18/09/2026 14:00:00 (GMT+7)
+ * NGÀY CẬP NHẬT: 24/10/2026 20:10:00 (GMT+7)
+ * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
+ * MÔ TẢ       : Quản trị, khởi tạo và đồng bộ bảng danh mục tham số chuẩn hóa (thamso_caidat)
  * ============================================================================
  */
 
-const THAMSO_CONFIG = {
-  SHEET_NAME: 'thamso_caidat'
-};
+const THAMSO_SHEET_NAME = 'thamso_caidat';
 
 /**
- * Khởi tạo hoặc cập nhật các giá trị mới từ raw_mobifiber vào sheet thamso_caidat
+ * KHỞI TẠO HOẶC CẤU TRÚC LẠI SHEET THAM SỐ CHUẨN HÓA SIÊU TỐC
  */
 function initThamSoCaiDat() {
+  const startTime = new Date().getTime();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
   const ui = SpreadsheetApp.getUi();
+  let tsSheet = ss.getSheetByName(THAMSO_SHEET_NAME);
 
-  if (!rawSheet) {
-    ui.alert(`❌ Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
-    return;
+  if (!tsSheet) {
+    tsSheet = ss.insertSheet(THAMSO_SHEET_NAME);
   }
 
-  let tsSheet = ss.getSheetByName(THAMSO_CONFIG.SHEET_NAME);
-  const isNew = !tsSheet;
+  // 1. THIẾT LẬP KHỐI BANNER CHÍNH
+  const bannerMatrix = [
+    ['BẢNG THAM SỐ CHUẨN HÓA HỆ THỐNG MOBIFIBER', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Cập nhật tự động khi phát sinh tham số mới từ file nguồn. Phân bổ khu vực theo Mã nhân viên.', '', '', '', '', '', '', '', '', '', '', '', '']
+  ];
+  tsSheet.getRange(1, 1, 2, 13).setValues(bannerMatrix);
+  tsSheet.getRange('A1:M1').merge().setBackground('#1a73e8').setFontColor('#ffffff').setFontWeight('bold').setFontSize(13).setHorizontalAlignment('center');
+  tsSheet.getRange('A2:M2').merge().setBackground('#e8f0fe').setFontColor('#174ea6').setFontStyle('italic').setHorizontalAlignment('center');
 
-  if (isNew) {
-    tsSheet = ss.insertSheet(THAMSO_CONFIG.SHEET_NAME);
-  }
+  // 2. KHỞI TẠO TIÊU ĐỀ 4 BẢNG DANH MỤC (HÀNG 3)
+  const headerRow3 = [
+    'LOẠI KHÁCH HÀNG', 'MÃ PHÂN LOẠI', '', 
+    'MÔ HÌNH TRIỂN KHAI', 'MÃ MÔ HÌNH', '', 
+    'MÃ CỬA HÀNG', 'TÊN CỬA HÀNG', '', 
+    'KHU VỰC PHÂN BỔ', 'MÃ CỬA HÀNG', 'MÃ NHÂN VIÊN', 'TÊN NHÂN VIÊN'
+  ];
+  tsSheet.getRange(3, 1, 1, 13).setValues([headerRow3]);
 
-  // 1. Quét dữ liệu thực tế từ raw_mobifiber
-  const lastRawRow = rawSheet.getLastRow();
-  const lastRawCol = rawSheet.getLastColumn();
-  if (lastRawRow < CONFIG.DATA_START_ROW_TARGET) {
-    ui.alert('ℹ️ Sheet raw_mobifiber chưa có dữ liệu để quét tham số.');
-    return;
-  }
+  // Định dạng tiêu đề từng bảng màu sắc trực quan
+  tsSheet.getRange('A3:B3').setBackground('#34a853').setFontColor('#ffffff').setFontWeight('bold').setHorizontalAlignment('center');
+  tsSheet.getRange('D3:E3').setBackground('#fbbc04').setFontColor('#202124').setFontWeight('bold').setHorizontalAlignment('center');
+  tsSheet.getRange('G3:H3').setBackground('#ea4335').setFontColor('#ffffff').setFontWeight('bold').setHorizontalAlignment('center');
+  tsSheet.getRange('J3:M3').setBackground('#00558f').setFontColor('#ffffff').setFontWeight('bold').setHorizontalAlignment('center');
 
-  const rawHeaders = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastRawCol)
-    .getValues()[0].map(h => normalizeHeader(h));
+  // Cố định hàng tiêu đề
+  tsSheet.setFrozenRows(3);
 
-  const idxLoaiKH   = rawHeaders.findIndex(h => h === 'loại khách hàng');
-  const idxMoHinh   = rawHeaders.findIndex(h => h === 'loại mô hình triển khai');
-  const idxTenCH    = rawHeaders.findIndex(h => h === 'tên cửa hàng');
-  const idxMaCH     = rawHeaders.findIndex(h => h === 'mã cửa hàng');
-  const idxMaNV     = rawHeaders.findIndex(h => h === 'mã nhân viên');
-  const idxTenNV    = rawHeaders.findIndex(h => h === 'tên nhân viên');
+  // 3. TỰ ĐỘNG QUÉT VÀ NẠP DANH MỤC TỪ RAW_MOBIFIBER NẾU CHƯA CÓ DỮ LIỆU
+  const lastRow = tsSheet.getLastRow();
+  let autoSyncCount = 0;
 
-  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRawRow - CONFIG.DATA_START_ROW_TARGET + 1, lastRawCol).getValues();
+  if (lastRow <= 3) {
+    const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
+    if (rawSheet && rawSheet.getLastRow() >= CONFIG.DATA_START_ROW_TARGET) {
+      const rawLastRow = rawSheet.getLastRow();
+      const rawLastCol = rawSheet.getLastColumn();
+      const rHeaders = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, rawLastCol).getValues()[0].map(h => normalizeHeader(h));
+      
+      const idxLoaiKH = rHeaders.findIndex(h => h === 'loại khách hàng');
+      const idxMoHinh = rHeaders.findIndex(h => h === 'loại mô hình triển khai');
+      const idxMaCH = rHeaders.findIndex(h => h === 'mã cửa hàng');
+      const idxTenCH = rHeaders.findIndex(h => h === 'tên cửa hàng');
+      const idxMaNV = rHeaders.findIndex(h => h === 'mã nhân viên');
+      const idxTenNV = rHeaders.findIndex(h => h === 'tên nhân viên');
 
-  // Tập hợp các giá trị duy nhất
-  const uniqueCustTypes = new Set();
-  const uniqueModels = new Set();
-  const uniqueStores = new Set();
-  const staffStoreMap = new Map(); // Key: "MaCH|MaNV" -> { maCH, maNV, tenNV }
+      const rawRows = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, rawLastRow - CONFIG.DATA_START_ROW_TARGET + 1, rawLastCol).getValues();
 
-  for (let i = 0; i < rawData.length; i++) {
-    const row = rawData[i];
-    if (idxLoaiKH !== -1 && row[idxLoaiKH]) uniqueCustTypes.add(String(row[idxLoaiKH]).trim());
-    if (idxMoHinh !== -1 && row[idxMoHinh]) uniqueModels.add(String(row[idxMoHinh]).trim());
-    if (idxTenCH !== -1 && row[idxTenCH]) uniqueStores.add(String(row[idxTenCH]).trim());
+      const loaiKhSet = new Set();
+      const moHinhSet = new Set();
+      const storeMap = new Map();
+      const staffMap = new Map();
 
-    if (idxMaNV !== -1 && row[idxMaNV]) {
-      const maNV = String(row[idxMaNV]).trim();
-      const maCH = idxMaCH !== -1 ? String(row[idxMaCH] || '').trim() : '';
-      const tenNV = idxTenNV !== -1 ? String(row[idxTenNV] || '').trim() : '';
-      const key = `${maCH}|${maNV}`;
-      if (!staffStoreMap.has(key)) {
-        staffStoreMap.set(key, { maCH, maNV, tenNV });
-      }
+      rawRows.forEach(r => {
+        if (idxLoaiKH !== -1 && r[idxLoaiKH]) loaiKhSet.add(String(r[idxLoaiKH]).trim());
+        if (idxMoHinh !== -1 && r[idxMoHinh]) moHinhSet.add(String(r[idxMoHinh]).trim());
+        if (idxMaCH !== -1 && idxTenCH !== -1 && r[idxMaCH]) {
+          storeMap.set(String(r[idxMaCH]).trim(), String(r[idxTenCH] || '').trim());
+        }
+        if (idxMaNV !== -1 && r[idxMaNV]) {
+          const mNv = String(r[idxMaNV]).trim();
+          const tNv = idxTenNV !== -1 ? String(r[idxTenNV] || '').trim() : '';
+          const mCh = idxMaCH !== -1 ? String(r[idxMaCH] || '').trim() : '';
+          staffMap.set(mNv, { tenNV: tNv, maCH: mCh });
+        }
+      });
+
+      // Ghi Loại KH ban đầu
+      const arrLoaiKH = Array.from(loaiKhSet).map(k => [k, '']);
+      if (arrLoaiKH.length > 0) tsSheet.getRange(4, 1, arrLoaiKH.length, 2).setValues(arrLoaiKH);
+
+      // Ghi Mô hình ban đầu
+      const arrMoHinh = Array.from(moHinhSet).map(m => [m, '']);
+      if (arrMoHinh.length > 0) tsSheet.getRange(4, 4, arrMoHinh.length, 2).setValues(arrMoHinh);
+
+      // Ghi Cửa hàng ban đầu
+      const arrStore = Array.from(storeMap.entries()).map(([k, v]) => [k, v]);
+      if (arrStore.length > 0) tsSheet.getRange(4, 7, arrStore.length, 2).setValues(arrStore);
+
+      // Ghi Nhân sự & Địa bàn ban đầu (Mặc định gắn Chưa phân bổ)
+      const arrStaff = Array.from(staffMap.entries()).map(([mNv, info]) => ['Chưa phân bổ KV', info.maCH, mNv, info.tenNV]);
+      if (arrStaff.length > 0) tsSheet.getRange(4, 10, arrStaff.length, 4).setValues(arrStaff);
+
+      autoSyncCount = arrStaff.length;
     }
   }
 
-  // 2. Thiết lập cấu trúc giao diện cho sheet thamso_caidat (nếu mới tạo)
-  if (isNew) {
-    // Dòng 1: Tiêu đề tổng quát
-    tsSheet.getRange('A1:M1').merge()
-      .setValue('HỆ THỐNG THAM SỐ CÀI ĐẶT & CHUẨN HÓA DỮ LIỆU MOBIFIBER')
-      .setFontWeight('bold').setFontSize(13).setBackground('#1B365D').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+  // 4. ĐỊNH DẠNG ĐỘ RỘNG CÁC CỘT HỢP LÝ
+  tsSheet.setColumnWidth(1, 160);
+  tsSheet.setColumnWidth(2, 110);
+  tsSheet.setColumnWidth(3, 25);  // Cột đệm
+  tsSheet.setColumnWidth(4, 160);
+  tsSheet.setColumnWidth(5, 110);
+  tsSheet.setColumnWidth(6, 25);  // Cột đệm
+  tsSheet.setColumnWidth(7, 100);
+  tsSheet.setColumnWidth(8, 160);
+  tsSheet.setColumnWidth(9, 25);  // Cột đệm
+  tsSheet.setColumnWidth(10, 140);
+  tsSheet.setColumnWidth(11, 100);
+  tsSheet.setColumnWidth(12, 110);
+  tsSheet.setColumnWidth(13, 160);
 
-    // Dòng 2: Tiêu đề 4 khối Bảng
-    tsSheet.getRange('A2:B2').merge().setValue('BẢNG 1: LOẠI KHÁCH HÀNG').setFontWeight('bold').setBackground('#D2E3FC').setFontColor('#174EA6').setHorizontalAlignment('center');
-    tsSheet.getRange('D2:E2').merge().setValue('BẢNG 2: MÔ HÌNH TRIỂN KHAI').setFontWeight('bold').setBackground('#D2E3FC').setFontColor('#174EA6').setHorizontalAlignment('center');
-    tsSheet.getRange('G2:H2').merge().setValue('BẢNG 3: TÊN CỬA HÀNG').setFontWeight('bold').setBackground('#D2E3FC').setFontColor('#174EA6').setHorizontalAlignment('center');
-    tsSheet.getRange('J2:M2').merge().setValue('BẢNG 4: PHÂN BỔ KHU VỰC & NHÂN SỰ').setFontWeight('bold').setBackground('#FCE8E6').setFontColor('#C5221F').setHorizontalAlignment('center');
-
-    // Dòng 3: Tiêu đề chi tiết các cột
-    const colHeaders = [
-      'LOẠI KHÁCH HÀNG (GỐC)', 'TÊN RÚT GỌN', '', 
-      'MÔ HÌNH TRIỂN KHAI (GỐC)', 'TÊN RÚT GỌN', '', 
-      'TÊN CỬA HÀNG (GỐC)', 'TÊN RÚT GỌN', '', 
-      'KHU VỰC', 'MÃ CỬA HÀNG', 'MÃ NHÂN VIÊN', 'TÊN NHÂN VIÊN'
-    ];
-    tsSheet.getRange(3, 1, 1, 13).setValues([colHeaders]).setFontWeight('bold').setFontColor('#FFFFFF').setHorizontalAlignment('center');
-
-    tsSheet.getRange('A3:B3').setBackground('#1B365D');
-    tsSheet.getRange('D3:E3').setBackground('#00558F');
-    tsSheet.getRange('G3:H3').setBackground('#007A78');
-    tsSheet.getRange('J3:M3').setBackground('#8A1C14');
-    tsSheet.setFrozenRows(3);
-
-    // Điền dữ liệu gợi ý Bảng 1: Loại khách hàng
-    const arrCust = Array.from(uniqueCustTypes).sort().map(item => [item, suggestShortCustType(item)]);
-    if (arrCust.length > 0) tsSheet.getRange(4, 1, arrCust.length, 2).setValues(arrCust);
-
-    // Điền dữ liệu gợi ý Bảng 2: Mô hình triển khai
-    const arrModel = Array.from(uniqueModels).sort().map(item => [item, suggestShortModel(item)]);
-    if (arrModel.length > 0) tsSheet.getRange(4, 4, arrModel.length, 2).setValues(arrModel);
-
-    // Điền dữ liệu gợi ý Bảng 3: Cửa hàng
-    const arrStore = Array.from(uniqueStores).sort().map(item => [item, suggestShortStore(item)]);
-    if (arrStore.length > 0) tsSheet.getRange(4, 7, arrStore.length, 2).setValues(arrStore);
-
-    // Điền dữ liệu Bảng 4: Khu vực & Nhân viên
-    const arrStaff = Array.from(staffStoreMap.values()).sort((a,b) => a.maCH.localeCompare(b.maCH)).map(item => [
-      '', // Để trống cột Khu vực để người dùng tự nhập (KV1, KV2, KV3, KV4, KV5)
-      "'" + item.maCH,
-      "'" + item.maNV,
-      '  ' + item.tenNV
-    ]);
-    if (arrStaff.length > 0) {
-      tsSheet.getRange(4, 10, arrStaff.length, 4).setValues(arrStaff);
-      tsSheet.getRange(4, 10, arrStaff.length, 1).setHorizontalAlignment('center'); // Khu vực
-      tsSheet.getRange(4, 11, arrStaff.length, 2).setNumberFormat('@').setHorizontalAlignment('center'); // Mã CH, Mã NV
-      tsSheet.getRange(4, 13, arrStaff.length, 1).setHorizontalAlignment('left'); // Tên NV
-    }
-
-    // Độ rộng các cột ngăn cách
-    tsSheet.setColumnWidth(3, 25);
-    tsSheet.setColumnWidth(6, 25);
-    tsSheet.setColumnWidth(9, 25);
-
-    // Độ rộng các cột dữ liệu
-    tsSheet.setColumnWidth(1, 260); tsSheet.setColumnWidth(2, 160); // Bảng 1
-    tsSheet.setColumnWidth(4, 260); tsSheet.setColumnWidth(5, 160); // Bảng 2
-    tsSheet.setColumnWidth(7, 280); tsSheet.setColumnWidth(8, 160); // Bảng 3
-    tsSheet.setColumnWidth(10, 110); tsSheet.setColumnWidth(11, 120); tsSheet.setColumnWidth(12, 120); tsSheet.setColumnWidth(13, 160); // Bảng 4
-
-    ss.setActiveSheet(tsSheet);
-    ui.alert(
-      '🎉 KHỞI TẠO THAM SỐ CÀI ĐẶT HOÀN TẤT!\n\n' +
-      'Đã thiết lập đầy đủ 4 Bảng tham số tại sheet "thamso_caidat":\n' +
-      '  1. Loại khách hàng (A-B)\n' +
-      '  2. Mô hình triển khai (D-E)\n' +
-      '  3. Tên cửa hàng (G-H)\n' +
-      '  4. Phân bổ Khu vực & Nhân viên (J-M)\n\n' +
-      '👉 Bạn có thể tự do chỉnh sửa cột "TÊN RÚT GỌN" và điền tên 5 Khu vực vào cột J theo đúng quy chuẩn quản lý.'
-    );
-  } else {
-    // Nếu sheet đã có sẵn: chỉ quét bổ sung các giá trị mới chưa có trong danh mục
-    syncNewValuesToThamSo(tsSheet, uniqueCustTypes, uniqueModels, uniqueStores, staffStoreMap);
-    ss.setActiveSheet(tsSheet);
-    ui.alert('✅ Đã đồng bộ kiểm tra và cập nhật các tham số mới (nếu có) vào sheet "thamso_caidat"!');
-  }
+  const duration = ((new Date().getTime() - startTime) / 1000).toFixed(2);
+  Logger.log(`⚡ Khởi tạo cấu trúc tham số chuẩn hóa hoàn tất trong ${duration}s!`);
+  ss.setActiveSheet(tsSheet);
+  ui.alert(`✅ Đã khởi tạo hoàn tất Bảng tham số chuẩn hóa (Thời gian: ${duration}s)! Hãy bổ sung tên Khu vực ở Cột J.`);
 }
 
 /**
- * Tự động đồng bộ các giá trị mới phát sinh vào bảng tham số
+ * HÀM DÙNG CHUNG: ĐỌC NHANH BẢN ĐỒ THAM SỐ VÀO RAM CHO CÁC MODULE KHÁC
  */
-function syncNewValuesToThamSo(tsSheet, uniqueCustTypes, uniqueModels, uniqueStores, staffStoreMap) {
-  const lastRow = Math.max(tsSheet.getLastRow(), 4);
+function getThamSoMappingCached() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tsSheet = ss.getSheetByName(THAMSO_SHEET_NAME);
+  const result = {
+    staffRegion: new Map(), // maNV -> { khuVuc, maCH, tenNV }
+    stores: new Map()       // maCH -> tenCH
+  };
 
-  // 1. Quét Bảng 1
-  const existingCust = new Set(tsSheet.getRange(4, 1, lastRow - 3, 1).getValues().map(r => String(r[0]).trim()).filter(v => v));
-  const newCust = Array.from(uniqueCustTypes).filter(v => !existingCust.has(v)).map(v => [v, suggestShortCustType(v)]);
-  if (newCust.length > 0) {
-    const nextR = getNextEmptyRowInCol(tsSheet, 1);
-    tsSheet.getRange(nextR, 1, newCust.length, 2).setValues(newCust);
-  }
+  if (!tsSheet || tsSheet.getLastRow() < 4) return result;
 
-  // 2. Quét Bảng 2
-  const existingModel = new Set(tsSheet.getRange(4, 4, lastRow - 3, 1).getValues().map(r => String(r[0]).trim()).filter(v => v));
-  const newModel = Array.from(uniqueModels).filter(v => !existingModel.has(v)).map(v => [v, suggestShortModel(v)]);
-  if (newModel.length > 0) {
-    const nextR = getNextEmptyRowInCol(tsSheet, 4);
-    tsSheet.getRange(nextR, 4, newModel.length, 2).setValues(newModel);
-  }
+  const lastRow = tsSheet.getLastRow();
 
-  // 3. Quét Bảng 3
-  const existingStore = new Set(tsSheet.getRange(4, 7, lastRow - 3, 1).getValues().map(r => String(r[0]).trim()).filter(v => v));
-  const newStore = Array.from(uniqueStores).filter(v => !existingStore.has(v)).map(v => [v, suggestShortStore(v)]);
-  if (newStore.length > 0) {
-    const nextR = getNextEmptyRowInCol(tsSheet, 7);
-    tsSheet.getRange(nextR, 7, newStore.length, 2).setValues(newStore);
-  }
+  // Đọc danh mục Cửa hàng (Cột G:H)
+  const storeData = tsSheet.getRange(4, 7, lastRow - 3, 2).getValues();
+  storeData.forEach(r => {
+    const maCH = String(r[0] || '').trim();
+    const tenCH = String(r[1] || '').trim();
+    if (maCH) result.stores.set(normalizeHeader(maCH), tenCH);
+  });
 
-  // 4. Quét Bảng 4
-  const existingStaff = new Set(tsSheet.getRange(4, 12, lastRow - 3, 1).getValues().map(r => String(r[0]).trim()).filter(v => v));
-  const newStaff = Array.from(staffStoreMap.values()).filter(v => !existingStaff.has(v.maNV)).map(item => [
-    '', "'" + item.maCH, "'" + item.maNV, '  ' + item.tenNV
-  ]);
-  if (newStaff.length > 0) {
-    const nextR = getNextEmptyRowInCol(tsSheet, 11);
-    tsSheet.getRange(nextR, 10, newStaff.length, 4).setValues(newStaff);
-  }
-}
+  // Đọc phân bổ Nhân sự & Địa bàn (Cột J:M)
+  const staffData = tsSheet.getRange(4, 10, lastRow - 3, 4).getValues();
+  staffData.forEach(r => {
+    const khuVuc = String(r[0] || '').trim();
+    const maCH = String(r[1] || '').trim();
+    const maNV = normalizeHeader(String(r[2] || ''));
+    const tenNV = String(r[3] || '').trim();
 
-function getNextEmptyRowInCol(sheet, col) {
-  const vals = sheet.getRange(4, col, Math.max(sheet.getLastRow() - 3, 1), 1).getValues();
-  for (let i = vals.length - 1; i >= 0; i--) {
-    if (vals[i][0] !== '') return 4 + i + 1;
-  }
-  return 4;
-}
+    if (maNV) {
+      result.staffRegion.set(maNV, {
+        khuVuc: khuVuc || 'Chưa phân bổ KV',
+        maCH: maCH,
+        tenNV: tenNV
+      });
+    }
+  });
 
-// ==========================================
-// CÁC HÀM GỢI Ý TÊN RÚT GỌN TỰ ĐỘNG BAN ĐẦU
-// ==========================================
-function suggestShortCustType(raw) {
-  const n = normalizeHeader(raw);
-  if (n.includes('hành chính') || n.includes('vũ trang') || n.includes('bca')) return 'HCSN & LLVT';
-  if (n.includes('doanh nghiệp') || n.includes('tnhh')) return 'Doanh nghiệp';
-  if (n.includes('vnr500')) return 'Khách hàng VNR500';
-  if (n.includes('tư nhân')) return 'Cá nhân';
-  if (n.includes('nghiệp vụ')) return 'Thuê bao Nghiệp vụ';
-  return raw;
-}
-
-function suggestShortModel(raw) {
-  const n = normalizeHeader(raw);
-  if (n.includes('chi nhánh') || n.includes('cửa hàng')) return 'Nội bộ Chi nhánh';
-  if (n.includes('gpon')) return 'Trạm BTS GPON';
-  if (n.includes('aon')) return 'Trạm BTS AON';
-  if (n.includes('cooperation')) return 'Hợp tác toàn diện';
-  if (n.includes('mnv') || n.includes('hđtv')) return 'Nghiệp vụ Lãnh đạo';
-  if (n.includes('tư nhân')) return 'Hạ tầng cá nhân';
-  return raw;
-}
-
-function suggestShortStore(raw) {
-  const n = normalizeHeader(raw);
-  if (n.includes('chi nhánh tổng công ty') || n.includes('lâm đồng')) return 'MobiFone Lâm Đồng';
-  if (n.includes('tổ kd ldo') || n.includes('gia tăng')) return 'Tổ KD Lâm Đồng';
-  if (n.includes('đak mil')) return 'CH Đăk Mil';
-  if (n.includes('đak song')) return 'CH Đăk Song';
-  if (n.includes('krông nô')) return 'CH Krông Nô';
-  if (n.includes('cư jút')) return 'CH Cư Jút';
-  if (n.includes('gia nghĩa')) return 'Tổ KD Gia Nghĩa';
-  if (n.includes('phan thiết')) return 'CH Phan Thiết';
-  if (n.includes('bảo lộc')) return 'CH Bảo Lộc';
-  return raw;
+  return result;
 }
