@@ -1,93 +1,173 @@
 /**
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
- * MODULE       : BÁO CÁO HIỆU QUẢ BÁN HÀNG & DOANH THU THEO KÊNH
- * PHIÊN BẢN    : 2.1 (Tải Excel sạch, Tự động dọn rác, Phân tích Kênh / Nhu cầu)
- * NGÀY CẬP NHẬT: 20/09/2026 19:30:00 (GMT+7)
- * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
+ * FILE        : Mod_BaoCaoKenh.gs
+ * PHIÊN BẢN   : 3.0 (High-Performance Engine: Dual In-Memory Aggregation & Matrix Formatting)
+ * NGÀY TẠO    : 19/09/2026 14:00:00 (GMT+7)
+ * NGÀY CẬP NHẬT: 24/10/2026 19:40:00 (GMT+7)
+ * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
+ * MÔ TẢ       : Tổng hợp báo cáo hiệu quả bán hàng, doanh thu và cơ cấu nhu cầu theo Kênh/Cửa hàng
  * ============================================================================
  */
 
 function generateSalesReport() {
+  const startTime = new Date().getTime();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
   const ui = SpreadsheetApp.getUi();
-  if (!rawSheet) return;
+
+  if (!rawSheet) {
+    ui.alert(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
+    return;
+  }
 
   const lastRow = rawSheet.getLastRow();
   const lastCol = rawSheet.getLastColumn();
-  if (lastRow < CONFIG.DATA_START_ROW_TARGET) return;
+  if (lastRow < CONFIG.DATA_START_ROW_TARGET) {
+    ui.alert('Sheet raw_mobifiber chưa có dữ liệu thuê bao!');
+    return;
+  }
 
+  // 1. ĐỌC DỮ LIỆU VÀ HEADERS VÀO RAM (1 LẦN DUY NHẤT)
   const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
-  const idxTenCH   = headers.findIndex(h => h === 'tên cửa hàng');
-  const idxNhuCau  = headers.findIndex(h => h === 'nhu cầu hòa mạng');
-  const idxDtpk    = headers.findIndex(h => h === 'dtpk');
+  const idxGiaCuoc = headers.findIndex(h => h === 'giá cước');
+  const idxChuKy = headers.findIndex(h => h === 'chu kỳ sử dụng');
+  const idxDtpk = headers.findIndex(h => h === 'dtpk');
   const idxTinhTrangHD = headers.findIndex(h => h === 'tình trạng hợp đồng');
+  const idxTenCH = headers.findIndex(h => h === 'tên cửa hàng');
+  const idxMaCH = headers.findIndex(h => h === 'mã cửa hàng');
+  const idxNhuCau = headers.findIndex(h => h === 'nhu cầu hòa mạng');
 
   const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
-  const storeMap = {}, nhuCauMap = {};
-  let totalActiveTB = 0, totalDtpk = 0;
+
+  // 2. DUAL IN-MEMORY AGGREGATION
+  const channelMap = new Map(); // Key: Tên Cửa Hàng -> { maCH, count, revenue, dtpk }
+  const demandMap = new Map();  // Key: Nhu Cầu Hòa Mạng -> { count, dtpk }
+
+  let grandTotalSub = 0;
+  let grandTotalRev = 0;
+  let grandTotalDtpk = 0;
 
   for (let i = 0; i < rawData.length; i++) {
     const row = rawData[i];
-    const status = normalizeHeader(row[idxTinhTrangHD]);
-    if (status === 'đã hủy' || status === 'da huy') continue;
+    const statusHD = normalizeHeader(String(row[idxTinhTrangHD] || ''));
 
-    totalActiveTB++;
-    const dtpk = parseCurrencyToInteger(row[idxDtpk]) || 0;
-    totalDtpk += dtpk;
+    // Bỏ qua hợp đồng đã hủy hoặc thanh lý
+    if (statusHD.includes('hủy') || statusHD.includes('huy') || statusHD.includes('thanh lý') || statusHD.includes('chấm dứt')) {
+      continue;
+    }
 
-    const ch = String(row[idxTenCH] || 'Chưa phân loại').trim();
-    if (!storeMap[ch]) storeMap[ch] = { count: 0, dtpk: 0 };
-    storeMap[ch].count++; storeMap[ch].dtpk += dtpk;
+    const giaCuoc = parseCurrency(row[idxGiaCuoc]);
+    const chuKy = parseInt(row[idxChuKy], 10) || 1;
+    let dtpk = parseCurrency(row[idxDtpk]);
+    if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
 
-    const nc = String(row[idxNhuCau] || 'Khác').trim();
-    if (!nhuCauMap[nc]) nhuCauMap[nc] = { count: 0, dtpk: 0 };
-    nhuCauMap[nc].count++; nhuCauMap[nc].dtpk += dtpk;
+    grandTotalSub++;
+    grandTotalRev += giaCuoc;
+    grandTotalDtpk += dtpk;
+
+    // Gom nhóm theo Kênh / Cửa hàng
+    const tenCH = String(row[idxTenCH] || 'Chưa xác định kênh').trim();
+    const maCH = String(row[idxMaCH] || '').trim();
+
+    if (!channelMap.has(tenCH)) {
+      channelMap.set(tenCH, { maCH: maCH, count: 0, revenue: 0, dtpk: 0 });
+    }
+    const cStat = channelMap.get(tenCH);
+    cStat.count++;
+    cStat.revenue += giaCuoc;
+    cStat.dtpk += dtpk;
+
+    // Gom nhóm theo Nhu cầu hòa mạng
+    let nhuCau = String(row[idxNhuCau] || 'Khác').trim();
+    if (!nhuCau) nhuCau = 'Khác';
+
+    if (!demandMap.has(nhuCau)) {
+      demandMap.set(nhuCau, { count: 0, dtpk: 0 });
+    }
+    const dStat = demandMap.get(nhuCau);
+    dStat.count++;
+    dStat.dtpk += dtpk;
   }
 
-  let rSheet = ss.getSheetByName(CONFIG.REPORT_SHEET_NAME);
-  if (!rSheet) rSheet = ss.insertSheet(CONFIG.REPORT_SHEET_NAME);
-  else rSheet.clear();
-
-  const ssId = ss.getId();
-  const sheetId = rSheet.getSheetId();
-  const directExportUrl = `https://docs.google.com/spreadsheets/d/${ssId}/export?format=xlsx&gid=${sheetId}`;
-
-  rSheet.getRange('A1:J1').merge().setValue('BÁO CÁO TỔNG HỢP HIỆU QUẢ PHÁT TRIỂN & DOANH THU MOBIFIBER')
-    .setFontWeight('bold').setFontSize(13).setBackground('#1B365D').setFontColor('#FFFFFF').setHorizontalAlignment('center');
-  
-  rSheet.getRange('A2:H2').merge().setValue(`📊 Tổng thuê bao đang hoạt động: ${totalActiveTB} TB   |   💰 Tổng Doanh thu Phân kỳ (DTPK): ${totalDtpk.toLocaleString('vi-VN')} VNĐ`)
-    .setFontWeight('bold').setFontSize(11).setBackground('#D2E3FC').setFontColor('#174EA6').setHorizontalAlignment('center');
-
-  rSheet.getRange('I2:J2').merge()
-    .setFormula(`=HYPERLINK("${directExportUrl}"; "📥 TẢI FILE EXCEL")`)
-    .setFontWeight('bold').setFontSize(11).setBackground('#1A73E8').setFontColor('#FFFFFF')
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
-
-  rSheet.getRange('A4:D4').merge().setValue('1. HIỆU QUẢ THEO CỬA HÀNG / KÊNH BÁN').setFontWeight('bold').setBackground('#E8F0FE').setFontColor('#174EA6');
-  rSheet.getRange('A5:D5').setValues([['TÊN CỬA HÀNG', 'SỐ THUÊ BAO', 'DOANH THU (DTPK)', 'TỶ TRỌNG']]).setFontWeight('bold').setBackground('#1B365D').setFontColor('#FFFFFF');
-
-  const storeRows = Object.keys(storeMap).map(k => [k, storeMap[k].count, storeMap[k].dtpk, totalDtpk > 0 ? (storeMap[k].dtpk / totalDtpk) : 0]).sort((a, b) => b[1] - a[1]);
-  if (storeRows.length > 0) {
-    rSheet.getRange(6, 1, storeRows.length, 4).setValues(storeRows);
-    rSheet.getRange(6, 2, storeRows.length, 1).setHorizontalAlignment('center');
-    rSheet.getRange(6, 3, storeRows.length, 1).setNumberFormat('#,##0').setHorizontalAlignment('right');
-    rSheet.getRange(6, 4, storeRows.length, 1).setNumberFormat('0.0%').setHorizontalAlignment('right');
+  // 3. TẠO HOẶC XÓA SHEET BÁO CÁO
+  const targetReportName = CONFIG.REPORT_SHEET_NAME || 'baocao_banhang';
+  let rSheet = ss.getSheetByName(targetReportName);
+  if (rSheet) {
+    rSheet.clear();
+  } else {
+    rSheet = ss.insertSheet(targetReportName);
   }
 
-  rSheet.getRange('F4:I4').merge().setValue('2. CƠ CẤU PHÁT TRIỂN (NHU CẦU)').setFontWeight('bold').setBackground('#E8F0FE').setFontColor('#174EA6');
-  rSheet.getRange('F5:I5').setValues([['NHU CẦU HÒA MẠNG', 'SỐ THUÊ BAO', 'DOANH THU (DTPK)', 'TỶ TRỌNG']]).setFontWeight('bold').setBackground('#00558F').setFontColor('#FFFFFF');
+  const nowStr = Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm');
 
-  const nhuCauRows = Object.keys(nhuCauMap).map(k => [k, nhuCauMap[k].count, nhuCauMap[k].dtpk, totalDtpk > 0 ? (nhuCauMap[k].dtpk / totalDtpk) : 0]).sort((a, b) => b[1] - a[1]);
-  if (nhuCauRows.length > 0) {
-    rSheet.getRange(6, 6, nhuCauRows.length, 4).setValues(nhuCauRows);
-    rSheet.getRange(6, 7, nhuCauRows.length, 1).setHorizontalAlignment('center');
-    rSheet.getRange(6, 8, nhuCauRows.length, 1).setNumberFormat('#,##0').setHorizontalAlignment('right');
-    rSheet.getRange(6, 9, nhuCauRows.length, 1).setNumberFormat('0.0%').setHorizontalAlignment('right');
-  }
+  // Khối Tiêu đề chung & Card KPI
+  const banner = [
+    ['BÁO CÁO HIỆU QUẢ BÁN HÀNG & DOANH THU THEO KÊNH PHÂN PHỐI', '', '', '', '', '', '', '', ''],
+    [
+      `🎯 TỔNG THUÊ BAO: ${grandTotalSub.toLocaleString('vi-VN')} TB | DOANH THU: ${grandTotalRev.toLocaleString('vi-VN')} đ | DTPK: ${grandTotalDtpk.toLocaleString('vi-VN')} đ`,
+      '', '', '', '', '', '', `🕒 Lập lúc: ${nowStr}`, ''
+    ]
+  ];
+  rSheet.getRange(1, 1, 2, 9).setValues(banner);
+  rSheet.getRange('A1:I1').merge().setBackground('#1a73e8').setFontColor('#ffffff').setFontWeight('bold').setFontSize(13).setHorizontalAlignment('center');
+  rSheet.getRange('A2:G2').merge().setBackground('#e8f0fe').setFontColor('#174ea6').setFontWeight('bold');
+  rSheet.getRange('H2:I2').merge().setBackground('#e8f0fe').setFontColor('#5f6368').setHorizontalAlignment('right');
 
-  rSheet.autoResizeColumns(1, 10);
+  // 4. XÂY DỰNG BẢNG 1: HIỆU QUẢ THEO KÊNH (Cột A -> D)
+  const b1Header = ['KÊNH / CỬA HÀNG', 'SỐ THUÊ BAO', 'DOANH THU (DTPK)', 'TỶ TRỌNG (%)'];
+  const b1Data = [];
+
+  // Sắp xếp Kênh giảm dần theo DTPK
+  const sortedChannels = Array.from(channelMap.entries()).sort((a, b) => b[1].dtpk - a[1].dtpk);
+  sortedChannels.forEach(([name, val]) => {
+    const ratio = grandTotalDtpk > 0 ? (val.dtpk / grandTotalDtpk) : 0;
+    b1Data.push([name, val.count, val.dtpk, ratio]);
+  });
+  b1Data.push(['TỔNG CỘNG', grandTotalSub, grandTotalDtpk, grandTotalDtpk > 0 ? 1 : 0]);
+
+  rSheet.getRange(4, 1, 1, 4).setValues([b1Header]).setBackground('#34a853').setFontColor('#ffffff').setFontWeight('bold').setHorizontalAlignment('center');
+  rSheet.getRange(5, 1, b1Data.length, 4).setValues(b1Data);
+
+  // Format Bảng 1
+  rSheet.getRange(5, 2, b1Data.length, 1).setNumberFormat('#,##0').setHorizontalAlignment('center');
+  rSheet.getRange(5, 3, b1Data.length, 1).setNumberFormat('#,##0" đ"').setHorizontalAlignment('right');
+  rSheet.getRange(5, 4, b1Data.length, 1).setNumberFormat('0.00%').setHorizontalAlignment('right');
+  rSheet.getRange(4 + b1Data.length, 1, 1, 4).setBackground('#ea4335').setFontColor('#ffffff').setFontWeight('bold');
+
+  // 5. XÂY DỰNG BẢNG 2: CƠ CẤU NHU CẦU HÒA MẠNG (Cột F -> I)
+  const b2Header = ['NHU CẦU HÒA MẠNG', 'SỐ THUÊ BAO', 'DOANH THU (DTPK)', 'TỶ TRỌNG (%)'];
+  const b2Data = [];
+
+  // Sắp xếp Nhu cầu giảm dần theo Số lượng
+  const sortedDemands = Array.from(demandMap.entries()).sort((a, b) => b[1].count - a[1].count);
+  sortedDemands.forEach(([demand, val]) => {
+    const ratio = grandTotalDtpk > 0 ? (val.dtpk / grandTotalDtpk) : 0;
+    b2Data.push([demand, val.count, val.dtpk, ratio]);
+  });
+  b2Data.push(['TỔNG CỘNG', grandTotalSub, grandTotalDtpk, grandTotalDtpk > 0 ? 1 : 0]);
+
+  rSheet.getRange(4, 6, 1, 4).setValues([b2Header]).setBackground('#00558f').setFontColor('#ffffff').setFontWeight('bold').setHorizontalAlignment('center');
+  rSheet.getRange(5, 6, b2Data.length, 4).setValues(b2Data);
+
+  // Format Bảng 2
+  rSheet.getRange(5, 7, b2Data.length, 1).setNumberFormat('#,##0').setHorizontalAlignment('center');
+  rSheet.getRange(5, 8, b2Data.length, 1).setNumberFormat('#,##0" đ"').setHorizontalAlignment('right');
+  rSheet.getRange(5, 9, b2Data.length, 1).setNumberFormat('0.00%').setHorizontalAlignment('right');
+  rSheet.getRange(4 + b2Data.length, 6, 1, 4).setBackground('#ea4335').setFontColor('#ffffff').setFontWeight('bold');
+
+  // Căn chỉnh độ rộng các cột
+  rSheet.setColumnWidth(1, 190);
+  rSheet.setColumnWidth(2, 110);
+  rSheet.setColumnWidth(3, 140);
+  rSheet.setColumnWidth(4, 110);
+  rSheet.setColumnWidth(5, 40); // Cột đệm giữa 2 bảng
+  rSheet.setColumnWidth(6, 180);
+  rSheet.setColumnWidth(7, 110);
+  rSheet.setColumnWidth(8, 140);
+  rSheet.setColumnWidth(9, 110);
+
+  const duration = ((new Date().getTime() - startTime) / 1000).toFixed(2);
+  Logger.log(`⚡ Tạo Báo cáo Kênh hoàn tất trong ${duration}s!`);
   ss.setActiveSheet(rSheet);
-  ui.alert('✅ Báo cáo Bán hàng & Doanh thu theo Kênh đã được cập nhật thành công!');
 }
