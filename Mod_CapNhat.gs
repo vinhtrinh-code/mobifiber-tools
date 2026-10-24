@@ -1,7 +1,12 @@
 /**
  * ============================================================================
- * MODULE : CẬP NHẬT DỮ LIỆU & AUDIT LOGGING (HIGH-PERFORMANCE ENGINE)
- * PHIÊN BẢN : 3.0 (Tối ưu In-Memory Batching, Xử lý >10.000 thuê bao dưới 20s)
+ * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
+ * FILE        : Mod_CapNhat.gs
+ * PHIÊN BẢN   : 3.0 (Tối ưu In-Memory Batching, Xử lý >10.000 thuê bao dưới 20s)
+ * NGÀY TẠO    : 18/09/2026 00:14:00 (GMT+7)
+ * NGÀY CẬP NHẬT: 24/10/2026 19:15:00 (GMT+7)
+ * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
+ * MÔ TẢ       : Xử lý đối soát, cập nhật thuê bao và ghi nhật ký thay đổi (Audit Log / CDC)
  * ============================================================================
  */
 
@@ -73,7 +78,7 @@ function processDataUpdateOptimized(sourceRawData, headerRowIndex) {
   const newRowsToAppend = [];
   let updateCount = 0;
 
-  // 3. XỬ LÝ ĐỐI SOÁT SIÊU TỐC TRÊN RAM
+  // 3. XỬ LÝ ĐỐI SOÁT TRÊN RAM
   validSourceRows.forEach(srcRow => {
     const custId = normalizeCustomerId(srcRow[sourceKeyIdx]);
     const custName = sourceNameIdx !== -1 ? String(srcRow[sourceNameIdx] || '').trim() : '';
@@ -87,7 +92,7 @@ function processDataUpdateOptimized(sourceRawData, headerRowIndex) {
     }
 
     if (targetMap.has(custId)) {
-      // TRƯỜNG HỢP: KHÁCH HÀNG ĐÃ TỒN TẠI -> ĐỐI SOÁT & CẬP NHẬT TRÊN RAM
+      // KHÁCH HÀNG ĐÃ TỒN TẠI -> ĐỐI SOÁT & CẬP NHẬT TRÊN RAM
       const info = targetMap.get(custId);
       const currentRow = targetData[info.dataIndex];
       let hasRowChanged = false;
@@ -101,7 +106,6 @@ function processDataUpdateOptimized(sourceRawData, headerRowIndex) {
 
         if (isFieldChanged(normHeader, oldVal, newVal)) {
           hasRowChanged = true;
-          // Chỉ ghi log các trường trọng yếu (Critical)
           if (criticalSet.has(normHeader)) {
             pendingLogs.push([
               nowStr,
@@ -114,13 +118,13 @@ function processDataUpdateOptimized(sourceRawData, headerRowIndex) {
               String(newVal ?? '')
             ]);
           }
-          currentRow[m.targetIdx] = newVal; // Ghi đè trực tiếp trong RAM
+          currentRow[m.targetIdx] = newVal;
         }
       });
 
       if (hasRowChanged) updateCount++;
     } else {
-      // TRƯỜNG HỢP: KHÁCH HÀNG MỚI -> TẠO DÒNG MỚI TRONG RAM
+      // KHÁCH HÀNG MỚI -> THÊM MỚI TRÊN RAM
       const newRow = new Array(lastTargetCol).fill('');
       colMapping.forEach(m => {
         let val = srcRow[m.sourceIdx];
@@ -143,20 +147,16 @@ function processDataUpdateOptimized(sourceRawData, headerRowIndex) {
     }
   });
 
-  // 4. BATCH WRITE TRỞ LẠI GOOGLE SHEETS (CHỈ GỌI 2 LẦN GHI DUY NHẤT)
-  
-  // 4.1 Ghi đè toàn bộ dữ liệu đã cập nhật lên raw_mobifiber
+  // 4. BATCH WRITE TRỞ LẠI GOOGLE SHEETS
   if (targetData.length > 0) {
     targetSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, targetData.length, lastTargetCol).setValues(targetData);
   }
 
-  // 4.2 Nối các dòng mới (nếu có)
   if (newRowsToAppend.length > 0) {
     const nextStartRow = targetSheet.getLastRow() + 1;
     targetSheet.getRange(nextStartRow, 1, newRowsToAppend.length, lastTargetCol).setValues(newRowsToAppend);
   }
 
-  // 4.3 Ghi toàn bộ logs vào log_capnhat một lần
   if (logSheet && pendingLogs.length > 0) {
     const logStartRow = logSheet.getLastRow() + 1;
     logSheet.getRange(logStartRow, 1, pendingLogs.length, pendingLogs[0].length).setValues(pendingLogs);
