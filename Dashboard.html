@@ -11,9 +11,9 @@
     .tab-btn.active { background-color: #1a73e8; color: #ffffff; font-weight: 600; }
   </style>
 </head>
-<body class="text-slate-800 antialiased min-h-screen pb-10">
+<body class="text-slate-800 antialiased min-h-screen pb-12">
 
-  <!-- HEADER -->
+  <!-- TOP HEADER -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
     <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
@@ -30,7 +30,7 @@
       </button>
     </div>
 
-    <!-- TABS KỲ BÁO CÁO (SCROLLABLE ON MOBILE) -->
+    <!-- TABS KỲ BÁO CÁO -->
     <div class="max-w-7xl mx-auto px-4 border-t border-slate-100 flex space-x-2 py-2 overflow-x-auto no-scrollbar">
       <button onclick="changePeriod('week')" id="tab-week" class="tab-btn px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-100 whitespace-nowrap transition-colors">Tuần này</button>
       <button onclick="changePeriod('month')" id="tab-month" class="tab-btn px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-100 whitespace-nowrap transition-colors active">Tháng này</button>
@@ -44,10 +44,10 @@
   <!-- MAIN CONTAINER -->
   <main class="max-w-7xl mx-auto px-4 py-5">
 
-    <!-- CỤM KPI CỐT LÕI (2 KHỐI NÉN TINH GỌN TRÊN 1 HÀNG HOẶC CARD TẬP TRUNG) -->
+    <!-- CỤM KPI CỐT LÕI: 2 CARD ĐỒNG BỘ TRÊN 1 HÀNG -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
       
-      <!-- KHỐI 1: TỔNG DOANH THU TOÀN TỈNH (CHUẨN DTPK HOẠT ĐỘNG BÌNH THƯỜNG) -->
+      <!-- CARD 1: DTPK TOÀN TỈNH -->
       <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-5 rounded-xl card-shadow flex flex-col justify-between">
         <div>
           <div class="flex justify-between items-center mb-1">
@@ -57,22 +57,20 @@
           <div class="text-2xl sm:text-3xl font-extrabold mt-1 tracking-tight" id="valDtpk">--- đ</div>
         </div>
         <div class="text-[11px] text-blue-200 mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
-          <span>✓ Đã loại trừ TB nghiệp vụ & Chặn nợ</span>
+          <span>✓ Chuẩn rule DTPB (Loại TB nghiệp vụ & Chặn nợ)</span>
           <span id="updateTime">Cập nhật: --:--</span>
         </div>
       </div>
 
-      <!-- KHỐI 2: TỔNG THUÊ BAO & 3 TRẠNG THÁI (ĐƯA VỀ CÙNG 1 KHUNG NHÌN) -->
+      <!-- CARD 2: TỔNG THUÊ BAO & 3 TRẠNG THÁI (GỌN GÀNG CÙNG 1 KHUNG) -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow flex flex-col justify-between">
         <div class="flex justify-between items-baseline mb-2">
-          <span class="text-xs uppercase font-semibold text-slate-500 tracking-wider">Tổng số lượng thuê bao</span>
+          <span class="text-xs uppercase font-semibold text-slate-500 tracking-wider">Tổng thuê bao tích lũy</span>
           <div class="text-2xl font-bold text-slate-900"><span id="valTotalSub">---</span> <span class="text-xs font-normal text-slate-500">TB</span></div>
         </div>
-
-        <!-- 3 Cột Trạng thái thuê bao Mini -->
         <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
           <div class="bg-emerald-50/80 p-2 rounded-lg border border-emerald-100">
-            <div class="text-[11px] text-emerald-700 font-medium">Hoạt động</div>
+            <div class="text-[11px] text-emerald-700 font-medium">Đang hoạt động</div>
             <div class="text-base sm:text-lg font-bold text-emerald-700 mt-0.5" id="valActiveSub">---</div>
           </div>
           <div class="bg-amber-50/80 p-2 rounded-lg border border-amber-100">
@@ -88,44 +86,46 @@
 
     </div>
 
-    <!-- KHỐI BIỂU ĐỒ 6 KHU VỰC & TOP GÓI CƯỚC -->
+    <!-- KHỐI BIỂU ĐỒ 6 KHU VỰC & DANH SÁCH TOÀN BỘ GÓI CƯỚC PTM -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
       
-      <!-- Biểu đồ Cột 6 Khu vực -->
+      <!-- Cột Trái: Biểu đồ Cột 6 Khu vực (Hỗ trợ chuyển đổi DTPK / Số TB) -->
       <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 card-shadow">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm sm:text-base font-bold text-slate-900">Phân bổ DTPK theo 6 Đơn vị địa bàn</h2>
-          <span class="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">VNĐ</span>
+          <div class="flex items-center space-x-2">
+            <button onclick="toggleChartMode('dtpk')" id="btnChartDtpk" class="text-xs font-bold px-3 py-1 rounded bg-blue-50 text-blue-600 border border-blue-200">Phân bổ DTPK</button>
+            <button onclick="toggleChartMode('sub')" id="btnChartSub" class="text-xs font-medium px-3 py-1 rounded text-slate-600 hover:bg-slate-50 border border-slate-200">Thuê bao theo 6 Địa bàn</button>
+          </div>
+          <span class="text-[11px] bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-medium" id="chartUnitLabel">VNĐ</span>
         </div>
         <div class="h-64 sm:h-72">
           <canvas id="regionChart"></canvas>
         </div>
       </div>
 
-      <!-- Top 6 Gói cước (Thiết kế trực quan kèm Progress Bar & %) -->
+      <!-- Cột Phải: Toàn bộ Gói cước PTM trong kỳ -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow flex flex-col justify-between">
         <div>
           <div class="flex items-center justify-between mb-3">
-            <h2 class="text-sm sm:text-base font-bold text-slate-900">Top Gói cước MobiFiber</h2>
-            <span class="text-[11px] text-slate-500 font-medium">Số lượng & Tỷ trọng</span>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900">Gói cước PTM trong kỳ</h2>
+            <span class="text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded"><span id="valPtmCount">0</span> TB PTM</span>
           </div>
-          <div id="packageList" class="space-y-3">
-            <!-- Đổ danh sách động -->
+          <div id="packageList" class="space-y-3 max-h-64 overflow-y-auto pr-1">
             <div class="text-xs text-slate-400 text-center py-8 italic">Đang nạp dữ liệu...</div>
           </div>
         </div>
-        <div class="text-[11px] text-slate-400 text-center pt-3 border-t border-slate-100 mt-3">
-          Sắp xếp theo DTPK đóng góp cao nhất
+        <div class="text-[11px] text-slate-400 text-center pt-3 border-t border-slate-100 mt-2">
+          Sắp xếp theo số lượng đăng ký PTM giảm dần
         </div>
       </div>
 
     </div>
 
-    <!-- BẢNG CHI TIẾT 6 KHU VỰC (BAO GỒM KV HÀM TÂN) -->
+    <!-- BẢNG CHI TIẾT 6 CỤM ĐỊA BÀN (GỒM CẢ PTM & DTPK) -->
     <div class="bg-white rounded-xl border border-slate-200 card-shadow overflow-hidden">
       <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
         <h2 class="text-sm font-bold text-slate-900">Chi tiết Chỉ số Kinh doanh 6 Cụm Địa bàn</h2>
-        <span class="text-xs text-slate-500">Áp dụng toàn tỉnh</span>
+        <span class="text-xs text-slate-500">Chuẩn hóa 6 đơn vị viễn thông</span>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs sm:text-sm text-slate-600">
@@ -133,14 +133,15 @@
             <tr>
               <th class="px-4 py-3">STT</th>
               <th class="px-4 py-3">Khu vực / Cụm</th>
+              <th class="px-4 py-3 text-center">PTM Trong kỳ</th>
               <th class="px-4 py-3 text-center">Thuê bao DTPK</th>
               <th class="px-4 py-3 text-right">Tổng DTPK</th>
-              <th class="px-4 py-3 text-right">Tỷ trọng (%)</th>
+              <th class="px-4 py-3 text-right">Tỷ trọng DTPK (%)</th>
             </tr>
           </thead>
           <tbody id="regionTableBody" class="divide-y divide-slate-200 font-medium">
             <tr>
-              <td colspan="5" class="px-4 py-6 text-center text-slate-400 italic">Đang tải số liệu...</td>
+              <td colspan="6" class="px-4 py-6 text-center text-slate-400 italic">Đang nạp dữ liệu...</td>
             </tr>
           </tbody>
         </table>
@@ -151,6 +152,8 @@
 
   <script>
     let currentPeriod = 'month';
+    let chartMode = 'dtpk'; // 'dtpk' hoặc 'sub'
+    let currentDashboardData = null;
     let regionChartInstance = null;
 
     const periodLabels = {
@@ -166,9 +169,21 @@
       return Number(num || 0).toLocaleString('vi-VN') + ' đ';
     }
 
+    function toggleChartMode(mode) {
+      chartMode = mode;
+      document.getElementById('btnChartDtpk').className = mode === 'dtpk' 
+        ? 'text-xs font-bold px-3 py-1 rounded bg-blue-50 text-blue-600 border border-blue-200'
+        : 'text-xs font-medium px-3 py-1 rounded text-slate-600 hover:bg-slate-50 border border-slate-200';
+      document.getElementById('btnChartSub').className = mode === 'sub'
+        ? 'text-xs font-bold px-3 py-1 rounded bg-blue-50 text-blue-600 border border-blue-200'
+        : 'text-xs font-medium px-3 py-1 rounded text-slate-600 hover:bg-slate-50 border border-slate-200';
+      document.getElementById('chartUnitLabel').innerText = mode === 'dtpk' ? 'VNĐ' : 'Thuê bao';
+
+      if (currentDashboardData) renderRegionChart(currentDashboardData);
+    }
+
     function changePeriod(p) {
       currentPeriod = p;
-      // Cập nhật giao diện tab
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       const activeBtn = document.getElementById('tab-' + p);
       if (activeBtn) activeBtn.classList.add('active');
@@ -180,27 +195,20 @@
       google.script.run
         .withSuccessHandler(function(data) {
           refreshBtn.innerText = '🔄 Làm mới';
+          currentDashboardData = data;
           renderDashboard(data);
         })
         .withFailureHandler(function(err) {
           refreshBtn.innerText = '🔄 Làm mới';
-          alert('Lỗi: ' + err.message);
+          alert('Lỗi nạp số liệu: ' + err.message);
         })
         .getDashboardMetrics(p);
     }
 
-    function renderDashboard(data) {
-      // 1. Gán số liệu KPI
-      document.getElementById('valDtpk').innerText = formatCurrency(data.totalRevenueDtpk);
-      document.getElementById('valTotalSub').innerText = data.totalSub.toLocaleString('vi-VN');
-      document.getElementById('valActiveSub').innerText = data.activeSub.toLocaleString('vi-VN');
-      document.getElementById('valBlockedSub').innerText = data.blockedSub.toLocaleString('vi-VN');
-      document.getElementById('valCancelledSub').innerText = data.cancelledSub.toLocaleString('vi-VN');
-      document.getElementById('updateTime').innerText = 'Cập nhật: ' + data.lastUpdated;
-
-      // 2. Render Biểu đồ cột 6 Đơn vị
+    function renderRegionChart(data) {
       const regLabels = data.regionStats.map(r => r.name);
-      const regValues = data.regionStats.map(r => r.dtpk);
+      const isDtpk = chartMode === 'dtpk';
+      const regValues = isDtpk ? data.regionStats.map(r => r.totalDtpk) : data.regionStats.map(r => r.totalSub);
 
       if (regionChartInstance) regionChartInstance.destroy();
       const ctx = document.getElementById('regionChart').getContext('2d');
@@ -209,7 +217,7 @@
         data: {
           labels: regLabels,
           datasets: [{
-            label: 'DTPK (VNĐ)',
+            label: isDtpk ? 'DTPK (VNĐ)' : 'Số Thuê bao',
             data: regValues,
             backgroundColor: [
               '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#38bdf8', '#cbd5e1'
@@ -224,7 +232,11 @@
           scales: {
             y: {
               beginAtZero: true,
-              ticks: { callback: function(val) { return (val / 1000000).toFixed(1) + 'M'; } }
+              ticks: {
+                callback: function(val) {
+                  return isDtpk ? (val / 1000000).toFixed(1) + 'M' : val;
+                }
+              }
             },
             x: {
               ticks: { font: { size: 11 } }
@@ -232,13 +244,27 @@
           }
         }
       });
+    }
 
-      // 3. Render Top Gói cước (Kèm thanh tiến độ % & DTPK)
+    function renderDashboard(data) {
+      // 1. KPI Cards
+      document.getElementById('valDtpk').innerText = formatCurrency(data.totalRevenueDtpk);
+      document.getElementById('valTotalSub').innerText = data.totalSub.toLocaleString('vi-VN');
+      document.getElementById('valActiveSub').innerText = data.activeSub.toLocaleString('vi-VN');
+      document.getElementById('valBlockedSub').innerText = data.blockedSub.toLocaleString('vi-VN');
+      document.getElementById('valCancelledSub').innerText = data.cancelledSub.toLocaleString('vi-VN');
+      document.getElementById('valPtmCount').innerText = data.ptmCount.toLocaleString('vi-VN');
+      document.getElementById('updateTime').innerText = 'Cập nhật: ' + data.lastUpdated;
+
+      // 2. Render Biểu đồ Khu vực
+      renderRegionChart(data);
+
+      // 3. Render Toàn bộ Gói cước PTM
       const pkgList = document.getElementById('packageList');
       pkgList.innerHTML = '';
 
       if (data.packageDistribution.length === 0) {
-        pkgList.innerHTML = '<div class="text-xs text-slate-400 text-center py-4 italic">Không có phát sinh gói trong kỳ.</div>';
+        pkgList.innerHTML = '<div class="text-xs text-slate-400 text-center py-6 italic">Không có phát sinh gói PTM trong kỳ.</div>';
       } else {
         data.packageDistribution.forEach(pkg => {
           const item = document.createElement('div');
@@ -260,28 +286,28 @@
         });
       }
 
-      // 4. Render Bảng chi tiết 6 Khu vực
+      // 4. Render Bảng 6 Cụm Địa bàn
       const tbody = document.getElementById('regionTableBody');
       tbody.innerHTML = '';
 
       data.regionStats.forEach((reg, idx) => {
-        const ratio = data.totalRevenueDtpk > 0 ? ((reg.dtpk / data.totalRevenueDtpk) * 100).toFixed(1) : '0.0';
-        const isZero = reg.count === 0;
+        const ratio = data.totalRevenueDtpk > 0 ? ((reg.totalDtpk / data.totalRevenueDtpk) * 100).toFixed(1) : '0.0';
+        const isZero = reg.totalSub === 0;
 
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 transition-colors';
         tr.innerHTML = `
           <td class="px-4 py-3 text-slate-400 font-normal">${idx + 1}</td>
           <td class="px-4 py-3 font-semibold ${isZero ? 'text-slate-400' : 'text-slate-900'}">${reg.name}</td>
-          <td class="px-4 py-3 text-center ${isZero ? 'text-slate-400' : 'text-slate-800'}">${reg.count.toLocaleString('vi-VN')} TB</td>
-          <td class="px-4 py-3 text-right font-bold ${isZero ? 'text-slate-400' : 'text-emerald-600'}">${formatCurrency(reg.dtpk)}</td>
+          <td class="px-4 py-3 text-center font-bold ${reg.ptmSub > 0 ? 'text-emerald-600' : 'text-slate-400'}">${reg.ptmSub.toLocaleString('vi-VN')} TB</td>
+          <td class="px-4 py-3 text-center ${isZero ? 'text-slate-400' : 'text-slate-800'}">${reg.totalSub.toLocaleString('vi-VN')} TB</td>
+          <td class="px-4 py-3 text-right font-bold ${isZero ? 'text-slate-400' : 'text-emerald-600'}">${formatCurrency(reg.totalDtpk)}</td>
           <td class="px-4 py-3 text-right font-semibold ${isZero ? 'text-slate-400' : 'text-blue-600'}">${ratio}%</td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    // Tự động tải dữ liệu Tháng này khi mở trang
     window.onload = function() {
       changePeriod('month');
     };
