@@ -41,6 +41,9 @@ const CONFIG = {
 };
 
 // Khởi tạo Menu chính trên Google Sheets
+/**
+ * Khởi tạo Menu chính trên Google Sheets (Gộp đầy đủ Nghiệp vụ & Công cụ Vibe Coding)
+ */
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('⚡ MobiFiber Tools')
@@ -50,7 +53,7 @@ function onOpen() {
     .addItem('⚙️ Cài đặt & Khởi tạo Tham số chuẩn hóa', 'initThamSoCaiDat')
     .addSeparator()
 
-    // NHÓM 2: CÁC MODULE BÁO CÁO & TRÍCH XUẤT LIỀN KỀ NHAU
+    // NHÓM 2: CÁC MODULE BÁO CÁO & TRÍCH XUẤT
     .addItem('🎯 Báo cáo PTM', 'showPtmReportDialog')
     .addItem('📈 Báo cáo Doanh thu Phân bổ (DTPK)', 'showRevenueAllocationDialog')
     .addItem('⏰ Kết xuất Danh sách Gia hạn', 'showRenewalPromptDialog')
@@ -60,10 +63,14 @@ function onOpen() {
     .addItem('🚫 Quản lý Chặn cắt & Thu hồi ONT', 'generateDisconnectionReport')
     .addSeparator()
 
-    // NHÓM 3: TIỆN ÍCH TẢI VỀ, DỌN RÁC & TRA CỨU
+    // NHÓM 3: TIỆN ÍCH TẢI VỀ & TRA CỨU
     .addItem('📥 Tải sheet hiện tại về Excel (.xlsx)', 'downloadCurrentActiveSheetClean')
     .addItem('🧹 Dọn sạch file rác tạm trên Drive', 'cleanAllOrphanedExportFiles')
     .addItem('🔍 Tra cứu thông tin thuê bao (360°)', 'showCustomerLookupDialog')
+    .addSeparator()
+
+    // NHÓM 4: CÔNG CỤ VIBE CODING
+    .addItem('📄 Xuất toàn bộ Code ra Google Doc', 'exportAllProjectCodeToGoogleDoc')
     .addToUi();
 }
 

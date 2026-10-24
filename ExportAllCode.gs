@@ -1,14 +1,4 @@
 /**
- * Tự động tạo menu trên Google Sheet để xuất toàn bộ code
- */
-function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('⚡ Công cụ Vibe Coding')
-    .addItem('Xuất toàn bộ Code ra Google Doc', 'exportAllScriptsToDoc')
-    .addToUi();
-}
-
-/**
  * Thêm scope tường minh để Apps Script tự cấp quyền truy cập Script API
  * @OnlyCurrentDoc
  */
