@@ -1,115 +1,175 @@
 /**
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
- * MODULE       : QUẢN LÝ CHẶN CẮT, NỢ CƯỚC & THU HỒI ONT
- * PHIÊN BẢN    : 2.1 (Tải Excel sạch, Tự động dọn rác, Phân loại rõ nợ cước / KHYC / Thu hồi ONT)
- * NGÀY CẬP NHẬT: 20/09/2026 19:30:00 (GMT+7)
- * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
+ * FILE        : Mod_ChanCat.gs
+ * PHIÊN BẢN   : 3.0 (High-Performance Engine: In-Memory Aggregation & Batch Highlighting)
+ * NGÀY TẠO    : 20/09/2026 19:30:00 (GMT+7)
+ * NGÀY CẬP NHẬT: 24/10/2026 19:35:00 (GMT+7)
+ * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
+ * MÔ TẢ       : Quản lý thuê bao chặn cắt, nợ cước và điều phối thu hồi thiết bị ONT
  * ============================================================================
  */
 
 function generateDisconnectionReport() {
+  const startTime = new Date().getTime();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
-  const ui = SpreadsheetApp.getUi();
-  if (!rawSheet) return;
+  if (!rawSheet) {
+    SpreadsheetApp.getUi().alert(`Không tìm thấy sheet dữ liệu gốc "${CONFIG.TARGET_SHEET_NAME}"!`);
+    return;
+  }
 
   const lastRow = rawSheet.getLastRow();
   const lastCol = rawSheet.getLastColumn();
-  if (lastRow < CONFIG.DATA_START_ROW_TARGET) return;
+  if (lastRow < CONFIG.DATA_START_ROW_TARGET) {
+    SpreadsheetApp.getUi().alert('Sheet dữ liệu chưa có bản ghi thuê bao!');
+    return;
+  }
 
+  // 1. ĐỌC DỮ LIỆU ĐÍCH VÀO RAM (1 LẦN DUY NHẤT)
   const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
-  const idxMaKH        = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
-  const idxTenTB       = headers.findIndex(h => h === 'tên thuê bao');
-  const idxSDT         = headers.findIndex(h => h === 'sđt liên hệ');
-  const idxDiaChi      = headers.findIndex(h => h === 'địa chỉ lắp đặt');
-  const idxGoiCuoc     = headers.findIndex(h => h === 'gói cước');
-  const idxGiaCuoc     = headers.findIndex(h => h === 'giá cước');
+  const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
+  const idxTenTB = headers.findIndex(h => h === 'tên thuê bao');
+  const idxSDT = headers.findIndex(h => h === 'sđt liên hệ');
+  const idxDiaChi = headers.findIndex(h => h === 'địa chỉ lắp đặt');
+  const idxGoiCuoc = headers.findIndex(h => h === 'gói cước');
+  const idxGiaCuoc = headers.findIndex(h => h === 'giá cước');
   const idxTinhTrangHD = headers.findIndex(h => h === 'tình trạng hợp đồng');
-  const idxChanCat     = headers.findIndex(h => h === 'tình trạng chặn cắt');
-  const idxThietBi     = headers.findIndex(h => h === 'loại thiết bị ont');
-  const idxSerial      = headers.findIndex(h => h === 'serial ont');
-  const idxTenCH       = headers.findIndex(h => h === 'tên cửa hàng');
-  const idxTenNV       = headers.findIndex(h => h === 'tên nhân viên');
+  const idxChanCat = headers.findIndex(h => h === 'tình trạng chặn cắt');
+  const idxThietBi = headers.findIndex(h => h === 'loại thiết bị ont');
+  const idxSerial = headers.findIndex(h => h === 'serial ont');
+  const idxTenCH = headers.findIndex(h => h === 'tên cửa hàng');
+  const idxTenNV = headers.findIndex(h => h === 'tên nhân viên');
   const idxNgayKetThuc = headers.findIndex(h => h === 'ngày kết thúc gói cước');
 
-  const numRows = lastRow - CONFIG.DATA_START_ROW_TARGET + 1;
-  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, numRows, lastCol).getValues();
+  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
 
+  // 2. LỌC & PHÂN LOẠI TRONG BỘ NHỚ
   const reportRows = [];
-  let countDebt = 0, countKHYC = 0, countCancelled = 0;
+  const statusColors = []; // Mảng màu Matrix Formatting
+  let countDebt = 0;        // Nợ cước
+  let countKHYC = 0;        // KHYC tạm ngưng
+  let countCancelled = 0;   // Hủy / Cần thu hồi ONT
 
   for (let i = 0; i < rawData.length; i++) {
     const row = rawData[i];
-    const chanCat = String(row[idxChanCat] || '').trim();
-    const tinhTrangHD = String(row[idxTinhTrangHD] || '').trim();
-    const isChanCat = chanCat && normalizeHeader(chanCat) !== 'bình thường';
-    const isCancelled = normalizeHeader(tinhTrangHD) === 'đã hủy' || normalizeHeader(tinhTrangHD) === 'da huy';
-    if (!isChanCat && !isCancelled) continue;
+    const statusHD = normalizeHeader(String(row[idxTinhTrangHD] || ''));
+    const statusChan = normalizeHeader(String(row[idxChanCat] || ''));
 
-    let phanLoai = '', bgColor = '#ffffff';
+    const isCancelled = statusHD.includes('hủy') || statusHD.includes('huy') || statusHD.includes('thanh lý') || statusHD.includes('chấm dứt');
+    const isDebt = statusChan.includes('nợ') || statusChan.includes('no cuoc') || statusChan.includes('khóa cước');
+    const isKHYC = statusChan.includes('khyc') || statusChan.includes('yêu cầu') || statusChan.includes('yeu cau');
+
+    // Chỉ lấy các thuê bao thuộc 1 trong 3 nhóm biến động
+    if (!isCancelled && !isDebt && !isKHYC) continue;
+
+    let groupName = '';
+    let rowColor = '#ffffff';
+
     if (isCancelled) {
-      phanLoai = '🔴 Hợp đồng đã hủy (Cần thu hồi ONT)'; bgColor = '#FCE8E6'; countCancelled++;
-    } else if (normalizeHeader(chanCat).includes('nợ cước') || normalizeHeader(chanCat).includes('no cuoc')) {
-      phanLoai = '🟠 Chặn do nợ cước (Cần đôn đốc)'; bgColor = '#FEF7E0'; countDebt++;
-    } else {
-      phanLoai = '🟡 Chặn theo yêu cầu KHYC'; bgColor = '#FEF9E7'; countKHYC++;
+      groupName = 'Hủy - Thu hồi ONT';
+      rowColor = '#fce8e6'; // Đỏ nhạt
+      countCancelled++;
+    } else if (isDebt) {
+      groupName = 'Chặn nợ cước';
+      rowColor = '#fef7e0'; // Vàng nhạt
+      countDebt++;
+    } else if (isKHYC) {
+      groupName = 'Tạm ngưng KHYC';
+      rowColor = '#e8f0fe'; // Xanh dương nhạt
+      countKHYC++;
     }
 
     let cleanMaKH = String(row[idxMaKH] || '').replace(/^'+/, '').trim();
     if (/^\d{8}$/.test(cleanMaKH)) cleanMaKH = '00' + cleanMaKH;
-    let cleanSDT = String(row[idxSDT] || '').replace(/^'+/, '').trim();
-    if (/^\d{9}$/.test(cleanSDT)) cleanSDT = '0' + cleanSDT;
 
-    reportRows.push({
-      bgColor,
-      values: [
-        phanLoai, "'" + cleanMaKH, '  ' + (row[idxTenTB] || ''), "'" + cleanSDT, '  ' + (row[idxDiaChi] || ''),
-        row[idxGoiCuoc] || '', parseCurrencyToInteger(row[idxGiaCuoc]), formatDateTimeStr(row[idxNgayKetThuc]),
-        chanCat || 'Bình thường', tinhTrangHD, '  ' + (row[idxThietBi] || ''), "'" + String(row[idxSerial] || '').replace(/^'+/, ''),
-        '  ' + (row[idxTenCH] || ''), '  ' + (row[idxTenNV] || '')
-      ]
-    });
+    const giaCuoc = parseCurrency(row[idxGiaCuoc]);
+    const dKetThuc = parseToDate(row[idxNgayKetThuc]);
+    const ketThucStr = dKetThuc ? Utilities.formatDate(dKetThuc, 'Asia/Saigon', 'dd/MM/yyyy') : '';
+
+    reportRows.push([
+      reportRows.length + 1,
+      groupName,
+      cleanMaKH,
+      row[idxTenTB],
+      row[idxSDT],
+      row[idxDiaChi],
+      row[idxGoiCuoc],
+      giaCuoc,
+      ketThucStr,
+      row[idxThietBi],
+      row[idxSerial],
+      row[idxTenCH],
+      row[idxTenNV]
+    ]);
+
+    statusColors.push(new Array(13).fill(rowColor));
   }
 
-  let destSheet = ss.getSheetByName(CONFIG.CHANCAT_SHEET_NAME);
-  if (!destSheet) destSheet = ss.insertSheet(CONFIG.CHANCAT_SHEET_NAME);
-  else destSheet.clear();
+  // 3. TẠO HOẶC LÀM SẠCH SHEET THEO DÕI
+  const targetSheetName = CONFIG.CHANCAT_SHEET_NAME || 'theo_doi_chancat';
+  let reportSheet = ss.getSheetByName(targetSheetName);
+  if (reportSheet) {
+    reportSheet.clear();
+  } else {
+    reportSheet = ss.insertSheet(targetSheetName);
+  }
 
-  const ssId = ss.getId();
-  const sheetId = destSheet.getSheetId();
-  const directExportUrl = `https://docs.google.com/spreadsheets/d/${ssId}/export?format=xlsx&gid=${sheetId}`;
+  const nowFormatted = Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm');
 
-  destSheet.getRange(1, 1, 1, 14).merge().setValue('DANH SÁCH THUÊ BAO CHẶN CẮT, NỢ CƯỚC & THU HỒI THIẾT BỊ ONT')
-    .setFontWeight('bold').setFontSize(13).setBackground('#1B365D').setFontColor('#FFFFFF').setHorizontalAlignment('center');
-  
-  destSheet.getRange(2, 1, 1, 12).merge().setValue(`📊 Tổng cộng: ${reportRows.length} TB   |   🟠 Nợ cước: ${countDebt} TB   |   🟡 Chặn KHYC: ${countKHYC} TB   |   🔴 Đã hủy: ${countCancelled} TB`)
-    .setFontWeight('bold').setFontSize(11).setBackground('#E8F0FE').setFontColor('#174EA6').setHorizontalAlignment('center');
+  // Khối Card KPI & Header
+  const headerMatrix = [
+    ['BÁO CÁO THEO DÕI CHẶN CẮT & THU HỒI THIẾT BỊ ONT', '', '', '', '', '', '', '', '', '', '', '', ''],
+    [
+      `📊 TỔNG CỘNG: ${reportRows.length} TB | 🔴 Nợ cước: ${countDebt} | 🟠 Thu hồi ONT: ${countCancelled} | 🔵 KHYC: ${countKHYC}`,
+      '', '', '', '', '', '', '', '', '', '', `🕒 Lập lúc: ${nowFormatted}`, ''
+    ],
+    [
+      'STT', 'PHÂN LOẠI', 'MÃ KHÁCH HÀNG', 'TÊN THUÊ BAO', 'SĐT LIÊN HỆ', 'ĐỊA CHỈ LẮP ĐẶT',
+      'GÓI CƯỚC', 'GIÁ CƯỚC', 'HẾT HẠN GÓI', 'LOẠI ONT', 'SERIAL ONT', 'TÊN CỬA HÀNG', 'NHÂN VIÊN QUẢN LÝ'
+    ]
+  ];
 
-  // Nút tải Excel trên sheet
-  destSheet.getRange(2, 13, 1, 2).merge()
-    .setFormula(`=HYPERLINK("${directExportUrl}"; "📥 TẢI FILE EXCEL")`)
-    .setFontWeight('bold').setFontSize(11).setBackground('#1A73E8').setFontColor('#FFFFFF')
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  // Ghi khối Header 1 lần
+  reportSheet.getRange(1, 1, 3, 13).setValues(headerMatrix);
 
-  const headersOut = ['Phân loại theo dõi', 'MÃ KHÁCH HÀNG', 'TÊN THUÊ BAO', 'SĐT LIÊN HỆ', 'ĐỊA CHỈ LẮP ĐẶT', 'GÓI CƯỚC', 'GIÁ CƯỚC', 'HẠN GÓI CƯỚC', 'TÌNH TRẠNG CHẶN CẮT', 'TÌNH TRẠNG HĐ', 'LOẠI THIẾT BỊ ONT', 'SERIAL ONT', 'TÊN CỬA HÀNG', 'TÊN NHÂN VIÊN'];
-  destSheet.getRange(4, 1, 1, headersOut.length).setValues([headersOut]).setFontWeight('bold').setBackground('#C5221F').setFontColor('#FFFFFF').setHorizontalAlignment('center');
-  destSheet.setFrozenRows(4);
+  // Định dạng Header
+  reportSheet.getRange('A1:M1').merge().setBackground('#1a73e8').setFontColor('#ffffff').setFontWeight('bold').setFontSize(13).setHorizontalAlignment('center');
+  reportSheet.getRange('A2:K2').merge().setBackground('#f8f9fa').setFontColor('#202124').setFontWeight('bold');
+  reportSheet.getRange('L2:M2').merge().setBackground('#f8f9fa').setFontColor('#5f6368').setHorizontalAlignment('right');
+  reportSheet.getRange('A3:M3').setBackground('#34a853').setFontColor('#ffffff').setFontWeight('bold').setHorizontalAlignment('center');
 
+  // 4. BATCH WRITE & MATRIX FORMATTING CHI TIẾT
   if (reportRows.length > 0) {
-    const outData = reportRows.map(r => r.values);
-    destSheet.getRange(5, 1, outData.length, headersOut.length).setValues(outData);
-    for (let r = 0; r < reportRows.length; r++) destSheet.getRange(5 + r, 1).setBackground(reportRows[r].bgColor).setFontWeight('bold');
-    destSheet.getRange(5, 2, outData.length, 1).setNumberFormat('@').setHorizontalAlignment('center');
-    destSheet.getRange(5, 4, outData.length, 1).setNumberFormat('@').setHorizontalAlignment('center');
-    destSheet.getRange(5, 7, outData.length, 1).setNumberFormat('#,##0').setHorizontalAlignment('right');
-    destSheet.getRange(5, 8, outData.length, 3).setHorizontalAlignment('center');
-    destSheet.getRange(5, 12, outData.length, 1).setNumberFormat('@').setHorizontalAlignment('center');
+    const dataRange = reportSheet.getRange(4, 1, reportRows.length, 13);
+    dataRange.setValues(reportRows);
+    dataRange.setBackgrounds(statusColors);
 
-    const exactWidths = [190, 120, 180, 115, 260, 110, 110, 155, 150, 130, 130, 130, 220, 160];
-    for (let c = 0; c < exactWidths.length; c++) destSheet.setColumnWidth(c + 1, exactWidths[c]);
+    // Format số & căn lề đồng loạt
+    reportSheet.getRange(4, 1, reportRows.length, 1).setHorizontalAlignment('center');
+    reportSheet.getRange(4, 2, reportRows.length, 1).setHorizontalAlignment('center').setFontWeight('bold');
+    reportSheet.getRange(4, 3, reportRows.length, 1).setNumberFormat('@').setHorizontalAlignment('center');
+    reportSheet.getRange(4, 8, reportRows.length, 1).setNumberFormat('#,##0" đ"');
+    reportSheet.getRange(4, 9, reportRows.length, 1).setHorizontalAlignment('center');
+    reportSheet.getRange(4, 11, reportRows.length, 1).setFontFamily('Roboto Mono').setHorizontalAlignment('center');
   }
 
-  ss.setActiveSheet(destSheet);
-  ui.alert(`✅ Đã trích xuất ${reportRows.length} thuê bao cần xử lý vào sheet "${CONFIG.CHANCAT_SHEET_NAME}"!`);
+  // Tối ưu độ rộng cột
+  reportSheet.setColumnWidth(1, 50);
+  reportSheet.setColumnWidth(2, 140);
+  reportSheet.setColumnWidth(3, 110);
+  reportSheet.setColumnWidth(4, 180);
+  reportSheet.setColumnWidth(5, 100);
+  reportSheet.setColumnWidth(6, 230);
+  reportSheet.setColumnWidth(7, 100);
+  reportSheet.setColumnWidth(8, 110);
+  reportSheet.setColumnWidth(9, 100);
+  reportSheet.setColumnWidth(10, 100);
+  reportSheet.setColumnWidth(11, 130);
+  reportSheet.setColumnWidth(12, 150);
+  reportSheet.setColumnWidth(13, 140);
+
+  const duration = ((new Date().getTime() - startTime) / 1000).toFixed(2);
+  Logger.log(`⚡ Tạo báo cáo Chặn cắt & Thu hồi ONT hoàn tất trong ${duration}s!`);
+  ss.setActiveSheet(reportSheet);
 }
