@@ -2,15 +2,14 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * FILE        : WebApp_API.gs
- * PHIÊN BẢN   : 2.0 (Multi-Period Filter, Standardized 6 Regions & Strict Revenue Rules)
+ * PHIÊN BẢN   : 3.0 (PTM-Strict Rule Engine & 6 Standard Regions Integration)
  * NGÀY TẠO    : 24/10/2026 20:15:00 (GMT+7)
- * NGÀY CẬP NHẬT: 24/10/2026 21:00:00 (GMT+7)
+ * NGÀY CẬP NHẬT: 24/10/2026 21:50:00 (GMT+7)
  * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
- * MÔ TẢ       : Backend API phục vụ Web Dashboard đa kỳ (Tuần, Tháng, Quý, 6T, 9T, Năm)
+ * MÔ TẢ       : Backend API phục vụ Web Dashboard đa kỳ chuẩn quy tắc PTM & DTPB
  * ============================================================================
  */
 
-// Danh sách 6 Đơn vị chuẩn hóa áp dụng xuyên suốt toàn dự án
 const STANDARD_REGIONS = [
   'TT.KDVT',
   'KV Đà Lạt',
@@ -35,13 +34,10 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-/**
- * Xác định khoảng ngày (Start - End) dựa theo kỳ báo cáo
- */
 function getDateRangeByPeriod(periodType) {
   const now = new Date();
   const y = now.getFullYear();
-  const m = now.getMonth(); // 0-indexed (0 = T1)
+  const m = now.getMonth();
   const d = now.getDate();
 
   let start = null;
@@ -49,32 +45,30 @@ function getDateRangeByPeriod(periodType) {
 
   switch (periodType) {
     case 'week': {
-      // Tuần hiện tại (tính từ Thứ 2 đến Chủ nhật)
       const currentDay = now.getDay();
       const diffToMonday = (currentDay === 0 ? -6 : 1) - currentDay;
       start = new Date(y, m, d + diffToMonday, 0, 0, 0);
       break;
     }
-    case 'month': // Mặc định: Tháng hiện tại
+    case 'month':
       start = new Date(y, m, 1, 0, 0, 0);
       end = new Date(y, m + 1, 0, 23, 59, 59);
       break;
     case 'quarter': {
-      // Quý hiện tại
       const qMonth = Math.floor(m / 3) * 3;
       start = new Date(y, qMonth, 1, 0, 0, 0);
       end = new Date(y, qMonth + 3, 0, 23, 59, 59);
       break;
     }
-    case '6tdn': // 6 Tháng đầu năm (01/01 - 30/06)
+    case '6tdn':
       start = new Date(y, 0, 1, 0, 0, 0);
       end = new Date(y, 5, 30, 23, 59, 59);
       break;
-    case '9tdn': // 9 Tháng đầu năm (01/01 - 30/09)
+    case '9tdn':
       start = new Date(y, 0, 1, 0, 0, 0);
       end = new Date(y, 8, 30, 23, 59, 59);
       break;
-    case 'year': // Cả năm hiện tại
+    case 'year':
       start = new Date(y, 0, 1, 0, 0, 0);
       end = new Date(y, 11, 31, 23, 59, 59);
       break;
@@ -86,9 +80,6 @@ function getDateRangeByPeriod(periodType) {
   return { start, end };
 }
 
-/**
- * API Bóc tách dữ liệu Dashboard theo kỳ (Mặc định: 'month')
- */
 function getDashboardMetrics(periodType = 'month') {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
@@ -96,11 +87,11 @@ function getDashboardMetrics(periodType = 'month') {
 
   const lastRow = rawSheet.getLastRow();
   const lastCol = rawSheet.getLastColumn();
-  
-  // Khởi tạo khung số liệu 6 Khu vực chuẩn hóa (Mặc định bằng 0)
+
+  // Khởi tạo khung 6 khu vực
   const regionMap = new Map();
   STANDARD_REGIONS.forEach(reg => {
-    regionMap.set(reg, { count: 0, dtpk: 0 });
+    regionMap.set(reg, { currentSub: 0, currentDtpk: 0, ptmSub: 0, ptmRevenue: 0, totalDtpk: 0 });
   });
 
   if (lastRow < CONFIG.DATA_START_ROW_TARGET) {
@@ -110,17 +101,20 @@ function getDashboardMetrics(periodType = 'month') {
       activeSub: 0,
       blockedSub: 0,
       cancelledSub: 0,
+      ptmCount: 0,
+      ptmRevenue: 0,
       totalRevenueDtpk: 0,
-      regionStats: STANDARD_REGIONS.map(name => ({ name, count: 0, dtpk: 0 })),
+      regionStats: STANDARD_REGIONS.map(name => ({ name, currentSub: 0, ptmSub: 0, totalSub: 0, totalDtpk: 0 })),
       packageDistribution: [],
       lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
     };
   }
 
-  // 1. ĐỌC DỮ LIỆU VÀ HEADERS TRONG RAM
+  // 1. ĐỌC DỮ LIỆU ĐÍCH VÀ BẢN ĐỒ THAM SỐ
   const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
   const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
   const idxLoaiKH = headers.findIndex(h => h === 'loại khách hàng');
+  const idxNhuCau = headers.findIndex(h => h === 'nhu cầu hòa mạng');
   const idxGoiCuoc = headers.findIndex(h => h === 'gói cước');
   const idxGiaCuoc = headers.findIndex(h => h === 'giá cước');
   const idxChuKy = headers.findIndex(h => h === 'chu kỳ sử dụng');
@@ -129,11 +123,13 @@ function getDashboardMetrics(periodType = 'month') {
   const idxChanCat = headers.findIndex(h => h === 'tình trạng chặn cắt');
   const idxMaNV = headers.findIndex(h => h === 'mã nhân viên');
   const idxNgayDauNoi = headers.findIndex(h => h === 'ngày đấu nối');
+  const idxNgayThiCong = headers.findIndex(h => h === 'ngày hoàn tất thi công');
   const idxNgayBatDau = headers.findIndex(h => h === 'ngày băt đầu gói cước' || h === 'ngày bắt đầu gói cước');
+  const idxNgayKetThuc = headers.findIndex(h => h === 'ngày kết thúc gói cước');
 
   const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
 
-  // Đọc bảng tham số ánh xạ nhân sự -> Khu vực
+  // Nạp map nhân viên -> khu vực
   const staffRegionMap = new Map();
   const thamSoSheet = ss.getSheetByName('thamso_caidat');
   if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
@@ -145,43 +141,30 @@ function getDashboardMetrics(periodType = 'month') {
     });
   }
 
-  // 2. PHÂN LOẠI & TÍNH TOÁN THEO KỲ
+  // 2. TÍNH TOÁN THEO CHUẨN RULE PTM & DTPB
   const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType);
 
-  let totalSub = 0;
   let activeSub = 0;
   let blockedSub = 0;
   let cancelledSub = 0;
+  let ptmCount = 0;
+  let ptmRevenue = 0;
   let totalRevenueDtpk = 0;
 
-  const packageMap = new Map(); // Key: Tên gói -> { count, dtpk }
+  const ptmPackageMap = new Map(); // Gom tất cả gói cước PTM trong kỳ
 
   for (let i = 0; i < rawData.length; i++) {
     const r = rawData[i];
-
-    // Lọc thời gian phát triển theo kỳ
-    const dDauNoi = parseToDate(r[idxNgayDauNoi]);
-    const dBatDau = parseToDate(r[idxNgayBatDau]);
-    const checkDate = dDauNoi || dBatDau;
-
-    // Nếu lọc theo tuần/quý/6T/9T/năm, kiểm tra mốc ngày
-    if (periodType !== 'all') {
-      if (!checkDate || checkDate < dateStart || checkDate > dateEnd) {
-        continue;
-      }
-    }
-
-    totalSub++;
-
     const statusHD = normalizeHeader(String(r[idxTinhTrangHD] || ''));
     const statusChan = normalizeHeader(String(r[idxChanCat] || ''));
     const loaiKH = normalizeHeader(String(r[idxLoaiKH] || ''));
+    const nhuCau = normalizeHeader(String(r[idxNhuCau] || ''));
 
     const isCancelled = statusHD.includes('hủy') || statusHD.includes('huy') || statusHD.includes('thanh lý') || statusHD.includes('chấm dứt');
     const isBlocked = statusChan.includes('nợ') || statusChan.includes('khóa') || statusChan.includes('chặn') || statusChan.includes('khyc');
     const isNghiepVu = loaiKH.includes('nghiệp vụ') || loaiKH.includes('nghiep vu');
 
-    // Thống kê số lượng 3 nhóm thuê bao
+    // Thống kê 3 trạng thái
     if (isCancelled) {
       cancelledSub++;
     } else if (isBlocked) {
@@ -190,79 +173,116 @@ function getDashboardMetrics(periodType = 'month') {
       activeSub++;
     }
 
-    // TIÊU CHÍ TÍNH DOANH THU TOÀN TỈNH & PHÂN BỔ:
-    // 1. Không phải Thuê bao nghiệp vụ
-    // 2. Tình trạng hợp đồng: Đang hoạt động
-    // 3. Tình trạng chặn cắt: Bình thường
-    const isQualifyForRevenue = !isNghiepVu && 
-                               (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
-                               (statusChan === 'bình thường' || statusChan === 'binh thuong' || !statusChan);
+    // Loại trừ hoàn toàn thuê bao đã hủy khỏi doanh thu
+    if (isCancelled) continue;
 
-    if (isQualifyForRevenue) {
-      const giaCuoc = safeParseCurrency(r[idxGiaCuoc]);
-      const chuKy = parseInt(r[idxChuKy], 10) || 1;
-      let dtpk = safeParseCurrency(r[idxDtpk]);
-      if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
+    const chuKy = parseInt(r[idxChuKy], 10) || 1;
+    const giaCuoc = safeParseCurrency(r[idxGiaCuoc]);
+    let dtpk = safeParseCurrency(r[idxDtpk]);
+    if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
 
-      totalRevenueDtpk += dtpk;
+    // Xác định Khu vực chuẩn
+    const maNV = normalizeHeader(String(r[idxMaNV] || ''));
+    let khuVuc = 'TT.KDVT';
+    if (maNV && staffRegionMap.has(maNV)) {
+      khuVuc = staffRegionMap.get(maNV);
+    }
+    let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc)) || 'TT.KDVT';
+    const regStat = regionMap.get(matchedRegion);
 
-      // Xác định Khu vực
-      const maNV = normalizeHeader(String(r[idxMaNV] || ''));
-      let khuVuc = 'Chưa phân bổ KV';
-      if (maNV && staffRegionMap.has(maNV)) {
-        khuVuc = staffRegionMap.get(maNV);
+    // XÉT TIÊU CHÍ PTM TRONG KỲ (CHUẨN RULE Mod_PTM.gs)
+    const isPtmDemand = (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi');
+    const isPtmActive = (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong');
+
+    let ptmDate = null;
+    if (isPtmDemand && !isNghiepVu && isPtmActive) {
+      const dDauNoi = parseToDate(r[idxNgayDauNoi]);
+      const dThiCong = parseToDate(r[idxNgayThiCong]);
+      const dBatDau = parseToDate(r[idxNgayBatDau]);
+
+      if (chuKy === 1) {
+        if (dDauNoi && dThiCong) {
+          ptmDate = (dThiCong.getTime() > dDauNoi.getTime()) ? dThiCong : dDauNoi;
+        } else {
+          ptmDate = dThiCong || dDauNoi || dBatDau;
+        }
+      } else {
+        ptmDate = dBatDau;
       }
+    }
 
-      // Khớp vào 6 Khu vực chuẩn
-      let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc));
-      if (!matchedRegion) {
-        matchedRegion = khuVuc.includes('TT') ? 'TT.KDVT' : 'TT.KDVT';
-      }
+    const isPtmInPeriod = ptmDate && (ptmDate >= dateStart && ptmDate <= dateEnd);
 
-      if (regionMap.has(matchedRegion)) {
-        const regStat = regionMap.get(matchedRegion);
-        regStat.count++;
-        regStat.dtpk += dtpk;
-      }
+    if (isPtmInPeriod) {
+      ptmCount++;
+      ptmRevenue += giaCuoc;
+      regStat.ptmSub++;
+      regStat.ptmRevenue += giaCuoc;
 
-      // Thống kê Gói cước
+      // Gom toàn bộ gói cước PTM
       const goiCuoc = String(r[idxGoiCuoc] || 'Khác').trim().toUpperCase();
-      if (!packageMap.has(goiCuoc)) {
-        packageMap.set(goiCuoc, { count: 0, dtpk: 0 });
+      if (!ptmPackageMap.has(goiCuoc)) {
+        ptmPackageMap.set(goiCuoc, { count: 0, revenue: 0, dtpk: 0 });
       }
-      const pkgStat = packageMap.get(goiCuoc);
-      pkgStat.count++;
-      pkgStat.dtpk += dtpk;
+      const pInfo = ptmPackageMap.get(goiCuoc);
+      pInfo.count++;
+      pInfo.revenue += giaCuoc;
+      pInfo.dtpk += dtpk;
+    }
+
+    // XÉT TIÊU CHÍ DOANH THU TOÀN TỈNH & DTPK HIỆN HỮU (CHUẨN RULE Mod_DoanhThuPhanBo.gs)
+    const isQualifyRevenue = !isNghiepVu && 
+                            (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
+                            (statusChan === 'bình thường' || statusChan === 'binh thuong' || !statusChan);
+
+    if (isQualifyRevenue) {
+      const dKetThuc = parseToDate(r[idxNgayKetThuc]);
+      const isValidCurrent = !dKetThuc || dKetThuc >= dateStart;
+
+      if (isPtmInPeriod) {
+        totalRevenueDtpk += dtpk;
+        regStat.totalDtpk += dtpk;
+      } else if (isValidCurrent) {
+        totalRevenueDtpk += dtpk;
+        regStat.currentSub++;
+        regStat.currentDtpk += dtpk;
+        regStat.totalDtpk += dtpk;
+      }
     }
   }
 
-  // 3. ĐÓNG GÓI JSON CHO DASHBOARD
+  // 3. ĐÓNG GÓI DỮ LIỆU JSON
   const regionStats = STANDARD_REGIONS.map(regName => {
-    const data = regionMap.get(regName);
+    const s = regionMap.get(regName);
     return {
       name: regName,
-      count: data.count,
-      dtpk: data.dtpk
+      currentSub: s.currentSub,
+      ptmSub: s.ptmSub,
+      totalSub: s.currentSub + s.ptmSub,
+      totalDtpk: s.totalDtpk,
+      ptmRevenue: s.ptmRevenue
     };
   });
 
-  // Top 6 gói cước có doanh thu DTPK hoặc số lượng lớn nhất
-  const packageDistribution = Array.from(packageMap.entries())
+  // Toàn bộ gói cước PTM sắp xếp từ lớn đến nhỏ theo số lượng đăng ký
+  const packageDistribution = Array.from(ptmPackageMap.entries())
     .map(([pkg, info]) => ({
       package: pkg,
       count: info.count,
+      revenue: info.revenue,
       dtpk: info.dtpk,
-      ratio: totalRevenueDtpk > 0 ? ((info.dtpk / totalRevenueDtpk) * 100).toFixed(1) : 0
+      ratio: ptmCount > 0 ? ((info.count / ptmCount) * 100).toFixed(1) : 0
     }))
-    .sort((a, b) => b.dtpk - a.dtpk)
-    .slice(0, 6);
+    .sort((a, b) => b.count - a.count);
 
   return {
     period: periodType,
-    totalSub: totalSub,
+    totalSub: activeSub + blockedSub + cancelledSub,
     activeSub: activeSub,
     blockedSub: blockedSub,
     cancelledSub: cancelledSub,
+    ptmCount: ptmCount,
+    ptmRevenue: ptmRevenue,
     totalRevenueDtpk: totalRevenueDtpk,
     regionStats: regionStats,
     packageDistribution: packageDistribution,
