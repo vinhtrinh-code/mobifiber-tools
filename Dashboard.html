@@ -2,217 +2,315 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Tra cứu MobiFiber 360° - MobiFone Lâm Đồng</title>
+  <title>MobiFiber Realtime Dashboard - MobiFone Lâm Đồng</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f1f5f9; }
-    .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.04); }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; }
+    .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
+    .tab-btn.active { background-color: #1a73e8; color: #ffffff; font-weight: 600; }
   </style>
 </head>
 <body class="text-slate-800 antialiased min-h-screen pb-12">
 
-  <!-- HEADER -->
+  <!-- TOP HEADER -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
-    <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-          🔍
+          MF
         </div>
         <div>
-          <h1 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">Tra Cứu MobiFiber 360°</h1>
+          <h1 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">MobiFiber Realtime Dashboard</h1>
           <p class="text-xs text-slate-500">TTKD Viễn thông MobiFone Lâm Đồng</p>
         </div>
       </div>
-      <a href="?page=dashboard" class="text-xs text-blue-600 font-semibold bg-blue-50 px-3 py-1.5 rounded-md hover:bg-blue-100 transition-colors">
-        📊 Xem Dashboard
-      </a>
+      <button onclick="changePeriod(currentPeriod)" id="refreshBtn" class="flex items-center space-x-1 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md text-xs font-semibold transition-colors">
+        <span>🔄 Làm mới</span>
+      </button>
+    </div>
+
+    <!-- TABS KỲ BÁO CÁO -->
+    <div class="max-w-7xl mx-auto px-4 border-t border-slate-100 flex space-x-2 py-2 overflow-x-auto no-scrollbar">
+      <button onclick="changePeriod('week')" id="tab-week" class="tab-btn px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-100 whitespace-nowrap transition-colors">Tuần này</button>
+      <button onclick="changePeriod('month')" id="tab-month" class="tab-btn px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-100 whitespace-nowrap transition-colors active">Tháng này</button>
+      <button onclick="changePeriod('quarter')" id="tab-quarter" class="tab-btn px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-100 whitespace-nowrap transition-colors">Quý này</button>
+      <button onclick="changePeriod('6tdn')" id="tab-6tdn" class="tab-btn px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-100 whitespace-nowrap transition-colors">6T Đầu năm</button>
+      <button onclick="changePeriod('9tdn')" id="tab-9tdn" class="tab-btn px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-100 whitespace-nowrap transition-colors">9T Đầu năm</button>
+      <button onclick="changePeriod('year')" id="tab-year" class="tab-btn px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-100 whitespace-nowrap transition-colors">Năm 2026</button>
     </div>
   </header>
 
-  <!-- SEARCH INPUT CONTAINER -->
-  <main class="max-w-4xl mx-auto px-4 py-5">
-    
-    <!-- SEARCH BOX -->
-    <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 card-shadow mb-5">
-      <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Nhập thông tin tra cứu</label>
-      <div class="flex flex-col sm:flex-row gap-2">
-        <div class="relative flex-1">
-          <input 
-            type="text" 
-            id="searchInput" 
-            placeholder="Mã khách hàng, Số điện thoại hoặc Serial ONT..." 
-            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-            onkeydown="if(event.key === 'Enter') handleSearch()"
-          >
-          <button onclick="clearSearch()" id="clearBtn" class="hidden absolute right-3 top-3 text-slate-400 hover:text-slate-600 text-sm">✕</button>
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 py-5">
+
+    <!-- CỤM KPI CỐT LÕI: 2 CARD ĐỒNG BỘ TRÊN 1 HÀNG -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+      
+      <!-- CARD 1: DTPK TOÀN TỈNH -->
+      <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-5 rounded-xl card-shadow flex flex-col justify-between">
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs uppercase font-medium tracking-wider text-blue-100">Doanh thu Phân kỳ (DTPK) Toàn tỉnh</span>
+            <span class="px-2 py-0.5 rounded text-[10px] bg-white/20 font-semibold" id="periodLabel">Tháng này</span>
+          </div>
+          <div class="text-2xl sm:text-3xl font-extrabold mt-1 tracking-tight" id="valDtpk">--- đ</div>
         </div>
-        <button 
-          onclick="handleSearch()" 
-          id="btnSearch"
-          class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center space-x-2"
-        >
-          <span>Tìm kiếm</span>
-        </button>
+        <div class="text-[11px] text-blue-200 mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
+          <span>✓ Chuẩn rule DTPB (Loại TB nghiệp vụ & Chặn nợ)</span>
+          <span id="updateTime">Cập nhật: --:--</span>
+        </div>
       </div>
-      <div class="flex flex-wrap items-center gap-2 mt-3 text-[11px] text-slate-400">
-        <span class="bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-medium">⚡ Mẹo tra cứu:</span>
-        <span>Hỗ trợ tìm gần đúng mã 8 số/10 số, số điện thoại liên hệ hoặc mã serial thiết bị.</span>
+
+      <!-- CARD 2: TỔNG THUÊ BAO & 3 TRẠNG THÁI (GỌN GÀNG CÙNG 1 KHUNG) -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow flex flex-col justify-between">
+        <div class="flex justify-between items-baseline mb-2">
+          <span class="text-xs uppercase font-semibold text-slate-500 tracking-wider">Tổng thuê bao tích lũy</span>
+          <div class="text-2xl font-bold text-slate-900"><span id="valTotalSub">---</span> <span class="text-xs font-normal text-slate-500">TB</span></div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+          <div class="bg-emerald-50/80 p-2 rounded-lg border border-emerald-100">
+            <div class="text-[11px] text-emerald-700 font-medium">Đang hoạt động</div>
+            <div class="text-base sm:text-lg font-bold text-emerald-700 mt-0.5" id="valActiveSub">---</div>
+          </div>
+          <div class="bg-amber-50/80 p-2 rounded-lg border border-amber-100">
+            <div class="text-[11px] text-amber-700 font-medium">Chặn / KHYC</div>
+            <div class="text-base sm:text-lg font-bold text-amber-700 mt-0.5" id="valBlockedSub">---</div>
+          </div>
+          <div class="bg-rose-50/80 p-2 rounded-lg border border-rose-100">
+            <div class="text-[11px] text-rose-700 font-medium">Hủy / Thu ONT</div>
+            <div class="text-base sm:text-lg font-bold text-rose-700 mt-0.5" id="valCancelledSub">---</div>
+          </div>
+        </div>
       </div>
+
     </div>
 
-    <!-- LOADING SPINNER -->
-    <div id="loadingBox" class="hidden text-center py-12">
-      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-      <p class="text-xs text-slate-500 mt-2 font-medium">Đang quét cơ sở dữ liệu trên hệ thống...</p>
+    <!-- KHỐI BIỂU ĐỒ 6 KHU VỰC & DANH SÁCH TOÀN BỘ GÓI CƯỚC PTM -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+      
+      <!-- Cột Trái: Biểu đồ Cột 6 Khu vực (Hỗ trợ chuyển đổi DTPK / Số TB) -->
+      <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 card-shadow">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2">
+            <button onclick="toggleChartMode('dtpk')" id="btnChartDtpk" class="text-xs font-bold px-3 py-1 rounded bg-blue-50 text-blue-600 border border-blue-200">Phân bổ DTPK</button>
+            <button onclick="toggleChartMode('sub')" id="btnChartSub" class="text-xs font-medium px-3 py-1 rounded text-slate-600 hover:bg-slate-50 border border-slate-200">Thuê bao theo 6 Địa bàn</button>
+          </div>
+          <span class="text-[11px] bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-medium" id="chartUnitLabel">VNĐ</span>
+        </div>
+        <div class="h-64 sm:h-72">
+          <canvas id="regionChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Cột Phải: Toàn bộ Gói cước PTM trong kỳ -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm sm:text-base font-bold text-slate-900">Gói cước PTM trong kỳ</h2>
+            <span class="text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded"><span id="valPtmCount">0</span> TB PTM</span>
+          </div>
+          <div id="packageList" class="space-y-3 max-h-64 overflow-y-auto pr-1">
+            <div class="text-xs text-slate-400 text-center py-8 italic">Đang nạp dữ liệu...</div>
+          </div>
+        </div>
+        <div class="text-[11px] text-slate-400 text-center pt-3 border-t border-slate-100 mt-2">
+          Sắp xếp theo số lượng đăng ký PTM giảm dần
+        </div>
+      </div>
+
     </div>
 
-    <!-- RESULT LIST CONTAINER -->
-    <div id="resultCount" class="text-xs font-semibold text-slate-500 mb-3 px-1 hidden"></div>
-    <div id="resultList" class="space-y-4"></div>
-
-    <!-- INITIAL EMPTY STATE -->
-    <div id="emptyGuide" class="bg-white rounded-2xl border border-slate-200 p-8 text-center card-shadow">
-      <div class="text-4xl mb-3">📱</div>
-      <h3 class="text-sm font-bold text-slate-800 mb-1">Cổng Tra Cứu Thông Tin Khách Hàng MobiFiber</h3>
-      <p class="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-        Nhập Mã khách hàng, Số điện thoại hoặc Serial modem ONT vào thanh tìm kiếm phía trên để xem chi tiết hồ sơ hợp đồng, chu kỳ cước, thời hạn và nhân sự phụ trách.
-      </p>
+    <!-- BẢNG CHI TIẾT 6 CỤM ĐỊA BÀN (GỒM CẢ PTM & DTPK) -->
+    <div class="bg-white rounded-xl border border-slate-200 card-shadow overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+        <h2 class="text-sm font-bold text-slate-900">Chi tiết Chỉ số Kinh doanh 6 Cụm Địa bàn</h2>
+        <span class="text-xs text-slate-500">Chuẩn hóa 6 đơn vị viễn thông</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs sm:text-sm text-slate-600">
+          <thead class="bg-slate-50 text-[11px] text-slate-500 uppercase tracking-wider border-b border-slate-200">
+            <tr>
+              <th class="px-4 py-3">STT</th>
+              <th class="px-4 py-3">Khu vực / Cụm</th>
+              <th class="px-4 py-3 text-center">PTM Trong kỳ</th>
+              <th class="px-4 py-3 text-center">Thuê bao DTPK</th>
+              <th class="px-4 py-3 text-right">Tổng DTPK</th>
+              <th class="px-4 py-3 text-right">Tỷ trọng DTPK (%)</th>
+            </tr>
+          </thead>
+          <tbody id="regionTableBody" class="divide-y divide-slate-200 font-medium">
+            <tr>
+              <td colspan="6" class="px-4 py-6 text-center text-slate-400 italic">Đang nạp dữ liệu...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
   </main>
 
   <script>
+    let currentPeriod = 'month';
+    let chartMode = 'dtpk'; // 'dtpk' hoặc 'sub'
+    let currentDashboardData = null;
+    let regionChartInstance = null;
+
+    const periodLabels = {
+      'week': 'Tuần này',
+      'month': 'Tháng này',
+      'quarter': 'Quý này',
+      '6tdn': '6T Đầu năm',
+      '9tdn': '9T Đầu năm',
+      'year': 'Năm 2026'
+    };
+
     function formatCurrency(num) {
       return Number(num || 0).toLocaleString('vi-VN') + ' đ';
     }
 
-    function clearSearch() {
-      const input = document.getElementById('searchInput');
-      input.value = '';
-      input.focus();
-      document.getElementById('clearBtn').classList.add('hidden');
+    function toggleChartMode(mode) {
+      chartMode = mode;
+      document.getElementById('btnChartDtpk').className = mode === 'dtpk' 
+        ? 'text-xs font-bold px-3 py-1 rounded bg-blue-50 text-blue-600 border border-blue-200'
+        : 'text-xs font-medium px-3 py-1 rounded text-slate-600 hover:bg-slate-50 border border-slate-200';
+      document.getElementById('btnChartSub').className = mode === 'sub'
+        ? 'text-xs font-bold px-3 py-1 rounded bg-blue-50 text-blue-600 border border-blue-200'
+        : 'text-xs font-medium px-3 py-1 rounded text-slate-600 hover:bg-slate-50 border border-slate-200';
+      document.getElementById('chartUnitLabel').innerText = mode === 'dtpk' ? 'VNĐ' : 'Thuê bao';
+
+      if (currentDashboardData) renderRegionChart(currentDashboardData);
     }
 
-    document.getElementById('searchInput').addEventListener('input', function(e) {
-      const btn = document.getElementById('clearBtn');
-      if (e.target.value.trim()) btn.classList.remove('hidden');
-      else btn.classList.add('hidden');
-    });
+    function changePeriod(p) {
+      currentPeriod = p;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById('tab-' + p);
+      if (activeBtn) activeBtn.classList.add('active');
+      document.getElementById('periodLabel').innerText = periodLabels[p] || 'Kỳ này';
 
-    function handleSearch() {
-      const q = document.getElementById('searchInput').value.trim();
-      if (!q) {
-        alert('Vui lòng nhập từ khóa tra cứu!');
-        return;
-      }
-
-      const btn = document.getElementById('btnSearch');
-      const loading = document.getElementById('loadingBox');
-      const resultList = document.getElementById('resultList');
-      const resultCount = document.getElementById('resultCount');
-      const emptyGuide = document.getElementById('emptyGuide');
-
-      btn.disabled = true;
-      btn.innerText = 'Đang tìm...';
-      loading.classList.remove('hidden');
-      resultList.innerHTML = '';
-      resultCount.classList.add('hidden');
-      emptyGuide.classList.add('hidden');
+      const refreshBtn = document.getElementById('refreshBtn');
+      refreshBtn.innerText = '⏳ Đang nạp...';
 
       google.script.run
-        .withSuccessHandler(function(results) {
-          btn.disabled = false;
-          btn.innerText = 'Tìm kiếm';
-          loading.classList.add('hidden');
-          renderResults(results);
+        .withSuccessHandler(function(data) {
+          refreshBtn.innerText = '🔄 Làm mới';
+          currentDashboardData = data;
+          renderDashboard(data);
         })
         .withFailureHandler(function(err) {
-          btn.disabled = false;
-          btn.innerText = 'Tìm kiếm';
-          loading.classList.add('hidden');
-          alert('Lỗi tra cứu: ' + err.message);
+          refreshBtn.innerText = '🔄 Làm mới';
+          alert('Lỗi nạp số liệu: ' + err.message);
         })
-        .apiSearchSubscriber(q);
+        .getDashboardMetrics(p);
     }
 
-    function renderResults(list) {
-      const resultList = document.getElementById('resultList');
-      const resultCount = document.getElementById('resultCount');
+    function renderRegionChart(data) {
+      const regLabels = data.regionStats.map(r => r.name);
+      const isDtpk = chartMode === 'dtpk';
+      const regValues = isDtpk ? data.regionStats.map(r => r.totalDtpk) : data.regionStats.map(r => r.totalSub);
 
-      if (!list || list.length === 0) {
-        resultList.innerHTML = `
-          <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center card-shadow">
-            <div class="text-3xl mb-2">❌</div>
-            <div class="text-sm font-bold text-slate-800">Không tìm thấy thuê bao phù hợp</div>
-            <div class="text-xs text-slate-500 mt-1">Vui lòng kiểm tra lại tính chính xác của Mã KH, SĐT hoặc Serial.</div>
-          </div>
-        `;
-        return;
-      }
-
-      resultCount.innerText = `Tìm thấy ${list.length} kết quả phù hợp:`;
-      resultCount.classList.remove('hidden');
-
-      list.forEach((item, index) => {
-        const isCancelled = item.tinhTrangHD.toLowerCase().includes('hủy') || item.tinhTrangHD.toLowerCase().includes('huy');
-        const isBlocked = item.tinhTrangChan.toLowerCase().includes('nợ') || item.tinhTrangChan.toLowerCase().includes('khóa') || item.tinhTrangChan.toLowerCase().includes('chặn');
-
-        let badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-        let badgeText = item.tinhTrangHD;
-
-        if (isCancelled) {
-          badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
-          badgeText = 'Hợp đồng hủy';
-        } else if (isBlocked) {
-          badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
-          badgeText = item.tinhTrangChan;
+      if (regionChartInstance) regionChartInstance.destroy();
+      const ctx = document.getElementById('regionChart').getContext('2d');
+      regionChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: regLabels,
+          datasets: [{
+            label: isDtpk ? 'DTPK (VNĐ)' : 'Số Thuê bao',
+            data: regValues,
+            backgroundColor: [
+              '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#38bdf8', '#cbd5e1'
+            ],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(val) {
+                  return isDtpk ? (val / 1000000).toFixed(1) + 'M' : val;
+                }
+              }
+            },
+            x: {
+              ticks: { font: { size: 11 } }
+            }
+          }
         }
-
-        const card = document.createElement('div');
-        card.className = 'bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 card-shadow transition-all';
-        card.innerHTML = `
-          <!-- CARD HEADER -->
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2 mb-3">
-            <div>
-              <div class="flex items-center space-x-2">
-                <span class="text-base font-bold text-blue-700">${item.tenTB}</span>
-                <span class="text-xs px-2 py-0.5 rounded-full border font-semibold ${badgeClass}">
-                  ${badgeText}
-                </span>
-              </div>
-              <div class="text-xs text-slate-500 mt-0.5">Mã KH: <span class="font-bold text-slate-800 tracking-wider">${item.maKH}</span></div>
-            </div>
-            <div class="text-left sm:text-right">
-              <div class="text-xs font-semibold text-slate-400">GÓI CƯỚC SỬ DỤNG</div>
-              <div class="text-base font-extrabold text-slate-900">${item.goiCuoc} <span class="text-xs font-normal text-slate-500">(${item.chuKy}T)</span></div>
-            </div>
-          </div>
-
-          <!-- CARD BODY 2 COLUMNS -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs mb-3">
-            <div class="space-y-1.5">
-              <div class="flex"><span class="w-24 text-slate-400">Số điện thoại:</span> <span class="font-semibold text-slate-800">${item.sdt || '---'}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">Giá gói:</span> <span class="font-semibold text-slate-800">${formatCurrency(item.giaCuoc)}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">DTPK:</span> <span class="font-bold text-emerald-600">${formatCurrency(item.dtpk)}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">Hạn gói cước:</span> <span class="font-semibold text-blue-600">${item.ngayKetThuc}</span></div>
-            </div>
-            <div class="space-y-1.5">
-              <div class="flex"><span class="w-24 text-slate-400">Khu vực:</span> <span class="font-semibold text-slate-800">${item.khuVuc}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">Cửa hàng:</span> <span class="font-semibold text-slate-800">${item.tenCH}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">Nhân viên:</span> <span class="font-semibold text-slate-800">${item.tenNV}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">Serial ONT:</span> <span class="font-mono font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">${item.serial}</span></div>
-            </div>
-          </div>
-
-          <!-- CARD FOOTER (ADDRESS) -->
-          <div class="pt-2.5 border-t border-slate-100 flex items-start text-xs text-slate-500">
-            <span class="mr-1.5">📍</span>
-            <span class="flex-1">${item.diaChi}</span>
-          </div>
-        `;
-        resultList.appendChild(card);
       });
     }
+
+    function renderDashboard(data) {
+      // 1. KPI Cards
+      document.getElementById('valDtpk').innerText = formatCurrency(data.totalRevenueDtpk);
+      document.getElementById('valTotalSub').innerText = data.totalSub.toLocaleString('vi-VN');
+      document.getElementById('valActiveSub').innerText = data.activeSub.toLocaleString('vi-VN');
+      document.getElementById('valBlockedSub').innerText = data.blockedSub.toLocaleString('vi-VN');
+      document.getElementById('valCancelledSub').innerText = data.cancelledSub.toLocaleString('vi-VN');
+      document.getElementById('valPtmCount').innerText = data.ptmCount.toLocaleString('vi-VN');
+      document.getElementById('updateTime').innerText = 'Cập nhật: ' + data.lastUpdated;
+
+      // 2. Render Biểu đồ Khu vực
+      renderRegionChart(data);
+
+      // 3. Render Toàn bộ Gói cước PTM
+      const pkgList = document.getElementById('packageList');
+      pkgList.innerHTML = '';
+
+      if (data.packageDistribution.length === 0) {
+        pkgList.innerHTML = '<div class="text-xs text-slate-400 text-center py-6 italic">Không có phát sinh gói PTM trong kỳ.</div>';
+      } else {
+        data.packageDistribution.forEach(pkg => {
+          const item = document.createElement('div');
+          item.className = 'text-xs';
+          item.innerHTML = `
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-bold text-slate-800">${pkg.package}</span>
+              <div class="text-right">
+                <span class="font-semibold text-blue-600">${pkg.count} TB</span>
+                <span class="text-slate-400 mx-1">|</span>
+                <span class="text-slate-600 font-medium">${pkg.ratio}%</span>
+              </div>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+              <div class="bg-blue-600 h-2 rounded-full" style="width: ${Math.min(pkg.ratio, 100)}%"></div>
+            </div>
+          `;
+          pkgList.appendChild(item);
+        });
+      }
+
+      // 4. Render Bảng 6 Cụm Địa bàn
+      const tbody = document.getElementById('regionTableBody');
+      tbody.innerHTML = '';
+
+      data.regionStats.forEach((reg, idx) => {
+        const ratio = data.totalRevenueDtpk > 0 ? ((reg.totalDtpk / data.totalRevenueDtpk) * 100).toFixed(1) : '0.0';
+        const isZero = reg.totalSub === 0;
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors';
+        tr.innerHTML = `
+          <td class="px-4 py-3 text-slate-400 font-normal">${idx + 1}</td>
+          <td class="px-4 py-3 font-semibold ${isZero ? 'text-slate-400' : 'text-slate-900'}">${reg.name}</td>
+          <td class="px-4 py-3 text-center font-bold ${reg.ptmSub > 0 ? 'text-emerald-600' : 'text-slate-400'}">${reg.ptmSub.toLocaleString('vi-VN')} TB</td>
+          <td class="px-4 py-3 text-center ${isZero ? 'text-slate-400' : 'text-slate-800'}">${reg.totalSub.toLocaleString('vi-VN')} TB</td>
+          <td class="px-4 py-3 text-right font-bold ${isZero ? 'text-slate-400' : 'text-emerald-600'}">${formatCurrency(reg.totalDtpk)}</td>
+          <td class="px-4 py-3 text-right font-semibold ${isZero ? 'text-slate-400' : 'text-blue-600'}">${ratio}%</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.onload = function() {
+      changePeriod('month');
+    };
   </script>
 </body>
 </html>
