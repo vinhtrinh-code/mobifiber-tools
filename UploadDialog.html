@@ -2,267 +2,110 @@
 <html>
 <head>
   <base target="_top">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-      padding: 14px;
-      margin: 0;
-      background: #f8f9fa;
-      color: #202124;
-      font-size: 13px;
-    }
-    .card {
-      background: #ffffff;
-      border: 1px solid #dadce0;
-      border-radius: 8px;
-      padding: 12px 14px;
-      margin-bottom: 10px;
-    }
-    .drop-zone {
-      border: 2px dashed #1a73e8;
-      border-radius: 6px;
-      padding: 16px 10px;
-      text-align: center;
-      background: #f8fafd;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .drop-zone.dragover {
-      background: #e8f0fe;
-      border-color: #0b57d0;
-    }
-    .drop-zone .icon { font-size: 26px; margin-bottom: 4px; }
-    .drop-zone strong { font-size: 13px; color: #1a73e8; display: block; }
-    .drop-zone .sub-text { font-size: 11px; color: #5f6368; margin-top: 2px; }
-    select {
-      width: 100%;
-      padding: 7px 10px;
-      border-radius: 4px;
-      border: 1px solid #dadce0;
-      font-size: 12px;
-      background: #fff;
-      margin-top: 6px;
-    }
-    .btn {
-      width: 100%;
-      padding: 10px 14px;
-      border-radius: 6px;
-      border: none;
-      font-weight: 600;
-      font-size: 13px;
-      cursor: pointer;
-      display: block;
-      text-align: center;
-    }
-    .btn-primary { background: #1a73e8; color: #ffffff; margin-top: 8px; }
-    .btn-primary:hover { background: #1557b0; }
-    .btn-primary:disabled { background: #dadce0; cursor: not-allowed; }
-    .btn-close { background: #f1f3f4; color: #202124; border: 1px solid #dadce0; margin-top: 8px; }
-    .btn-close:hover { background: #e8eaed; }
-
-    .alert-banner {
-      display: none;
-      background: #fce8e6;
-      border: 1px solid #f5c2c7;
-      color: #c5221f;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      margin-bottom: 10px;
-    }
-    .status {
-      font-size: 12px;
-      margin-top: 8px;
-      padding: 8px;
-      border-radius: 4px;
-      display: none;
-      text-align: center;
-    }
-    .status.info { background: #e8f0fe; color: #174ea6; display: block; }
-
-    #successView { display: none; padding: 4px 2px; }
-    .success-title { font-size: 16px; font-weight: bold; color: #137333; margin-bottom: 10px; text-align: center; }
-    .result-card {
-      border-radius: 6px;
-      padding: 10px 14px;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-left: 4px solid;
-    }
-    .card-update { background: #e8f0fe; border-color: #1a73e8; color: #174ea6; }
-    .card-insert { background: #e6f4ea; border-color: #137333; color: #0d652d; }
-    .card-sync { background: #fef7e0; border-color: #b06000; color: #7e5700; }
-    .result-title { font-size: 12px; font-weight: 600; }
-    .result-detail { font-size: 11px; opacity: 0.85; margin-top: 2px; }
-    .result-value { font-size: 18px; font-weight: 700; white-space: nowrap; margin-left: 8px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; margin: 0; background: #f8fafc; font-size: 13px; color: #1e293b; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .drop-zone { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.2s; background: #f1f5f9; }
+    .drop-zone:hover { border-color: #3b82f6; background: #eff6ff; }
+    .btn { display: inline-block; width: 100%; padding: 10px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; margin-top: 10px; }
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .status-box { display: none; margin-top: 12px; padding: 10px; border-radius: 8px; font-size: 12px; text-align: center; }
+    .status-loading { background: #dbeafe; color: #1e40af; }
+    .status-success { background: #dcfce7; color: #15803d; }
+    .status-error { background: #fee2e2; color: #b91c1c; }
   </style>
 </head>
 <body>
-  <div id="formView">
-    <div id="errorBanner" class="alert-banner"></div>
+  <div class="card">
+    <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px; color: #0f172a;">Cập nhật danh sách thuê bao MobiFiber</div>
+    <div style="font-size: 11px; color: #64748b; margin-bottom: 12px;">Hỗ trợ tệp định dạng Excel (.xlsx, .xls) trích xuất từ hệ thống cước.</div>
 
-    <div class="card" id="dropCard">
-      <div class="drop-zone" id="dropZone">
-        <div class="icon">📂</div>
-        <strong id="fileLabel">Chọn hoặc kéo thả file Excel vào đây</strong>
-        <div class="sub-text">Hỗ trợ các định dạng .xlsx, .xls, .csv</div>
-        <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none" onchange="handleFile(this.files[0])">
-      </div>
+    <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+      <div style="font-size: 28px; margin-bottom: 4px;">📂</div>
+      <div id="dropText" style="font-weight: 600; color: #334155;">Nhấp hoặc kéo thả file Excel vào đây</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Tối đa 1 file mỗi lần cập nhật</div>
+      <input type="file" id="fileInput" accept=".xlsx, .xls" style="display: none;" onchange="onFileSelected(this)">
     </div>
 
-    <div class="card" id="headerSection" style="display:none;">
-      <div style="font-size: 12px; font-weight: 600; color: #3c4043;">Dòng tiêu đề chính (chứa cột "MÃ KHÁCH HÀNG"):</div>
-      <select id="headerSelect"></select>
-      <div style="font-size: 11px; color: #5f6368; margin-top: 4px; font-style: italic;">
-        💡 Hệ thống sẽ tự động bỏ qua dòng đánh số thứ tự cột và tự động đồng bộ tham số mới.
-      </div>
-    </div>
+    <div id="statusBox" class="status-box"></div>
 
-    <button id="btnSubmit" class="btn btn-primary" style="display:none;" onclick="startUpdate()">🚀 Cập nhật dữ liệu</button>
-    <div id="statusBox" class="status"></div>
-  </div>
-
-  <div id="successView">
-    <div class="success-title">🎉 CẬP NHẬT DỮ LIỆU THÀNH CÔNG!</div>
-    
-    <div class="result-card card-update">
-      <div>
-        <div class="result-title">1. Thuê bao cập nhật thông tin</div>
-        <div class="result-detail" id="updateDetail">Chi tiết các ô dữ liệu được đồng bộ</div>
-      </div>
-      <div class="result-value" id="updateCount">0</div>
-    </div>
-
-    <div class="result-card card-insert">
-      <div>
-        <div class="result-title">2. Thuê bao phát sinh mới</div>
-        <div class="result-detail" id="insertDetail">Bổ sung hợp lệ vào cuối bảng</div>
-      </div>
-      <div class="result-value" id="insertCount">0</div>
-    </div>
-
-    <!-- THẺ THÔNG BÁO ĐỒNG BỘ THAM SỐ MỚI -->
-    <div class="result-card card-sync" id="syncBox" style="display:none;">
-      <div>
-        <div class="result-title">3. Tự động đồng bộ tham số mới</div>
-        <div class="result-detail" id="syncDetail">Đã bổ sung vào sheet "thamso_caidat"</div>
-      </div>
-      <div class="result-value" id="syncCount">0</div>
-    </div>
-
-    <button class="btn btn-close" onclick="google.script.host.close()">Đóng cửa sổ</button>
+    <button id="btnUpload" class="btn btn-primary" onclick="startProcess()" disabled>
+      Tiến hành Cập nhật & Đối soát
+    </button>
   </div>
 
   <script>
-    let rawDataArray = [];
-    const dropZone = document.getElementById('dropZone');
+    let rawSheetData = null;
 
-    dropZone.addEventListener('click', () => document.getElementById('fileInput').click());
-
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-      window.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
-      dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
-    });
-
-    ['dragenter', 'dragover'].forEach(name => dropZone.addEventListener(name, () => dropZone.classList.add('dragover'), false));
-    ['dragleave', 'drop'].forEach(name => dropZone.addEventListener(name, () => dropZone.classList.remove('dragover'), false));
-
-    dropZone.addEventListener('drop', e => {
-      const files = e.dataTransfer.files;
-      if (files && files.length > 0) handleFile(files[0]);
-    });
-
-    function showError(msg) {
-      const b = document.getElementById('errorBanner');
-      b.innerText = '⚠️ ' + msg;
-      b.style.display = 'block';
-    }
-
-    function hideError() {
-      document.getElementById('errorBanner').style.display = 'none';
-    }
-
-    function handleFile(file) {
+    function onFileSelected(input) {
+      const file = input.files[0];
       if (!file) return;
-      hideError();
-      document.getElementById('fileLabel').innerText = '📄 ' + file.name;
+
+      document.getElementById('dropText').innerText = '📄 ' + file.name;
+      showStatus('Đang đọc cấu trúc file Excel...', 'loading');
 
       const reader = new FileReader();
       reader.onload = function(e) {
         try {
           const data = new Uint8Array(e.target.result);
-          const wb = XLSX.read(data, { type: 'array', cellDates: true });
-          rawDataArray = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
-          detectHeaderRow();
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          rawSheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+          if (!rawSheetData || rawSheetData.length < 2) {
+            showStatus('File không có dữ liệu hợp lệ!', 'error');
+            return;
+          }
+
+          document.getElementById('btnUpload').disabled = false;
+          showStatus(`Đã nạp thành công ${rawSheetData.length} dòng. Nhấn nút bên dưới để cập nhật.`, 'success');
         } catch (err) {
-          showError('Không thể đọc file: ' + err.message);
+          showStatus('Lỗi đọc file: ' + err.message, 'error');
         }
       };
       reader.readAsArrayBuffer(file);
     }
 
-    function detectHeaderRow() {
-      const select = document.getElementById('headerSelect');
-      select.innerHTML = '';
-      let detectedIdx = 0;
+    function startProcess() {
+      if (!rawSheetData) return;
+      const btn = document.getElementById('btnUpload');
+      btn.disabled = true;
+      btn.innerText = '⏳ Đang đối soát và ghi nhật ký...';
+      showStatus('Hệ thống đang ghi dữ liệu vào raw_mobifiber và đối soát thay đổi...', 'loading');
 
-      for (let i = 0; i < Math.min(15, rawDataArray.length); i++) {
-        const row = rawDataArray[i] || [];
-        const opt = document.createElement('option');
-        opt.value = i;
-        opt.text = `Dòng ${i + 1}: ` + row.filter(c => c).slice(0, 4).join(' | ');
-        select.appendChild(opt);
-
-        const rowStr = row.map(c => String(c || '').toLowerCase()).join(' ');
-        if (rowStr.includes('mã khách hàng') || rowStr.includes('ma khach hang') || rowStr.includes('makh')) {
-          detectedIdx = i;
+      // Tự động tìm dòng tiêu đề (chứa MÃ KHÁCH HÀNG)
+      let headerRowIndex = 0;
+      for (let i = 0; i < Math.min(rawSheetData.length, 10); i++) {
+        const rowStr = (rawSheetData[i] || []).join(' ').toLowerCase();
+        if (rowStr.includes('mã khách hàng') || rowStr.includes('ma khach hang')) {
+          headerRowIndex = i;
+          break;
         }
       }
 
-      select.value = detectedIdx;
-      document.getElementById('headerSection').style.display = 'block';
-      document.getElementById('btnSubmit').style.display = 'block';
-    }
-
-    function startUpdate() {
-      hideError();
-      const headerIdx = parseInt(document.getElementById('headerSelect').value, 10);
-      const btn = document.getElementById('btnSubmit');
-      const status = document.getElementById('statusBox');
-
-      btn.disabled = true;
-      btn.innerText = '⏳ Đang quét & đối soát...';
-      status.className = 'status info';
-      status.innerText = 'Đang tự động đối soát và đồng bộ tham số mới...';
-
       google.script.run
         .withSuccessHandler(function(res) {
-          document.getElementById('formView').style.display = 'none';
-          document.getElementById('updateCount').innerText = res.updatedCustCount + ' KH';
-          document.getElementById('updateDetail').innerText = 'Đã cập nhật ' + res.updatedFieldsCount + ' ô thông tin thay đổi';
-          document.getElementById('insertCount').innerText = res.insertedCount + ' KH';
-          document.getElementById('insertDetail').innerText = 'Đã thêm ' + res.insertedCount + ' thuê bao mới hợp lệ';
-
-          // Hiển thị kết quả đồng bộ tham số mới (nếu có phát sinh)
-          if (res.newParamsCount && res.newParamsCount > 0) {
-            document.getElementById('syncBox').style.display = 'flex';
-            document.getElementById('syncCount').innerText = res.newParamsCount;
-            document.getElementById('syncDetail').innerText = res.syncDetails;
-          }
-
-          document.getElementById('successView').style.display = 'block';
+          btn.innerText = 'Hoàn tất';
+          showStatus(`✅ Đã cập nhật xong! Thêm mới: ${res.insertedCount} TB | Cập nhật: ${res.updatedCustCount} TB.`, 'success');
+          setTimeout(() => { google.script.host.close(); }, 2000);
         })
         .withFailureHandler(function(err) {
           btn.disabled = false;
-          btn.innerText = '🚀 Cập nhật dữ liệu';
-          status.style.display = 'none';
-          showError(err.message);
+          btn.innerText = 'Thử lại';
+          showStatus('Lỗi xử lý: ' + err.message, 'error');
         })
-        .processDataUpdate(rawDataArray, headerIdx);
+        .processDataUpdate(rawSheetData, headerRowIndex);
+    }
+
+    function showStatus(text, type) {
+      const box = document.getElementById('statusBox');
+      box.style.display = 'block';
+      box.innerText = text;
+      box.className = 'status-box status-' + type;
     }
   </script>
 </body>
