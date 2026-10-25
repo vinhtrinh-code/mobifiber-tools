@@ -2,9 +2,9 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * FILE        : WebApp_API.gs
- * PHIÊN BẢN   : 6.0 (Hỗ trợ lọc linh hoạt Tháng/Năm, Tra cứu USER & Data Labels)
+ * PHIÊN BẢN   : 7.0 (API Xu hướng 12 Tháng cho Biểu đồ Điểm & Chuẩn hóa Lọc Năm/Tháng)
  * NGÀY TẠO    : 24/10/2026 20:15:00 (GMT+7)
- * NGÀY CẬP NHẬT: 25/10/2026 15:30:00 (GMT+7)
+ * NGÀY CẬP NHẬT: 25/10/2026 17:00:00 (GMT+7)
  * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
@@ -33,13 +33,10 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-/**
- * Xác định khoảng ngày linh hoạt theo Năm và Kỳ chọn
- */
 function getDateRangeByPeriod(periodType, selectedYear, selectedMonth) {
   const now = new Date();
   const y = parseInt(selectedYear, 10) || now.getFullYear();
-  const m = selectedMonth !== undefined ? parseInt(selectedMonth, 10) : now.getMonth(); // 0-indexed
+  const m = selectedMonth !== undefined ? parseInt(selectedMonth, 10) : now.getMonth();
 
   let start = null;
   let end = null;
@@ -93,7 +90,7 @@ function getDateRangeByPeriod(periodType, selectedYear, selectedMonth) {
 }
 
 /**
- * 1. API BÓC TÁCH DỮ LIỆU DASHBOARD
+ * API BÓC TÁCH DỮ LIỆU DASHBOARD & TÍNH XU HƯỚNG 12 THÁNG
  */
 function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -102,38 +99,47 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
 
   const lastRow = rawSheet.getLastRow();
   const lastCol = rawSheet.getLastColumn();
+  const yTarget = parseInt(selectedYear, 10) || new Date().getFullYear();
+  const mTarget = selectedMonth !== undefined ? parseInt(selectedMonth, 10) : new Date().getMonth();
 
   const regionMap = new Map();
   STANDARD_REGIONS.forEach(reg => {
     regionMap.set(reg, {
-      currentSub: 0,
-      currentDtpk: 0,
-      ptmSub: 0,
-      ptmDtpk: 0,
-      totalSub: 0,
-      totalDtpk: 0
+      currentSub: 0, currentDtpk: 0,
+      ptmSub: 0, ptmDtpk: 0,
+      totalSub: 0, totalDtpk: 0
     });
   });
+
+  // Mảng 12 tháng xu hướng cho biểu đồ Điểm
+  const monthlyTrend = [];
+  for (let m = 0; m < 12; m++) {
+    monthlyTrend.push({
+      monthLabel: 'T' + (m + 1),
+      monthIndex: m,
+      hasData: m <= mTarget,
+      currentDtpk: 0,
+      ptmDtpk: 0,
+      totalDtpk: 0,
+      ptmSub: 0,
+      currentSub: 0
+    });
+  }
 
   if (lastRow < CONFIG.DATA_START_ROW_TARGET) {
     return {
       period: periodType,
-      selectedYear: selectedYear || new Date().getFullYear(),
-      selectedMonth: selectedMonth !== undefined ? selectedMonth : new Date().getMonth(),
+      selectedYear: yTarget,
+      selectedMonth: mTarget,
       summary: {
-        totalRevenue: 0,
-        revenueCurrent: 0,
-        revenuePtm: 0,
-        totalActiveSub: 0,
-        subCurrent: 0,
-        subPtm: 0,
-        subDebt: 0,
-        subKhyc: 0,
-        subCancelled: 0
+        totalRevenue: 0, revenueCurrent: 0, revenuePtm: 0,
+        totalActiveSub: 0, subCurrent: 0, subPtm: 0,
+        subDebt: 0, subKhyc: 0, subCancelled: 0
       },
       regionStats: STANDARD_REGIONS.map(name => ({
         name, currentSub: 0, ptmSub: 0, totalSub: 0, currentDtpk: 0, ptmDtpk: 0, totalDtpk: 0
       })),
+      monthlyTrend: monthlyTrend,
       packagePtmDistribution: [],
       lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
     };
@@ -168,7 +174,7 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     });
   }
 
-  const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType, selectedYear, selectedMonth);
+  const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType, yTarget, mTarget);
 
   let subDebt = 0;
   let subKhyc = 0;
@@ -233,9 +239,8 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
       }
     }
 
+    // 1. Phân loại theo kỳ hiện tại đang chọn
     const isPtmInPeriod = ptmDate && (ptmDate >= dateStart && ptmDate <= dateEnd);
-
-    // Rule Doanh thu & Hiện hữu chuẩn
     const isNormalActive = !isNghiepVu && 
                            (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
                            (statusChan === 'bình thường' || statusChan === 'binh thuong' || !statusChan);
@@ -266,6 +271,30 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
         regStat.totalDtpk += dtpk;
       }
     }
+
+    // 2. Tính dữ liệu xu hướng 12 tháng của Năm đang chọn
+    if (isNormalActive || ptmDate) {
+      const dBatDauAll = parseToDate(r[idxNgayBatDau]);
+      const dKetThucAll = parseToDate(r[idxNgayKetThuc]);
+
+      for (let m = 0; m <= mTarget; m++) {
+        const mStart = new Date(yTarget, m, 1, 0, 0, 0);
+        const mEnd = new Date(yTarget, m + 1, 0, 23, 59, 59);
+
+        if (ptmDate && ptmDate >= mStart && ptmDate <= mEnd) {
+          monthlyTrend[m].ptmSub++;
+          monthlyTrend[m].ptmDtpk += dtpk;
+          monthlyTrend[m].totalDtpk += dtpk;
+        } else if (isNormalActive) {
+          const isAliveInMonth = (!dBatDauAll || dBatDauAll <= mEnd) && (!dKetThucAll || dKetThucAll >= mStart);
+          if (isAliveInMonth) {
+            monthlyTrend[m].currentSub++;
+            monthlyTrend[m].currentDtpk += dtpk;
+            monthlyTrend[m].totalDtpk += dtpk;
+          }
+        }
+      }
+    }
   }
 
   const regionStats = STANDARD_REGIONS.map(regName => {
@@ -291,8 +320,8 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
 
   return {
     period: periodType,
-    selectedYear: selectedYear || new Date().getFullYear(),
-    selectedMonth: selectedMonth !== undefined ? selectedMonth : new Date().getMonth(),
+    selectedYear: yTarget,
+    selectedMonth: mTarget,
     summary: {
       totalRevenue: revenueCurrent + revenuePtm,
       revenueCurrent: revenueCurrent,
@@ -305,6 +334,7 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
       subCancelled: subCancelled
     },
     regionStats: regionStats,
+    monthlyTrend: monthlyTrend,
     packagePtmDistribution: packagePtmDistribution,
     lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
   };
