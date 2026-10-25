@@ -2,9 +2,9 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * FILE        : WebApp_API.gs
- * PHIÊN BẢN   : 5.1 (Chuẩn hóa API Tra cứu USER, Tách Nợ cước/KHYC & Dashboard)
+ * PHIÊN BẢN   : 6.0 (Hỗ trợ lọc linh hoạt Tháng/Năm, Tra cứu USER & Data Labels)
  * NGÀY TẠO    : 24/10/2026 20:15:00 (GMT+7)
- * NGÀY CẬP NHẬT: 25/10/2026 10:15:00 (GMT+7)
+ * NGÀY CẬP NHẬT: 25/10/2026 15:30:00 (GMT+7)
  * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
@@ -33,20 +33,23 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function getDateRangeByPeriod(periodType) {
+/**
+ * Xác định khoảng ngày linh hoạt theo Năm và Kỳ chọn
+ */
+function getDateRangeByPeriod(periodType, selectedYear, selectedMonth) {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const d = now.getDate();
+  const y = parseInt(selectedYear, 10) || now.getFullYear();
+  const m = selectedMonth !== undefined ? parseInt(selectedMonth, 10) : now.getMonth(); // 0-indexed
 
   let start = null;
-  let end = new Date(y, m, d, 23, 59, 59);
+  let end = null;
 
   switch (periodType) {
     case 'week': {
       const currentDay = now.getDay();
       const diffToMonday = (currentDay === 0 ? -6 : 1) - currentDay;
-      start = new Date(y, m, d + diffToMonday, 0, 0, 0);
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday + 6, 23, 59, 59);
       break;
     }
     case 'month':
@@ -92,7 +95,7 @@ function getDateRangeByPeriod(periodType) {
 /**
  * 1. API BÓC TÁCH DỮ LIỆU DASHBOARD
  */
-function getDashboardMetrics(periodType = 'month') {
+function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
   if (!rawSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
@@ -115,6 +118,8 @@ function getDashboardMetrics(periodType = 'month') {
   if (lastRow < CONFIG.DATA_START_ROW_TARGET) {
     return {
       period: periodType,
+      selectedYear: selectedYear || new Date().getFullYear(),
+      selectedMonth: selectedMonth !== undefined ? selectedMonth : new Date().getMonth(),
       summary: {
         totalRevenue: 0,
         revenueCurrent: 0,
@@ -163,7 +168,7 @@ function getDashboardMetrics(periodType = 'month') {
     });
   }
 
-  const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType);
+  const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType, selectedYear, selectedMonth);
 
   let subDebt = 0;
   let subKhyc = 0;
@@ -286,6 +291,8 @@ function getDashboardMetrics(periodType = 'month') {
 
   return {
     period: periodType,
+    selectedYear: selectedYear || new Date().getFullYear(),
+    selectedMonth: selectedMonth !== undefined ? selectedMonth : new Date().getMonth(),
     summary: {
       totalRevenue: revenueCurrent + revenuePtm,
       revenueCurrent: revenueCurrent,
