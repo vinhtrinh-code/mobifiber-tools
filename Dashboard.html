@@ -95,33 +95,74 @@
   </section>
 
   <!-- ========================================== -->
-  <!-- KHUNG ĐIỀU KHIỂN KỲ DÙNG CHUNG CHO DASHBOARD -->
+  <!-- KHUNG ĐIỀU KHIỂN KỲ LINH HOẠT THÁNG & NĂM -->
   <!-- ========================================== -->
   <div id="dashboardPeriodBar" class="hidden max-w-7xl mx-auto px-4 pt-5">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-200">
       
-      <!-- DANH SÁCH TAB KỲ: TUẦN, THÁNG, LIST ĐỦ 4 QUÝ, 6TĐN, 9TĐN, NĂM -->
-      <div class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-1">
-        <button type="button" onclick="changePeriod('week')" id="tab-week" class="period-tab px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Tuần này</button>
-        <button type="button" onclick="changePeriod('month')" id="tab-month" class="period-tab px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors active">Tháng này</button>
+      <div class="flex flex-wrap items-center gap-1.5 overflow-x-auto py-1">
+        <!-- Nút Tuần -->
+        <button type="button" onclick="selectPeriodMode('week')" id="tab-week" class="period-tab px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Tuần này</button>
         
+        <!-- DROPDOWN 12 THÁNG -->
+        <div class="relative inline-flex items-center">
+          <select id="selectMonth" onchange="onSelectMonthChanged()" class="bg-white border border-slate-300 text-slate-700 text-xs font-semibold rounded-full px-3 py-1 outline-none hover:border-blue-500 focus:border-blue-600 transition-colors cursor-pointer shadow-sm">
+            <option value="0">Tháng 1</option>
+            <option value="1">Tháng 2</option>
+            <option value="2">Tháng 3</option>
+            <option value="3">Tháng 4</option>
+            <option value="4">Tháng 5</option>
+            <option value="5">Tháng 6</option>
+            <option value="6">Tháng 7</option>
+            <option value="7">Tháng 8</option>
+            <option value="8">Tháng 9</option>
+            <option value="9">Tháng 10</option>
+            <option value="10">Tháng 11</option>
+            <option value="11">Tháng 12</option>
+          </select>
+        </div>
+
         <span class="text-slate-300">|</span>
         
-        <button type="button" onclick="changePeriod('q1')" id="tab-q1" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 1</button>
-        <button type="button" onclick="changePeriod('q2')" id="tab-q2" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 2</button>
-        <button type="button" onclick="changePeriod('q3')" id="tab-q3" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 3</button>
-        <button type="button" onclick="changePeriod('q4')" id="tab-q4" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 4</button>
+        <!-- 4 QUÝ -->
+        <button type="button" onclick="selectPeriodMode('q1')" id="tab-q1" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 1</button>
+        <button type="button" onclick="selectPeriodMode('q2')" id="tab-q2" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 2</button>
+        <button type="button" onclick="selectPeriodMode('q3')" id="tab-q3" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 3</button>
+        <button type="button" onclick="selectPeriodMode('q4')" id="tab-q4" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 4</button>
         
         <span class="text-slate-300">|</span>
 
-        <button type="button" onclick="changePeriod('6tdn')" id="tab-6tdn" class="period-tab px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">6T Đầu năm</button>
-        <button type="button" onclick="changePeriod('9tdn')" id="tab-9tdn" class="period-tab px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">9T Đầu năm</button>
-        <button type="button" onclick="changePeriod('year')" id="tab-year" class="period-tab px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Năm 2026</button>
+        <!-- 6T & 9T -->
+        <button type="button" onclick="selectPeriodMode('6tdn')" id="tab-6tdn" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">6T Đầu năm</button>
+        <button type="button" onclick="selectPeriodMode('9tdn')" id="tab-9tdn" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">9T Đầu năm</button>
+        
+        <!-- NĂM (POPOVER CHỌN NĂM DẠNG LƯỚI CALENDAR) -->
+        <div class="relative inline-block text-left">
+          <button type="button" onclick="toggleYearPicker()" id="btnYearPicker" class="px-3 py-1 bg-white border border-slate-300 text-slate-700 text-xs font-semibold rounded-full hover:border-blue-500 flex items-center space-x-1 shadow-sm">
+            <span id="currentYearText">Năm 2026</span>
+            <span class="text-[10px]">▼</span>
+          </button>
+          
+          <!-- Lưới năm (Dropdown Grid) -->
+          <div id="yearDropdownGrid" class="hidden absolute left-0 mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-lg p-2 z-50">
+            <div class="text-[11px] font-bold text-slate-400 px-2 pb-1.5 border-b border-slate-100 mb-1.5">CHỌN NĂM BÁO CÁO</div>
+            <div class="grid grid-cols-2 gap-1 text-center text-xs">
+              <button type="button" onclick="selectYear(2023)" class="py-1.5 hover:bg-blue-50 hover:text-blue-600 rounded-lg font-medium transition-colors">2023</button>
+              <button type="button" onclick="selectYear(2024)" class="py-1.5 hover:bg-blue-50 hover:text-blue-600 rounded-lg font-medium transition-colors">2024</button>
+              <button type="button" onclick="selectYear(2025)" class="py-1.5 hover:bg-blue-50 hover:text-blue-600 rounded-lg font-medium transition-colors">2025</button>
+              <button type="button" onclick="selectYear(2026)" class="py-1.5 bg-blue-600 text-white rounded-lg font-bold transition-colors">2026</button>
+              <button type="button" onclick="selectYear(2027)" class="py-1.5 hover:bg-blue-50 hover:text-blue-600 rounded-lg font-medium transition-colors">2027</button>
+              <button type="button" onclick="selectYear(2028)" class="py-1.5 hover:bg-blue-50 hover:text-blue-600 rounded-lg font-medium transition-colors">2028</button>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" onclick="selectPeriodMode('year')" id="tab-year" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Cả năm</button>
       </div>
 
       <div class="flex items-center space-x-2">
-        <span id="periodLabelBadge" class="text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-1 rounded-md">Tháng này</span>
-        <button type="button" onclick="changePeriod(currentPeriod)" id="refreshBtn" class="flex items-center space-x-1 px-3 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-md text-xs font-semibold transition-colors shadow-sm">
+        <span id="periodLabelBadge" class="text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-1 rounded-md">Tháng 10/2026</span>
+        <button type="button" onclick="reloadDashboardMetrics()" id="refreshBtn" class="flex items-center space-x-1 px-3 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-md text-xs font-semibold transition-colors shadow-sm">
           <span>🔄 Làm mới</span>
         </button>
       </div>
@@ -129,7 +170,7 @@
   </div>
 
   <!-- ========================================== -->
-  <!-- TAB 2: DASHBOARD DOANH THU (TÁCH 2 BIỂU ĐỒ) -->
+  <!-- TAB 2: DASHBOARD DOANH THU (TÁCH 2 BIỂU ĐỒ ĐỘC LẬP) -->
   <!-- ========================================== -->
   <section id="paneRevenue" class="hidden max-w-7xl mx-auto px-4 py-4">
     
@@ -172,9 +213,9 @@
     <!-- KHỐI TÁCH RỜI 2 BIỂU ĐỒ DOANH THU ĐỘC LẬP -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
       
-      <!-- Biểu đồ 1: DT Hiện Hữu (Cột Xanh Dương) -->
+      <!-- Biểu đồ 1: DT Hiện Hữu (Bên Trái) -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center justify-between mb-2">
           <div>
             <h2 class="text-sm sm:text-base font-bold text-slate-900">Doanh thu Hiện hữu (DTPK) theo 6 Địa bàn</h2>
             <p class="text-xs text-slate-500">Dòng tiền nền tảng từ khách hàng đang duy trì</p>
@@ -186,9 +227,9 @@
         </div>
       </div>
 
-      <!-- Biểu đồ 2: DT PTM (Cột Xanh Lá - Thang đo chuẩn nhìn rõ từng ngàn đồng) -->
+      <!-- Biểu đồ 2: DT PTM (Bên Phải) -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center justify-between mb-2">
           <div>
             <h2 class="text-sm sm:text-base font-bold text-slate-900">Doanh thu PTM (DTPK) theo 6 Địa bàn</h2>
             <p class="text-xs text-slate-500">Doanh thu phát sinh mới từ thuê bao PTM kỳ này</p>
@@ -227,7 +268,7 @@
   </section>
 
   <!-- ========================================== -->
-  <!-- TAB 3: DASHBOARD THUÊ BAO (TÁCH 2 BIỂU ĐỒ) -->
+  <!-- TAB 3: DASHBOARD THUÊ BAO (ĐỒNG BỘ BỐ CỤC: TRÁI LÀ HIỆN HỮU, PHẢI LÀ PTM) -->
   <!-- ========================================== -->
   <section id="paneSub" class="hidden max-w-7xl mx-auto px-4 py-4">
     
@@ -260,26 +301,12 @@
       </div>
     </div>
 
-    <!-- KHỐI TÁCH RỜI 2 BIỂU ĐỒ THUÊ BAO ĐỘC LẬP -->
+    <!-- KHỐI 2 BIỂU ĐỒ THUÊ BAO: TRÁI HIỆN HỮU, PHẢI PTM -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
       
-      <!-- Biểu đồ 1 (Focus cho Lãnh đạo): Thuê Bao PTM (Thang đo nhỏ, chuẩn xác từng TB) -->
+      <!-- Biểu đồ 1: Quy mô Thuê Bao Hiện Hữu (Bên Trái) -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <h2 class="text-sm sm:text-base font-bold text-slate-900">Chiến dịch Thuê bao PTM theo 6 Địa bàn</h2>
-            <p class="text-xs text-slate-500">Đánh giá năng lực phát triển mới độc lập giữa các đơn vị</p>
-          </div>
-          <span class="text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-bold">🎯 Trọng tâm PTM</span>
-        </div>
-        <div class="h-64 sm:h-72 relative">
-          <canvas id="chartSubPtm"></canvas>
-        </div>
-      </div>
-
-      <!-- Biểu đồ 2: Quy mô Thuê Bao Hiện Hữu (Thang đo lớn) -->
-      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center justify-between mb-2">
           <div>
             <h2 class="text-sm sm:text-base font-bold text-slate-900">Quy mô Thuê bao Hiện hữu theo 6 Địa bàn</h2>
             <p class="text-xs text-slate-500">Số lượng khách hàng đang duy trì hợp đồng hoạt động</p>
@@ -288,6 +315,20 @@
         </div>
         <div class="h-64 sm:h-72 relative">
           <canvas id="chartSubCurrent"></canvas>
+        </div>
+      </div>
+
+      <!-- Biểu đồ 2: Thuê Bao PTM (Bên Phải - Focus cho Lãnh Đạo) -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
+        <div class="flex items-center justify-between mb-2">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900">Chiến dịch Thuê bao PTM theo 6 Địa bàn</h2>
+            <p class="text-xs text-slate-500">Đánh giá năng lực phát triển mới độc lập giữa các đơn vị</p>
+          </div>
+          <span class="text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-bold">🎯 Trọng tâm PTM</span>
+        </div>
+        <div class="h-64 sm:h-72 relative">
+          <canvas id="chartSubPtm"></canvas>
         </div>
       </div>
 
@@ -336,13 +377,14 @@
     </div>
   </section>
 
-  <!-- JAVASCRIPT ĐIỀU PHỐI SPA CHUẨN XÁC -->
+  <!-- JAVASCRIPT ĐIỀU PHỐI SPA & DATA LABELS -->
   <script>
     var activeMainTab = 'lookup';
-    var currentPeriod = 'month';
+    var currentPeriodMode = 'month';
+    var selectedYear = 2026;
+    var selectedMonth = 9; // 9 = Tháng 10 (0-indexed)
     var cachedMetrics = null;
 
-    // 4 Biểu đồ độc lập
     var chartRevCurrentInst = null;
     var chartRevPtmInst = null;
     var chartSubCurrentInst = null;
@@ -350,20 +392,61 @@
 
     var periodNames = {
       'week': 'Tuần này',
-      'month': 'Tháng này',
+      'month': 'Tháng',
       'q1': 'Quý 1',
       'q2': 'Quý 2',
       'q3': 'Quý 3',
       'q4': 'Quý 4',
       '6tdn': '6T Đầu năm',
       '9tdn': '9T Đầu năm',
-      'year': 'Năm 2026'
+      'year': 'Cả năm'
     };
 
     function formatCurrency(num) {
       return Number(num || 0).toLocaleString('vi-VN') + ' đ';
     }
 
+    // Rút gọn doanh thu cho đỉnh cột (M hoặc k)
+    function formatCompactCurrency(val) {
+      if (!val || val === 0) return '0';
+      if (val >= 1000000) {
+        return (val / 1000000).toFixed(1).replace('.0', '') + 'M';
+      }
+      if (val >= 1000) {
+        return (val / 1000).toFixed(0) + 'k';
+      }
+      return val.toString();
+    }
+
+    // PLUGIN VẼ DATA LABELS TRÊN ĐỈNH CỘT (CHỐNG LỖI CDN)
+    var topLabelPlugin = {
+      id: 'topLabelPlugin',
+      afterDatasetsDraw: function(chart) {
+        var ctx = chart.ctx;
+        chart.data.datasets.forEach(function(dataset, i) {
+          var meta = chart.getDatasetMeta(i);
+          meta.data.forEach(function(bar, index) {
+            var val = dataset.data[index];
+            var text = '';
+            if (chart.canvas.id.indexOf('chartRev') !== -1) {
+              text = formatCompactCurrency(val);
+            } else {
+              text = (val || 0) + ' TB';
+            }
+
+            ctx.save();
+            ctx.fillStyle = '#475569';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(text, bar.x, bar.y - 4);
+            ctx.restore();
+          });
+        });
+      }
+    };
+
+    // ĐIỀU HƯỚNG TABS CHÍNH
     function switchMainTab(tab) {
       try {
         activeMainTab = tab;
@@ -388,7 +471,7 @@
 
         if (tab !== 'lookup') {
           if (!cachedMetrics) {
-            changePeriod(currentPeriod);
+            reloadDashboardMetrics();
           } else {
             setTimeout(function() {
               if (tab === 'revenue') renderRevenueDashboard(cachedMetrics);
@@ -401,19 +484,84 @@
       }
     }
 
-    function changePeriod(p) {
-      try {
-        currentPeriod = p;
+    // CHỌN KỲ BÁO CÁO (TUẦN / QUÝ / 6T / 9T / NĂM)
+    function selectPeriodMode(mode) {
+      currentPeriodMode = mode;
+      document.querySelectorAll('.period-tab').forEach(function(b) {
+        b.classList.remove('active');
+      });
+      var activeBtn = document.getElementById('tab-' + mode);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Tắt trạng thái active của dropdown tháng nếu chọn kỳ khác
+      if (mode !== 'month') {
+        var selM = document.getElementById('selectMonth');
+        if (selM) selM.classList.remove('border-blue-600', 'bg-blue-50');
+      }
+
+      updatePeriodBadgeLabel();
+      reloadDashboardMetrics();
+    }
+
+    // KHI ĐỔI DROPDOWN THÁNG
+    function onSelectMonthChanged() {
+      var selM = document.getElementById('selectMonth');
+      if (selM) {
+        selectedMonth = parseInt(selM.value, 10);
+        currentPeriodMode = 'month';
 
         document.querySelectorAll('.period-tab').forEach(function(b) {
           b.classList.remove('active');
         });
-        var activeBtn = document.getElementById('tab-' + p);
-        if (activeBtn) activeBtn.classList.add('active');
+        selM.classList.add('border-blue-600', 'bg-blue-50');
 
-        var badge = document.getElementById('periodLabelBadge');
-        if (badge) badge.innerText = periodNames[p] || 'Kỳ này';
+        updatePeriodBadgeLabel();
+        reloadDashboardMetrics();
+      }
+    }
 
+    // POPOVER NĂM DẠNG LƯỚI
+    function toggleYearPicker() {
+      var grid = document.getElementById('yearDropdownGrid');
+      if (grid) grid.classList.toggle('hidden');
+    }
+
+    function selectYear(yr) {
+      selectedYear = yr;
+      document.getElementById('currentYearText').innerText = 'Năm ' + yr;
+      var grid = document.getElementById('yearDropdownGrid');
+      if (grid) grid.classList.add('hidden');
+
+      updatePeriodBadgeLabel();
+      reloadDashboardMetrics();
+    }
+
+    // ĐÓNG POPOVER KHI CLICK RA NGOÀI
+    document.addEventListener('click', function(e) {
+      var btn = document.getElementById('btnYearPicker');
+      var grid = document.getElementById('yearDropdownGrid');
+      if (btn && grid && !btn.contains(e.target) && !grid.contains(e.target)) {
+        grid.classList.add('hidden');
+      }
+    });
+
+    function updatePeriodBadgeLabel() {
+      var badge = document.getElementById('periodLabelBadge');
+      if (!badge) return;
+
+      if (currentPeriodMode === 'month') {
+        badge.innerText = 'Tháng ' + (selectedMonth + 1) + '/' + selectedYear;
+      } else if (currentPeriodMode === 'year') {
+        badge.innerText = 'Cả năm ' + selectedYear;
+      } else if (currentPeriodMode === 'week') {
+        badge.innerText = 'Tuần này';
+      } else {
+        badge.innerText = (periodNames[currentPeriodMode] || currentPeriodMode) + ' ' + selectedYear;
+      }
+    }
+
+    function reloadDashboardMetrics() {
+      try {
         var refBtn = document.getElementById('refreshBtn');
         if (refBtn) refBtn.innerText = '⏳ Đang nạp...';
 
@@ -429,19 +577,16 @@
             })
             .withFailureHandler(function(err) {
               if (refBtn) refBtn.innerText = '🔄 Làm mới';
-              alert('Lỗi nạp số liệu Dashboard: ' + err.message);
+              alert('Lỗi nạp số liệu: ' + err.message);
             })
-            .getDashboardMetrics(p);
-        } else {
-          if (refBtn) refBtn.innerText = '🔄 Làm mới';
-          alert('Không tìm thấy kết nối google.script.run');
+            .getDashboardMetrics(currentPeriodMode, selectedYear, selectedMonth);
         }
       } catch (err) {
-        console.error('Lỗi changePeriod:', err);
+        console.error('Lỗi reloadDashboardMetrics:', err);
       }
     }
 
-    // RENDER 2 BIỂU ĐỒ DOANH THU RIÊNG BIỆT
+    // RENDER DASHBOARD DOANH THU
     function renderRevenueDashboard(data) {
       try {
         if (!data || !data.summary) return;
@@ -461,10 +606,11 @@
         var valPtm = data.regionStats.map(function(r) { return r.ptmDtpk; });
 
         if (typeof Chart !== 'undefined') {
-          // 1. Biểu đồ DT Hiện Hữu
+          // 1. Biểu đồ DT Hiện Hữu (Bên Trái)
           if (chartRevCurrentInst) chartRevCurrentInst.destroy();
           var cvCur = document.getElementById('chartRevCurrent');
           if (cvCur) {
+            var maxCur = Math.max.apply(null, valCurrent) || 1000000;
             chartRevCurrentInst = new Chart(cvCur.getContext('2d'), {
               type: 'bar',
               data: {
@@ -483,17 +629,20 @@
                 scales: {
                   y: {
                     beginAtZero: true,
+                    suggestedMax: maxCur * 1.25, // Tạo khoảng trống phía trên cho Data Label
                     ticks: { callback: function(v) { return (v / 1000000).toFixed(1) + 'M'; } }
                   }
                 }
-              }
+              },
+              plugins: [topLabelPlugin]
             });
           }
 
-          // 2. Biểu đồ DT PTM Mới
+          // 2. Biểu đồ DT PTM Mới (Bên Phải)
           if (chartRevPtmInst) chartRevPtmInst.destroy();
           var cvPtm = document.getElementById('chartRevPtm');
           if (cvPtm) {
+            var maxPtm = Math.max.apply(null, valPtm) || 1000;
             chartRevPtmInst = new Chart(cvPtm.getContext('2d'), {
               type: 'bar',
               data: {
@@ -512,15 +661,17 @@
                 scales: {
                   y: {
                     beginAtZero: true,
+                    suggestedMax: maxPtm * 1.25,
                     ticks: { callback: function(v) { return (v / 1000).toFixed(0) + 'k'; } }
                   }
                 }
-              }
+              },
+              plugins: [topLabelPlugin]
             });
           }
         }
 
-        // Render Bảng Doanh thu
+        // Render Bảng Doanh thu có dòng Tổng cộng
         var tbody = document.getElementById('revTableBody');
         if (tbody) {
           tbody.innerHTML = '';
@@ -565,7 +716,7 @@
       }
     }
 
-    // RENDER 2 BIỂU ĐỒ THUÊ BAO RIÊNG BIỆT
+    // RENDER DASHBOARD THUÊ BAO
     function renderSubscriberDashboard(data) {
       try {
         if (!data || !data.summary) return;
@@ -589,10 +740,42 @@
         var valPtmSub = data.regionStats.map(function(r) { return r.ptmSub; });
 
         if (typeof Chart !== 'undefined') {
-          // 1. Biểu đồ Thuê Bao PTM (Focus cho Lãnh Đạo - Thang đo 0..5 TB)
+          // 1. Biểu đồ TB Hiện Hữu (Bên Trái)
+          if (chartSubCurrentInst) chartSubCurrentInst.destroy();
+          var cvSubCur = document.getElementById('chartSubCurrent');
+          if (cvSubCur) {
+            var maxCurSub = Math.max.apply(null, valCurrentSub) || 10;
+            chartSubCurrentInst = new Chart(cvSubCur.getContext('2d'), {
+              type: 'bar',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'TB Hiện hữu',
+                  data: valCurrentSub,
+                  backgroundColor: '#3b82f6',
+                  borderRadius: 6
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    suggestedMax: maxCurSub * 1.25
+                  }
+                }
+              },
+              plugins: [topLabelPlugin]
+            });
+          }
+
+          // 2. Biểu đồ TB PTM (Bên Phải - Focus Lãnh Đạo)
           if (chartSubPtmInst) chartSubPtmInst.destroy();
           var cvSubPtm = document.getElementById('chartSubPtm');
           if (cvSubPtm) {
+            var maxPtmSub = Math.max.apply(null, valPtmSub) || 5;
             chartSubPtmInst = new Chart(cvSubPtm.getContext('2d'), {
               type: 'bar',
               data: {
@@ -611,36 +794,12 @@
                 scales: {
                   y: {
                     beginAtZero: true,
+                    suggestedMax: maxPtmSub * 1.3,
                     ticks: { stepSize: 1 }
                   }
                 }
-              }
-            });
-          }
-
-          // 2. Biểu đồ Thuê Bao Hiện Hữu (Quy mô mạng lưới)
-          if (chartSubCurrentInst) chartSubCurrentInst.destroy();
-          var cvSubCur = document.getElementById('chartSubCurrent');
-          if (cvSubCur) {
-            chartSubCurrentInst = new Chart(cvSubCur.getContext('2d'), {
-              type: 'bar',
-              data: {
-                labels: labels,
-                datasets: [{
-                  label: 'TB Hiện hữu',
-                  data: valCurrentSub,
-                  backgroundColor: '#3b82f6',
-                  borderRadius: 6
-                }]
               },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: { beginAtZero: true }
-                }
-              }
+              plugins: [topLabelPlugin]
             });
           }
         }
@@ -740,6 +899,13 @@
           }
         });
       }
+
+      // Khởi tạo giá trị mặc định cho Dropdown Tháng & Năm
+      var selM = document.getElementById('selectMonth');
+      if (selM) {
+        selM.value = "9"; // Mặc định Tháng 10
+        selM.classList.add('border-blue-600', 'bg-blue-50');
+      }
     });
 
     function handleSearch() {
@@ -785,13 +951,6 @@
               alert('Lỗi tra cứu: ' + err.message);
             })
             .apiSearchSubscriber(q);
-        } else {
-          if (btn) {
-            btn.disabled = false;
-            btn.innerText = 'Tìm kiếm';
-          }
-          if (loading) loading.classList.add('hidden');
-          alert('Không tìm thấy kết nối google.script.run');
         }
       } catch (err) {
         console.error('Lỗi handleSearch:', err);
