@@ -2,9 +2,9 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * FILE        : WebApp_API.gs
- * PHIÊN BẢN   : 4.0 (Tách Độc Lập Dashboard Doanh Thu & Thuê Bao, List Đủ 4 Quý)
+ * PHIÊN BẢN   : 5.0 (Hỗ trợ Tra cứu USER, Tách Nợ cước/KHYC & Dual-View Analytics)
  * NGÀY TẠO    : 24/10/2026 20:15:00 (GMT+7)
- * NGÀY CẬP NHẬT: 25/10/2026 09:30:00 (GMT+7)
+ * NGÀY CẬP NHẬT: 25/10/2026 10:00:00 (GMT+7)
  * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
@@ -28,14 +28,11 @@ function safeParseCurrency(val) {
 function doGet(e) {
   return HtmlService.createTemplateFromFile('Dashboard')
     .evaluate()
-    .setTitle('MobiFiber Analytics Portal - MobiFone Lâm Đồng')
+    .setTitle('MobiFiber Portal - MobiFone Lâm Đồng')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-/**
- * Xác định khoảng ngày lọc (Hỗ trợ chi tiết Q1, Q2, Q3, Q4)
- */
 function getDateRangeByPeriod(periodType) {
   const now = new Date();
   const y = now.getFullYear();
@@ -93,7 +90,7 @@ function getDateRangeByPeriod(periodType) {
 }
 
 /**
- * API Bóc tách dữ liệu chuyên sâu cho Doanh thu & Thuê bao
+ * API BÓC TÁCH DỮ LIỆU DASHBOARD CHO CẢ DOANH THU & THUÊ BAO
  */
 function getDashboardMetrics(periodType = 'month') {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -118,7 +115,6 @@ function getDashboardMetrics(periodType = 'month') {
   if (lastRow < CONFIG.DATA_START_ROW_TARGET) {
     return {
       period: periodType,
-      currentPeriodQuarter: 'q' + (Math.floor(new Date().getMonth() / 3) + 1),
       summary: {
         totalRevenue: 0,
         revenueCurrent: 0,
@@ -126,7 +122,8 @@ function getDashboardMetrics(periodType = 'month') {
         totalActiveSub: 0,
         subCurrent: 0,
         subPtm: 0,
-        subBlocked: 0,
+        subDebt: 0,
+        subKhyc: 0,
         subCancelled: 0
       },
       regionStats: STANDARD_REGIONS.map(name => ({
@@ -139,6 +136,7 @@ function getDashboardMetrics(periodType = 'month') {
 
   const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
   const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
+  const idxUser = headers.findIndex(h => h === 'user');
   const idxLoaiKH = headers.findIndex(h => h === 'loại khách hàng');
   const idxNhuCau = headers.findIndex(h => h === 'nhu cầu hòa mạng');
   const idxGoiCuoc = headers.findIndex(h => h === 'gói cước');
@@ -155,7 +153,6 @@ function getDashboardMetrics(periodType = 'month') {
 
   const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
 
-  // Nạp map nhân viên -> khu vực
   const staffRegionMap = new Map();
   const thamSoSheet = ss.getSheetByName('thamso_caidat');
   if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
@@ -169,7 +166,8 @@ function getDashboardMetrics(periodType = 'month') {
 
   const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType);
 
-  let subBlocked = 0;
+  let subDebt = 0;
+  let subKhyc = 0;
   let subCancelled = 0;
   let revenueCurrent = 0;
   let revenuePtm = 0;
@@ -186,16 +184,16 @@ function getDashboardMetrics(periodType = 'month') {
     const nhuCau = normalizeHeader(String(r[idxNhuCau] || ''));
 
     const isCancelled = statusHD.includes('hủy') || statusHD.includes('huy') || statusHD.includes('thanh lý') || statusHD.includes('chấm dứt');
-    const isBlocked = statusChan.includes('nợ') || statusChan.includes('khóa') || statusChan.includes('chặn') || statusChan.includes('khyc');
+    const isDebt = statusChan.includes('nợ') || statusChan.includes('no cuoc') || statusChan.includes('khóa cước');
+    const isKhyc = statusChan.includes('khyc') || statusChan.includes('yêu cầu') || statusChan.includes('yeu cau');
     const isNghiepVu = loaiKH.includes('nghiệp vụ') || loaiKH.includes('nghiep vu');
 
     if (isCancelled) {
       subCancelled++;
       continue;
     }
-    if (isBlocked) {
-      subBlocked++;
-    }
+    if (isDebt) subDebt++;
+    if (isKhyc) subKhyc++;
 
     const chuKy = parseInt(r[idxChuKy], 10) || 1;
     const giaCuoc = safeParseCurrency(r[idxGiaCuoc]);
@@ -211,7 +209,7 @@ function getDashboardMetrics(periodType = 'month') {
     let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc)) || 'TT.KDVT';
     const regStat = regionMap.get(matchedRegion);
 
-    // 1. KIỂM TRA THUÊ BAO PTM THEO RULE Mod_PTM.gs
+    // 1. RULE PTM CHUẨN
     const isPtmDemand = (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi');
     const isPtmActive = (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong');
     let ptmDate = null;
@@ -234,7 +232,7 @@ function getDashboardMetrics(periodType = 'month') {
 
     const isPtmInPeriod = ptmDate && (ptmDate >= dateStart && ptmDate <= dateEnd);
 
-    // 2. KIỂM TRA ĐIỀU KIỆN HOẠT ĐỘNG CHUẨN DOANH THU & HIỆN HỮU (RULE Mod_DoanhThuPhanBo.gs)
+    // 2. RULE DOANH THU & HIỆN HỮU CHUẨN
     const isNormalActive = !isNghiepVu && 
                            (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
                            (statusChan === 'bình thường' || statusChan === 'binh thuong' || !statusChan);
@@ -248,7 +246,6 @@ function getDashboardMetrics(periodType = 'month') {
       regStat.totalSub++;
       regStat.totalDtpk += dtpk;
 
-      // Thống kê gói PTM
       const goiCuoc = String(r[idxGoiCuoc] || 'Khác').trim().toUpperCase();
       ptmPackageMap.set(goiCuoc, (ptmPackageMap.get(goiCuoc) || 0) + 1);
 
@@ -289,11 +286,8 @@ function getDashboardMetrics(periodType = 'month') {
     }))
     .sort((a, b) => b.count - a.count);
 
-  const currentQuarterCode = 'q' + (Math.floor(new Date().getMonth() / 3) + 1);
-
   return {
     period: periodType,
-    currentPeriodQuarter: currentQuarterCode,
     summary: {
       totalRevenue: revenueCurrent + revenuePtm,
       revenueCurrent: revenueCurrent,
@@ -301,7 +295,8 @@ function getDashboardMetrics(periodType = 'month') {
       totalActiveSub: subCurrent + subPtm,
       subCurrent: subCurrent,
       subPtm: subPtm,
-      subBlocked: subBlocked,
+      subDebt: subDebt,
+      subKhyc: subKhyc,
       subCancelled: subCancelled
     },
     regionStats: regionStats,
@@ -311,7 +306,7 @@ function getDashboardMetrics(periodType = 'month') {
 }
 
 /**
- * 3. API TRA CỨU HỒ SƠ 360°
+ * 3. API TRA CỨU HỒ SƠ 360° (ĐÃ BỔ SUNG TÌM KIẾM THEO USER)
  */
 function apiSearchSubscriber(keyword) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -328,6 +323,7 @@ function apiSearchSubscriber(keyword) {
 
   const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
   const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
+  const idxUser = headers.findIndex(h => h === 'user');
   const idxTenTB = headers.findIndex(h => h === 'tên thuê bao');
   const idxSDT = headers.findIndex(h => h === 'sđt liên hệ');
   const idxDiaChi = headers.findIndex(h => h === 'địa chỉ lắp đặt');
@@ -366,10 +362,17 @@ function apiSearchSubscriber(keyword) {
     let maKH = String(row[idxMaKH] || '').replace(/[\s\uFEFF\xA0]+/g, '').replace(/^'+/, '');
     if (/^\d{8}$/.test(maKH)) maKH = '00' + maKH;
 
+    const userStr = idxUser !== -1 ? String(row[idxUser] || '').toLowerCase().trim() : '';
     const sdt = String(row[idxSDT] || '').replace(/[^0-9]/g, '');
     const serial = String(row[idxSerial] || '').replace(/[\s\uFEFF\xA0]+/g, '').toLowerCase();
 
-    if ((qDigits && maKH.includes(qDigits)) || (qDigits && sdt.includes(qDigits)) || (qClean && serial.includes(qClean))) {
+    // Bổ sung tìm kiếm theo USER
+    const matchMaKH = qDigits && maKH.includes(qDigits);
+    const matchUser = userStr && userStr.includes(qClean);
+    const matchSDT = qDigits && sdt.includes(qDigits);
+    const matchSerial = qClean && serial.includes(qClean);
+
+    if (matchMaKH || matchUser || matchSDT || matchSerial) {
       const giaCuoc = safeParseCurrency(row[idxGiaCuoc]);
       const chuKy = parseInt(row[idxChuKy], 10) || 1;
       let dtpk = safeParseCurrency(row[idxDtpk]);
@@ -386,6 +389,7 @@ function apiSearchSubscriber(keyword) {
 
       matched.push({
         maKH: maKH,
+        user: idxUser !== -1 ? String(row[idxUser] || '').trim() : '',
         tenTB: String(row[idxTenTB] || 'Chưa cập nhật').trim(),
         sdt: String(row[idxSDT] || '').replace(/^'+/, ''),
         diaChi: String(row[idxDiaChi] || '---').trim(),
