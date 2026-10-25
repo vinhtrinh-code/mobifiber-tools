@@ -165,18 +165,37 @@
       </div>
     </div>
 
-    <!-- BIỂU ĐỒ CỘT NGANG ĐÔI TRỰC QUAN (HORIZONTAL BAR) -->
-    <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow mb-5">
-      <div class="flex items-center justify-between mb-3">
-        <div>
-          <h2 class="text-sm sm:text-base font-bold text-slate-900">Phân rã Doanh thu Phân kỳ (DTPK) theo 6 Cụm Địa bàn</h2>
-          <p class="text-xs text-slate-500">Biểu đồ cột ngang thể hiện song song Doanh thu Hiện hữu và Doanh thu PTM</p>
+    <!-- TÁCH BIỆT THÀNH 2 BIỂU ĐỒ DOANH THU ĐỘC LẬP -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+      
+      <!-- Biểu đồ 1: DT Hiện hữu theo 6 Địa bàn -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900">Doanh thu Hiện hữu (DTPK)</h2>
+            <p class="text-xs text-slate-500">Quy mô dòng tiền duy trì theo 6 Cụm địa bàn</p>
+          </div>
+          <span class="text-[11px] bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-full">Hiện hữu</span>
         </div>
-        <span class="text-[11px] bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-medium">VNĐ</span>
+        <div class="h-64 sm:h-72">
+          <canvas id="revCurrentChart"></canvas>
+        </div>
       </div>
-      <div class="h-80">
-        <canvas id="revChart"></canvas>
+
+      <!-- Biểu đồ 2: DT PTM theo 6 Địa bàn -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900">Doanh thu Phát triển mới (DTPK)</h2>
+            <p class="text-xs text-slate-500">Doanh thu mới phát sinh theo kỳ theo 6 Cụm địa bàn</p>
+          </div>
+          <span class="text-[11px] bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">PTM Mới</span>
+        </div>
+        <div class="h-64 sm:h-72">
+          <canvas id="revPtmChart"></canvas>
+        </div>
       </div>
+
     </div>
 
     <!-- BẢNG CHI TIẾT DOANH THU 6 KHU VỰC (CÓ DÒNG TỔNG CỘNG) -->
@@ -237,20 +256,34 @@
       </div>
     </div>
 
-    <!-- BIỂU ĐỒ THUÊ BAO TẬP TRUNG PTM & GÓI CƯỚC -->
+    <!-- TÁCH BIỆT THÀNH 2 BIỂU ĐỒ THUÊ BAO ĐỘC LẬP & GÓI CƯỚC -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
       
-      <!-- BIỂU ĐỒ TRỤC KÉP / FOCUS PTM CHO LÃNH ĐẠO -->
-      <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 card-shadow">
+      <!-- Biểu đồ 1: Thuê bao PTM (Tập trung chiến dịch, thang đo chi tiết) -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h2 class="text-sm sm:text-base font-bold text-slate-900">Chiến dịch PTM & Quy mô Thuê bao theo Địa bàn</h2>
-            <p class="text-xs text-slate-500">Cột xanh lá: Thuê bao PTM (Trục trái) | Đường xanh dương: Tổng TB Hiện hữu (Trục phải)</p>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900">Thuê bao PTM theo Địa bàn</h2>
+            <p class="text-xs text-slate-500">Năng lực phát triển mới trong kỳ (Focus PTM)</p>
           </div>
-          <span class="text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-bold">Focus PTM</span>
+          <span class="text-[11px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full">PTM</span>
         </div>
-        <div class="h-72">
-          <canvas id="subChart"></canvas>
+        <div class="h-64 sm:h-72">
+          <canvas id="subPtmChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Biểu đồ 2: Thuê bao Hiện hữu (Quy mô tập khách hàng duy trì) -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900">Thuê bao Hiện hữu theo Địa bàn</h2>
+            <p class="text-xs text-slate-500">Quy mô cơ sở khách hàng duy trì cước</p>
+          </div>
+          <span class="text-[11px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full">Hiện hữu</span>
+        </div>
+        <div class="h-64 sm:h-72">
+          <canvas id="subCurrentChart"></canvas>
         </div>
       </div>
 
@@ -298,8 +331,12 @@
     let activeMainTab = 'lookup';
     let currentPeriod = 'month';
     let cachedMetrics = null;
-    let revChartInstance = null;
-    let subChartInstance = null;
+
+    // Biến lưu các instance Chart độc lập
+    let revCurrentChartInst = null;
+    let revPtmChartInst = null;
+    let subCurrentChartInst = null;
+    let subPtmChartInst = null;
 
     const periodNames = {
       'week': 'Tuần này',
@@ -364,44 +401,64 @@
         .getDashboardMetrics(p);
     }
 
-    // RENDER DASHBOARD DOANH THU (CỘT NGANG ĐÔI & DÒNG TỔNG CỘNG)
+    // RENDER DASHBOARD DOANH THU: 2 BIỂU ĐỒ ĐỘC LẬP
     function renderRevenueDashboard(data) {
       document.getElementById('revTotal').innerText = formatCurrency(data.summary.totalRevenue);
       document.getElementById('revCurrent').innerText = formatCurrency(data.summary.revenueCurrent);
       document.getElementById('revPtm').innerText = formatCurrency(data.summary.revenuePtm);
       document.getElementById('revUpdateTime').innerText = 'Cập nhật: ' + data.lastUpdated;
 
-      // Biểu đồ Cột Ngang Đôi (Horizontal Bar Chart)
       const labels = data.regionStats.map(r => r.name);
       const valCurrent = data.regionStats.map(r => r.currentDtpk);
       const valPtm = data.regionStats.map(r => r.ptmDtpk);
 
-      if (revChartInstance) revChartInstance.destroy();
-      const ctx = document.getElementById('revChart').getContext('2d');
-      revChartInstance = new Chart(ctx, {
+      // Biểu đồ 1: Doanh thu Hiện hữu (Horizontal Bar)
+      if (revCurrentChartInst) revCurrentChartInst.destroy();
+      const ctxRevCur = document.getElementById('revCurrentChart').getContext('2d');
+      revCurrentChartInst = new Chart(ctxRevCur, {
         type: 'bar',
         data: {
           labels: labels,
-          datasets: [
-            {
-              label: 'DT Hiện hữu',
-              data: valCurrent,
-              backgroundColor: '#3b82f6',
-              borderRadius: 4
-            },
-            {
-              label: 'DT PTM',
-              data: valPtm,
-              backgroundColor: '#10b981',
-              borderRadius: 4
-            }
-          ]
+          datasets: [{
+            label: 'DT Hiện hữu (VNĐ)',
+            data: valCurrent,
+            backgroundColor: '#3b82f6',
+            borderRadius: 4
+          }]
         },
         options: {
-          indexAxis: 'y', // Chuyển thành trục ngang
+          indexAxis: 'y',
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { position: 'top' } },
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: { callback: v => (v / 1000000).toFixed(1) + 'M' }
+            }
+          }
+        }
+      });
+
+      // Biểu đồ 2: Doanh thu PTM (Horizontal Bar)
+      if (revPtmChartInst) revPtmChartInst.destroy();
+      const ctxRevPtm = document.getElementById('revPtmChart').getContext('2d');
+      revPtmChartInst = new Chart(ctxRevPtm, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'DT PTM (VNĐ)',
+            data: valPtm,
+            backgroundColor: '#10b981',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
           scales: {
             x: {
               beginAtZero: true,
@@ -421,288 +478,4 @@
         sumPtm += r.ptmDtpk;
         sumTotal += r.totalDtpk;
 
-        const ratio = data.summary.totalRevenue > 0 ? ((r.totalDtpk / data.summary.totalRevenue) * 100).toFixed(1) : '0.0';
-        const isZero = r.totalDtpk === 0;
-
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-50 transition-colors';
-        tr.innerHTML = `
-          <td class="px-4 py-3 text-slate-400">${idx + 1}</td>
-          <td class="px-4 py-3 font-semibold ${isZero ? 'text-slate-400' : 'text-slate-900'}">${r.name}</td>
-          <td class="px-4 py-3 text-right ${isZero ? 'text-slate-400' : 'text-slate-700'}">${formatCurrency(r.currentDtpk)}</td>
-          <td class="px-4 py-3 text-right font-medium ${r.ptmDtpk > 0 ? 'text-emerald-600' : 'text-slate-400'}">${formatCurrency(r.ptmDtpk)}</td>
-          <td class="px-4 py-3 text-right font-bold ${isZero ? 'text-slate-400' : 'text-blue-700'}">${formatCurrency(r.totalDtpk)}</td>
-          <td class="px-4 py-3 text-right font-semibold ${isZero ? 'text-slate-400' : 'text-blue-600'}">${ratio}%</td>
-        `;
-        tbody.appendChild(tr);
-      });
-
-      // Dòng Tổng cộng
-      const tfoot = document.getElementById('revTableFoot');
-      tfoot.innerHTML = `
-        <tr>
-          <td colspan="2" class="px-4 py-3 uppercase tracking-wider text-center">TỔNG CỘNG</td>
-          <td class="px-4 py-3 text-right text-slate-800">${formatCurrency(sumCurrent)}</td>
-          <td class="px-4 py-3 text-right text-emerald-700">${formatCurrency(sumPtm)}</td>
-          <td class="px-4 py-3 text-right text-blue-800">${formatCurrency(sumTotal)}</td>
-          <td class="px-4 py-3 text-right text-blue-800">100%</td>
-        </tr>
-      `;
-    }
-
-    // RENDER DASHBOARD THUÊ BAO (TRỤC KÉP FOCUS PTM & DÒNG TỔNG CỘNG)
-    function renderSubscriberDashboard(data) {
-      document.getElementById('subActiveTotal').innerText = data.summary.totalActiveSub.toLocaleString('vi-VN');
-      document.getElementById('subCurrentVal').innerText = data.summary.subCurrent.toLocaleString('vi-VN');
-      document.getElementById('subPtmVal').innerText = data.summary.subPtm.toLocaleString('vi-VN');
-      document.getElementById('subDebtVal').innerText = data.summary.subDebt.toLocaleString('vi-VN');
-      document.getElementById('subKhycVal').innerText = data.summary.subKhyc.toLocaleString('vi-VN');
-      document.getElementById('subPtmBadge').innerText = data.summary.subPtm + ' TB PTM';
-
-      // Biểu đồ Trục Kép: Thuê bao PTM (Cột xanh) + Thuê bao Hiện hữu (Đường line xám/xanh)
-      const labels = data.regionStats.map(r => r.name);
-      const valCurrentSub = data.regionStats.map(r => r.currentSub);
-      const valPtmSub = data.regionStats.map(r => r.ptmSub);
-
-      if (subChartInstance) subChartInstance.destroy();
-      const ctx = document.getElementById('subChart').getContext('2d');
-      subChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              type: 'bar',
-              label: 'Thuê bao PTM (Tập trung)',
-              data: valPtmSub,
-              backgroundColor: '#10b981',
-              borderRadius: 6,
-              yAxisID: 'yPTM'
-            },
-            {
-              type: 'line',
-              label: 'TB Hiện hữu (Quy mô)',
-              data: valCurrentSub,
-              borderColor: '#3b82f6',
-              backgroundColor: '#93c5fd',
-              pointRadius: 4,
-              yAxisID: 'yCurrent'
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'top' } },
-          scales: {
-            yPTM: {
-              type: 'linear',
-              position: 'left',
-              beginAtZero: true,
-              title: { display: true, text: 'Số TB PTM' }
-            },
-            yCurrent: {
-              type: 'linear',
-              position: 'right',
-              beginAtZero: true,
-              grid: { drawOnChartArea: false },
-              title: { display: true, text: 'Số TB Hiện hữu' }
-            }
-          }
-        }
-      });
-
-      // Render Gói cước PTM
-      const pkgList = document.getElementById('subPackageList');
-      pkgList.innerHTML = '';
-      if (data.packagePtmDistribution.length === 0) {
-        pkgList.innerHTML = '<div class="text-xs text-slate-400 text-center py-6 italic">Không có thuê bao PTM trong kỳ.</div>';
-      } else {
-        data.packagePtmDistribution.forEach(pkg => {
-          const div = document.createElement('div');
-          div.className = 'text-xs';
-          div.innerHTML = `
-            <div class="flex justify-between items-center mb-1">
-              <span class="font-bold text-slate-800">${pkg.package}</span>
-              <div class="text-right">
-                <span class="font-semibold text-emerald-600">${pkg.count} TB</span>
-                <span class="text-slate-400 mx-1">|</span>
-                <span class="text-slate-600">${pkg.ratio}%</span>
-              </div>
-            </div>
-            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-              <div class="bg-emerald-500 h-2 rounded-full" style="width: ${Math.min(pkg.ratio, 100)}%"></div>
-            </div>
-          `;
-          pkgList.appendChild(div);
-        });
-      }
-
-      // Render Bảng Thuê bao có dòng Tổng cộng
-      const tbody = document.getElementById('subTableBody');
-      tbody.innerHTML = '';
-      let sumCurrent = 0, sumPtm = 0, sumTotal = 0;
-
-      data.regionStats.forEach((r, idx) => {
-        sumCurrent += r.currentSub;
-        sumPtm += r.ptmSub;
-        sumTotal += r.totalSub;
-
-        const ratio = data.summary.totalActiveSub > 0 ? ((r.totalSub / data.summary.totalActiveSub) * 100).toFixed(1) : '0.0';
-        const isZero = r.totalSub === 0;
-
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-50 transition-colors';
-        tr.innerHTML = `
-          <td class="px-4 py-3 text-slate-400">${idx + 1}</td>
-          <td class="px-4 py-3 font-semibold ${isZero ? 'text-slate-400' : 'text-slate-900'}">${r.name}</td>
-          <td class="px-4 py-3 text-center ${isZero ? 'text-slate-400' : 'text-slate-800'}">${r.currentSub.toLocaleString('vi-VN')} TB</td>
-          <td class="px-4 py-3 text-center font-bold ${r.ptmSub > 0 ? 'text-emerald-600' : 'text-slate-400'}">${r.ptmSub.toLocaleString('vi-VN')} TB</td>
-          <td class="px-4 py-3 text-center font-bold ${isZero ? 'text-slate-400' : 'text-blue-700'}">${r.totalSub.toLocaleString('vi-VN')} TB</td>
-          <td class="px-4 py-3 text-right font-semibold ${isZero ? 'text-slate-400' : 'text-blue-600'}">${ratio}%</td>
-        `;
-        tbody.appendChild(tr);
-      });
-
-      // Dòng Tổng cộng
-      const tfoot = document.getElementById('subTableFoot');
-      tfoot.innerHTML = `
-        <tr>
-          <td colspan="2" class="px-4 py-3 uppercase tracking-wider text-center">TỔNG CỘNG</td>
-          <td class="px-4 py-3 text-center text-slate-800">${sumCurrent.toLocaleString('vi-VN')} TB</td>
-          <td class="px-4 py-3 text-center text-emerald-700">${sumPtm.toLocaleString('vi-VN')} TB</td>
-          <td class="px-4 py-3 text-center text-blue-800">${sumTotal.toLocaleString('vi-VN')} TB</td>
-          <td class="px-4 py-3 text-right text-blue-800">100%</td>
-        </tr>
-      `;
-    }
-
-    // --- LOGIC TRA CỨU 360° ---
-    function clearSearch() {
-      const input = document.getElementById('searchInput');
-      input.value = '';
-      input.focus();
-      document.getElementById('clearBtn').classList.add('hidden');
-    }
-
-    document.getElementById('searchInput').addEventListener('input', function(e) {
-      const btn = document.getElementById('clearBtn');
-      if (e.target.value.trim()) btn.classList.remove('hidden');
-      else btn.classList.add('hidden');
-    });
-
-    function handleSearch() {
-      const q = document.getElementById('searchInput').value.trim();
-      if (!q) {
-        alert('Vui lòng nhập từ khóa tra cứu!');
-        return;
-      }
-
-      const btn = document.getElementById('btnSearch');
-      const loading = document.getElementById('loadingBox');
-      const resultList = document.getElementById('resultList');
-      const resultCount = document.getElementById('resultCount');
-      const emptyGuide = document.getElementById('emptyGuide');
-
-      btn.disabled = true;
-      btn.innerText = 'Đang tìm...';
-      loading.classList.remove('hidden');
-      resultList.innerHTML = '';
-      resultCount.classList.add('hidden');
-      emptyGuide.classList.add('hidden');
-
-      google.script.run
-        .withSuccessHandler(function(results) {
-          btn.disabled = false;
-          btn.innerText = 'Tìm kiếm';
-          loading.classList.add('hidden');
-          renderResults(results);
-        })
-        .withFailureHandler(function(err) {
-          btn.disabled = false;
-          btn.innerText = 'Tìm kiếm';
-          loading.classList.add('hidden');
-          alert('Lỗi tra cứu: ' + err.message);
-        })
-        .apiSearchSubscriber(q);
-    }
-
-    function renderResults(list) {
-      const resultList = document.getElementById('resultList');
-      const resultCount = document.getElementById('resultCount');
-
-      if (!list || list.length === 0) {
-        resultList.innerHTML = `
-          <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center card-shadow">
-            <div class="text-3xl mb-2">❌</div>
-            <div class="text-sm font-bold text-slate-800">Không tìm thấy thuê bao phù hợp</div>
-            <div class="text-xs text-slate-500 mt-1">Vui lòng kiểm tra lại Mã KH, USER, SĐT hoặc Serial ONT.</div>
-          </div>
-        `;
-        return;
-      }
-
-      resultCount.innerText = `Tìm thấy ${list.length} kết quả phù hợp:`;
-      resultCount.classList.remove('hidden');
-
-      list.forEach(item => {
-        const isCancelled = item.tinhTrangHD.toLowerCase().includes('hủy') || item.tinhTrangHD.toLowerCase().includes('huy');
-        const isBlocked = item.tinhTrangChan.toLowerCase().includes('nợ') || item.tinhTrangChan.toLowerCase().includes('khóa') || item.tinhTrangChan.toLowerCase().includes('chặn');
-
-        let badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-        let badgeText = item.tinhTrangHD;
-
-        if (isCancelled) {
-          badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
-          badgeText = 'Hợp đồng hủy';
-        } else if (isBlocked) {
-          badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
-          badgeText = item.tinhTrangChan;
-        }
-
-        const card = document.createElement('div');
-        card.className = 'bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 card-shadow transition-all';
-        card.innerHTML = `
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2 mb-3">
-            <div>
-              <div class="flex items-center space-x-2">
-                <span class="text-base font-bold text-blue-700">${item.tenTB}</span>
-                <span class="text-xs px-2 py-0.5 rounded-full border font-semibold ${badgeClass}">
-                  ${badgeText}
-                </span>
-              </div>
-              <div class="flex items-center space-x-3 text-xs text-slate-500 mt-1">
-                <span>Mã KH: <b class="text-slate-800">${item.maKH}</b></span>
-                ${item.user ? `<span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-mono font-semibold">USER: ${item.user}</span>` : ''}
-              </div>
-            </div>
-            <div class="text-left sm:text-right">
-              <div class="text-xs font-semibold text-slate-400">GÓI CƯỚC SỬ DỤNG</div>
-              <div class="text-base font-extrabold text-slate-900">${item.goiCuoc} <span class="text-xs font-normal text-slate-500">(${item.chuKy}T)</span></div>
-            </div>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs mb-3">
-            <div class="space-y-1.5">
-              <div class="flex"><span class="w-24 text-slate-400">Số điện thoại:</span> <span class="font-semibold text-slate-800">${item.sdt || '---'}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">Giá gói:</span> <span class="font-semibold text-slate-800">${formatCurrency(item.giaCuoc)}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">DTPK:</span> <span class="font-bold text-emerald-600">${formatCurrency(item.dtpk)}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">Hạn gói cước:</span> <span class="font-semibold text-blue-600">${item.ngayKetThuc}</span></div>
-            </div>
-            <div class="space-y-1.5">
-              <div class="flex"><span class="w-24 text-slate-400">Khu vực:</span> <span class="font-semibold text-slate-800">${item.khuVuc}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">Cửa hàng:</span> <span class="font-semibold text-slate-800">${item.tenCH}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">Nhân viên:</span> <span class="font-semibold text-slate-800">${item.tenNV}</span></div>
-              <div class="flex"><span class="w-24 text-slate-400">Serial ONT:</span> <span class="font-mono font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">${item.serial}</span></div>
-            </div>
-          </div>
-          <div class="pt-2.5 border-t border-slate-100 flex items-start text-xs text-slate-500">
-            <span class="mr-1.5">📍</span>
-            <span class="flex-1">${item.diaChi}</span>
-          </div>
-        `;
-        resultList.appendChild(card);
-      });
-    }
-  </script>
-</body>
-</html>
+        const ratio = data.summary.totalRevenue > 0 ? ((r.totalDtpk / data.summary.totalRevenue) * 100).toFixed
