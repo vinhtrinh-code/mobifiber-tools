@@ -2,11 +2,10 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * FILE        : WebApp_API.gs
- * PHIÊN BẢN   : 3.2 (Hợp nhất Cổng Tra Cứu 360° & Dashboard Đa kỳ SPA)
+ * PHIÊN BẢN   : 4.0 (Tách Độc Lập Dashboard Doanh Thu & Thuê Bao, List Đủ 4 Quý)
  * NGÀY TẠO    : 24/10/2026 20:15:00 (GMT+7)
- * NGÀY CẬP NHẬT: 24/10/2026 22:30:00 (GMT+7)
+ * NGÀY CẬP NHẬT: 25/10/2026 09:30:00 (GMT+7)
  * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
- * MÔ TẢ       : Backend API phục vụ Web App duy nhất chuẩn SPA (Single Page App)
  * ============================================================================
  */
 
@@ -29,13 +28,290 @@ function safeParseCurrency(val) {
 function doGet(e) {
   return HtmlService.createTemplateFromFile('Dashboard')
     .evaluate()
-    .setTitle('MobiFiber Portal - MobiFone Lâm Đồng')
+    .setTitle('MobiFiber Analytics Portal - MobiFone Lâm Đồng')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /**
- * 1. API TRA CỨU HỒ SƠ THUÊ BAO 360°
+ * Xác định khoảng ngày lọc (Hỗ trợ chi tiết Q1, Q2, Q3, Q4)
+ */
+function getDateRangeByPeriod(periodType) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const d = now.getDate();
+
+  let start = null;
+  let end = new Date(y, m, d, 23, 59, 59);
+
+  switch (periodType) {
+    case 'week': {
+      const currentDay = now.getDay();
+      const diffToMonday = (currentDay === 0 ? -6 : 1) - currentDay;
+      start = new Date(y, m, d + diffToMonday, 0, 0, 0);
+      break;
+    }
+    case 'month':
+      start = new Date(y, m, 1, 0, 0, 0);
+      end = new Date(y, m + 1, 0, 23, 59, 59);
+      break;
+    case 'q1':
+      start = new Date(y, 0, 1, 0, 0, 0);
+      end = new Date(y, 2, 31, 23, 59, 59);
+      break;
+    case 'q2':
+      start = new Date(y, 3, 1, 0, 0, 0);
+      end = new Date(y, 5, 30, 23, 59, 59);
+      break;
+    case 'q3':
+      start = new Date(y, 6, 1, 0, 0, 0);
+      end = new Date(y, 8, 30, 23, 59, 59);
+      break;
+    case 'q4':
+      start = new Date(y, 9, 1, 0, 0, 0);
+      end = new Date(y, 11, 31, 23, 59, 59);
+      break;
+    case '6tdn':
+      start = new Date(y, 0, 1, 0, 0, 0);
+      end = new Date(y, 5, 30, 23, 59, 59);
+      break;
+    case '9tdn':
+      start = new Date(y, 0, 1, 0, 0, 0);
+      end = new Date(y, 8, 30, 23, 59, 59);
+      break;
+    case 'year':
+      start = new Date(y, 0, 1, 0, 0, 0);
+      end = new Date(y, 11, 31, 23, 59, 59);
+      break;
+    default:
+      start = new Date(y, m, 1, 0, 0, 0);
+      end = new Date(y, m + 1, 0, 23, 59, 59);
+  }
+
+  return { start, end };
+}
+
+/**
+ * API Bóc tách dữ liệu chuyên sâu cho Doanh thu & Thuê bao
+ */
+function getDashboardMetrics(periodType = 'month') {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
+  if (!rawSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
+
+  const lastRow = rawSheet.getLastRow();
+  const lastCol = rawSheet.getLastColumn();
+
+  const regionMap = new Map();
+  STANDARD_REGIONS.forEach(reg => {
+    regionMap.set(reg, {
+      currentSub: 0,
+      currentDtpk: 0,
+      ptmSub: 0,
+      ptmDtpk: 0,
+      totalSub: 0,
+      totalDtpk: 0
+    });
+  });
+
+  if (lastRow < CONFIG.DATA_START_ROW_TARGET) {
+    return {
+      period: periodType,
+      currentPeriodQuarter: 'q' + (Math.floor(new Date().getMonth() / 3) + 1),
+      summary: {
+        totalRevenue: 0,
+        revenueCurrent: 0,
+        revenuePtm: 0,
+        totalActiveSub: 0,
+        subCurrent: 0,
+        subPtm: 0,
+        subBlocked: 0,
+        subCancelled: 0
+      },
+      regionStats: STANDARD_REGIONS.map(name => ({
+        name, currentSub: 0, ptmSub: 0, totalSub: 0, currentDtpk: 0, ptmDtpk: 0, totalDtpk: 0
+      })),
+      packagePtmDistribution: [],
+      lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
+    };
+  }
+
+  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
+  const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
+  const idxLoaiKH = headers.findIndex(h => h === 'loại khách hàng');
+  const idxNhuCau = headers.findIndex(h => h === 'nhu cầu hòa mạng');
+  const idxGoiCuoc = headers.findIndex(h => h === 'gói cước');
+  const idxGiaCuoc = headers.findIndex(h => h === 'giá cước');
+  const idxChuKy = headers.findIndex(h => h === 'chu kỳ sử dụng');
+  const idxDtpk = headers.findIndex(h => h === 'dtpk');
+  const idxTinhTrangHD = headers.findIndex(h => h === 'tình trạng hợp đồng');
+  const idxChanCat = headers.findIndex(h => h === 'tình trạng chặn cắt');
+  const idxMaNV = headers.findIndex(h => h === 'mã nhân viên');
+  const idxNgayDauNoi = headers.findIndex(h => h === 'ngày đấu nối');
+  const idxNgayThiCong = headers.findIndex(h => h === 'ngày hoàn tất thi công');
+  const idxNgayBatDau = headers.findIndex(h => h === 'ngày băt đầu gói cước' || h === 'ngày bắt đầu gói cước');
+  const idxNgayKetThuc = headers.findIndex(h => h === 'ngày kết thúc gói cước');
+
+  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
+
+  // Nạp map nhân viên -> khu vực
+  const staffRegionMap = new Map();
+  const thamSoSheet = ss.getSheetByName('thamso_caidat');
+  if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
+    const tsData = thamSoSheet.getRange(4, 10, thamSoSheet.getLastRow() - 3, 4).getValues();
+    tsData.forEach(r => {
+      const kv = String(r[0] || '').trim();
+      const maNV = normalizeHeader(String(r[2] || ''));
+      if (maNV && kv) staffRegionMap.set(maNV, kv);
+    });
+  }
+
+  const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType);
+
+  let subBlocked = 0;
+  let subCancelled = 0;
+  let revenueCurrent = 0;
+  let revenuePtm = 0;
+  let subCurrent = 0;
+  let subPtm = 0;
+
+  const ptmPackageMap = new Map();
+
+  for (let i = 0; i < rawData.length; i++) {
+    const r = rawData[i];
+    const statusHD = normalizeHeader(String(r[idxTinhTrangHD] || ''));
+    const statusChan = normalizeHeader(String(r[idxChanCat] || ''));
+    const loaiKH = normalizeHeader(String(r[idxLoaiKH] || ''));
+    const nhuCau = normalizeHeader(String(r[idxNhuCau] || ''));
+
+    const isCancelled = statusHD.includes('hủy') || statusHD.includes('huy') || statusHD.includes('thanh lý') || statusHD.includes('chấm dứt');
+    const isBlocked = statusChan.includes('nợ') || statusChan.includes('khóa') || statusChan.includes('chặn') || statusChan.includes('khyc');
+    const isNghiepVu = loaiKH.includes('nghiệp vụ') || loaiKH.includes('nghiep vu');
+
+    if (isCancelled) {
+      subCancelled++;
+      continue;
+    }
+    if (isBlocked) {
+      subBlocked++;
+    }
+
+    const chuKy = parseInt(r[idxChuKy], 10) || 1;
+    const giaCuoc = safeParseCurrency(r[idxGiaCuoc]);
+    let dtpk = safeParseCurrency(r[idxDtpk]);
+    if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
+
+    // Xác định Khu vực chuẩn
+    const maNV = normalizeHeader(String(r[idxMaNV] || ''));
+    let khuVuc = 'TT.KDVT';
+    if (maNV && staffRegionMap.has(maNV)) {
+      khuVuc = staffRegionMap.get(maNV);
+    }
+    let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc)) || 'TT.KDVT';
+    const regStat = regionMap.get(matchedRegion);
+
+    // 1. KIỂM TRA THUÊ BAO PTM THEO RULE Mod_PTM.gs
+    const isPtmDemand = (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi');
+    const isPtmActive = (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong');
+    let ptmDate = null;
+
+    if (isPtmDemand && !isNghiepVu && isPtmActive) {
+      const dDauNoi = parseToDate(r[idxNgayDauNoi]);
+      const dThiCong = parseToDate(r[idxNgayThiCong]);
+      const dBatDau = parseToDate(r[idxNgayBatDau]);
+
+      if (chuKy === 1) {
+        if (dDauNoi && dThiCong) {
+          ptmDate = (dThiCong.getTime() > dDauNoi.getTime()) ? dThiCong : dDauNoi;
+        } else {
+          ptmDate = dThiCong || dDauNoi || dBatDau;
+        }
+      } else {
+        ptmDate = dBatDau;
+      }
+    }
+
+    const isPtmInPeriod = ptmDate && (ptmDate >= dateStart && ptmDate <= dateEnd);
+
+    // 2. KIỂM TRA ĐIỀU KIỆN HOẠT ĐỘNG CHUẨN DOANH THU & HIỆN HỮU (RULE Mod_DoanhThuPhanBo.gs)
+    const isNormalActive = !isNghiepVu && 
+                           (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
+                           (statusChan === 'bình thường' || statusChan === 'binh thuong' || !statusChan);
+
+    if (isPtmInPeriod) {
+      subPtm++;
+      revenuePtm += dtpk;
+
+      regStat.ptmSub++;
+      regStat.ptmDtpk += dtpk;
+      regStat.totalSub++;
+      regStat.totalDtpk += dtpk;
+
+      // Thống kê gói PTM
+      const goiCuoc = String(r[idxGoiCuoc] || 'Khác').trim().toUpperCase();
+      ptmPackageMap.set(goiCuoc, (ptmPackageMap.get(goiCuoc) || 0) + 1);
+
+    } else if (isNormalActive) {
+      const dKetThuc = parseToDate(r[idxNgayKetThuc]);
+      const isValidCurrent = !dKetThuc || dKetThuc >= dateStart;
+
+      if (isValidCurrent) {
+        subCurrent++;
+        revenueCurrent += dtpk;
+
+        regStat.currentSub++;
+        regStat.currentDtpk += dtpk;
+        regStat.totalSub++;
+        regStat.totalDtpk += dtpk;
+      }
+    }
+  }
+
+  const regionStats = STANDARD_REGIONS.map(regName => {
+    const s = regionMap.get(regName);
+    return {
+      name: regName,
+      currentSub: s.currentSub,
+      ptmSub: s.ptmSub,
+      totalSub: s.totalSub,
+      currentDtpk: s.currentDtpk,
+      ptmDtpk: s.ptmDtpk,
+      totalDtpk: s.totalDtpk
+    };
+  });
+
+  const packagePtmDistribution = Array.from(ptmPackageMap.entries())
+    .map(([pkg, count]) => ({
+      package: pkg,
+      count: count,
+      ratio: subPtm > 0 ? ((count / subPtm) * 100).toFixed(1) : 0
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const currentQuarterCode = 'q' + (Math.floor(new Date().getMonth() / 3) + 1);
+
+  return {
+    period: periodType,
+    currentPeriodQuarter: currentQuarterCode,
+    summary: {
+      totalRevenue: revenueCurrent + revenuePtm,
+      revenueCurrent: revenueCurrent,
+      revenuePtm: revenuePtm,
+      totalActiveSub: subCurrent + subPtm,
+      subCurrent: subCurrent,
+      subPtm: subPtm,
+      subBlocked: subBlocked,
+      subCancelled: subCancelled
+    },
+    regionStats: regionStats,
+    packagePtmDistribution: packagePtmDistribution,
+    lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
+  };
+}
+
+/**
+ * 3. API TRA CỨU HỒ SƠ 360°
  */
 function apiSearchSubscriber(keyword) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -93,11 +369,7 @@ function apiSearchSubscriber(keyword) {
     const sdt = String(row[idxSDT] || '').replace(/[^0-9]/g, '');
     const serial = String(row[idxSerial] || '').replace(/[\s\uFEFF\xA0]+/g, '').toLowerCase();
 
-    const matchMaKH = qDigits && maKH.includes(qDigits);
-    const matchSDT = qDigits && sdt.includes(qDigits);
-    const matchSerial = qClean && serial.includes(qClean);
-
-    if (matchMaKH || matchSDT || matchSerial) {
+    if ((qDigits && maKH.includes(qDigits)) || (qDigits && sdt.includes(qDigits)) || (qClean && serial.includes(qClean))) {
       const giaCuoc = safeParseCurrency(row[idxGiaCuoc]);
       const chuKy = parseInt(row[idxChuKy], 10) || 1;
       let dtpk = safeParseCurrency(row[idxDtpk]);
@@ -137,253 +409,4 @@ function apiSearchSubscriber(keyword) {
   }
 
   return matched;
-}
-
-/**
- * 2. API BÁO CÁO DASHBOARD ĐA KỲ
- */
-function getDateRangeByPeriod(periodType) {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const d = now.getDate();
-
-  let start = null;
-  let end = new Date(y, m, d, 23, 59, 59);
-
-  switch (periodType) {
-    case 'week': {
-      const currentDay = now.getDay();
-      const diffToMonday = (currentDay === 0 ? -6 : 1) - currentDay;
-      start = new Date(y, m, d + diffToMonday, 0, 0, 0);
-      break;
-    }
-    case 'month':
-      start = new Date(y, m, 1, 0, 0, 0);
-      end = new Date(y, m + 1, 0, 23, 59, 59);
-      break;
-    case 'quarter': {
-      const qMonth = Math.floor(m / 3) * 3;
-      start = new Date(y, qMonth, 1, 0, 0, 0);
-      end = new Date(y, qMonth + 3, 0, 23, 59, 59);
-      break;
-    }
-    case '6tdn':
-      start = new Date(y, 0, 1, 0, 0, 0);
-      end = new Date(y, 5, 30, 23, 59, 59);
-      break;
-    case '9tdn':
-      start = new Date(y, 0, 1, 0, 0, 0);
-      end = new Date(y, 8, 30, 23, 59, 59);
-      break;
-    case 'year':
-      start = new Date(y, 0, 1, 0, 0, 0);
-      end = new Date(y, 11, 31, 23, 59, 59);
-      break;
-    default:
-      start = new Date(y, m, 1, 0, 0, 0);
-      end = new Date(y, m + 1, 0, 23, 59, 59);
-  }
-
-  return { start, end };
-}
-
-function getDashboardMetrics(periodType = 'month') {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
-  if (!rawSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
-
-  const lastRow = rawSheet.getLastRow();
-  const lastCol = rawSheet.getLastColumn();
-
-  const regionMap = new Map();
-  STANDARD_REGIONS.forEach(reg => {
-    regionMap.set(reg, { currentSub: 0, currentDtpk: 0, ptmSub: 0, ptmRevenue: 0, totalDtpk: 0 });
-  });
-
-  if (lastRow < CONFIG.DATA_START_ROW_TARGET) {
-    return {
-      period: periodType,
-      totalSub: 0,
-      activeSub: 0,
-      blockedSub: 0,
-      cancelledSub: 0,
-      ptmCount: 0,
-      ptmRevenue: 0,
-      totalRevenueDtpk: 0,
-      regionStats: STANDARD_REGIONS.map(name => ({ name, currentSub: 0, ptmSub: 0, totalSub: 0, totalDtpk: 0 })),
-      packageDistribution: [],
-      lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
-    };
-  }
-
-  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
-  const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
-  const idxLoaiKH = headers.findIndex(h => h === 'loại khách hàng');
-  const idxNhuCau = headers.findIndex(h => h === 'nhu cầu hòa mạng');
-  const idxGoiCuoc = headers.findIndex(h => h === 'gói cước');
-  const idxGiaCuoc = headers.findIndex(h => h === 'giá cước');
-  const idxChuKy = headers.findIndex(h => h === 'chu kỳ sử dụng');
-  const idxDtpk = headers.findIndex(h => h === 'dtpk');
-  const idxTinhTrangHD = headers.findIndex(h => h === 'tình trạng hợp đồng');
-  const idxChanCat = headers.findIndex(h => h === 'tình trạng chặn cắt');
-  const idxMaNV = headers.findIndex(h => h === 'mã nhân viên');
-  const idxNgayDauNoi = headers.findIndex(h => h === 'ngày đấu nối');
-  const idxNgayThiCong = headers.findIndex(h => h === 'ngày hoàn tất thi công');
-  const idxNgayBatDau = headers.findIndex(h => h === 'ngày băt đầu gói cước' || h === 'ngày bắt đầu gói cước');
-  const idxNgayKetThuc = headers.findIndex(h => h === 'ngày kết thúc gói cước');
-
-  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
-
-  const staffRegionMap = new Map();
-  const thamSoSheet = ss.getSheetByName('thamso_caidat');
-  if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
-    const tsData = thamSoSheet.getRange(4, 10, thamSoSheet.getLastRow() - 3, 4).getValues();
-    tsData.forEach(r => {
-      const kv = String(r[0] || '').trim();
-      const maNV = normalizeHeader(String(r[2] || ''));
-      if (maNV && kv) staffRegionMap.set(maNV, kv);
-    });
-  }
-
-  const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType);
-
-  let activeSub = 0;
-  let blockedSub = 0;
-  let cancelledSub = 0;
-  let ptmCount = 0;
-  let ptmRevenue = 0;
-  let totalRevenueDtpk = 0;
-
-  const ptmPackageMap = new Map();
-
-  for (let i = 0; i < rawData.length; i++) {
-    const r = rawData[i];
-    const statusHD = normalizeHeader(String(r[idxTinhTrangHD] || ''));
-    const statusChan = normalizeHeader(String(r[idxChanCat] || ''));
-    const loaiKH = normalizeHeader(String(r[idxLoaiKH] || ''));
-    const nhuCau = normalizeHeader(String(r[idxNhuCau] || ''));
-
-    const isCancelled = statusHD.includes('hủy') || statusHD.includes('huy') || statusHD.includes('thanh lý') || statusHD.includes('chấm dứt');
-    const isBlocked = statusChan.includes('nợ') || statusChan.includes('khóa') || statusChan.includes('chặn') || statusChan.includes('khyc');
-    const isNghiepVu = loaiKH.includes('nghiệp vụ') || loaiKH.includes('nghiep vu');
-
-    if (isCancelled) {
-      cancelledSub++;
-    } else if (isBlocked) {
-      blockedSub++;
-    } else {
-      activeSub++;
-    }
-
-    if (isCancelled) continue;
-
-    const chuKy = parseInt(r[idxChuKy], 10) || 1;
-    const giaCuoc = safeParseCurrency(r[idxGiaCuoc]);
-    let dtpk = safeParseCurrency(r[idxDtpk]);
-    if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
-
-    const maNV = normalizeHeader(String(r[idxMaNV] || ''));
-    let khuVuc = 'TT.KDVT';
-    if (maNV && staffRegionMap.has(maNV)) {
-      khuVuc = staffRegionMap.get(maNV);
-    }
-    let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc)) || 'TT.KDVT';
-    const regStat = regionMap.get(matchedRegion);
-
-    // Rule PTM chuẩn
-    const isPtmDemand = (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi');
-    const isPtmActive = (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong');
-
-    let ptmDate = null;
-    if (isPtmDemand && !isNghiepVu && isPtmActive) {
-      const dDauNoi = parseToDate(r[idxNgayDauNoi]);
-      const dThiCong = parseToDate(r[idxNgayThiCong]);
-      const dBatDau = parseToDate(r[idxNgayBatDau]);
-
-      if (chuKy === 1) {
-        if (dDauNoi && dThiCong) {
-          ptmDate = (dThiCong.getTime() > dDauNoi.getTime()) ? dThiCong : dDauNoi;
-        } else {
-          ptmDate = dThiCong || dDauNoi || dBatDau;
-        }
-      } else {
-        ptmDate = dBatDau;
-      }
-    }
-
-    const isPtmInPeriod = ptmDate && (ptmDate >= dateStart && ptmDate <= dateEnd);
-
-    if (isPtmInPeriod) {
-      ptmCount++;
-      ptmRevenue += giaCuoc;
-      regStat.ptmSub++;
-      regStat.ptmRevenue += giaCuoc;
-
-      const goiCuoc = String(r[idxGoiCuoc] || 'Khác').trim().toUpperCase();
-      if (!ptmPackageMap.has(goiCuoc)) {
-        ptmPackageMap.set(goiCuoc, { count: 0, revenue: 0, dtpk: 0 });
-      }
-      const pInfo = ptmPackageMap.get(goiCuoc);
-      pInfo.count++;
-      pInfo.revenue += giaCuoc;
-      pInfo.dtpk += dtpk;
-    }
-
-    // Rule DTPB chuẩn
-    const isQualifyRevenue = !isNghiepVu && 
-                            (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
-                            (statusChan === 'bình thường' || statusChan === 'binh thuong' || !statusChan);
-
-    if (isQualifyRevenue) {
-      const dKetThuc = parseToDate(r[idxNgayKetThuc]);
-      const isValidCurrent = !dKetThuc || dKetThuc >= dateStart;
-
-      if (isPtmInPeriod) {
-        totalRevenueDtpk += dtpk;
-        regStat.totalDtpk += dtpk;
-      } else if (isValidCurrent) {
-        totalRevenueDtpk += dtpk;
-        regStat.currentSub++;
-        regStat.currentDtpk += dtpk;
-        regStat.totalDtpk += dtpk;
-      }
-    }
-  }
-
-  const regionStats = STANDARD_REGIONS.map(regName => {
-    const s = regionMap.get(regName);
-    return {
-      name: regName,
-      currentSub: s.currentSub,
-      ptmSub: s.ptmSub,
-      totalSub: s.currentSub + s.ptmSub,
-      totalDtpk: s.totalDtpk,
-      ptmRevenue: s.ptmRevenue
-    };
-  });
-
-  const packageDistribution = Array.from(ptmPackageMap.entries())
-    .map(([pkg, info]) => ({
-      package: pkg,
-      count: info.count,
-      revenue: info.revenue,
-      dtpk: info.dtpk,
-      ratio: ptmCount > 0 ? ((info.count / ptmCount) * 100).toFixed(1) : 0
-    }))
-    .sort((a, b) => b.count - a.count);
-
-  return {
-    period: periodType,
-    totalSub: activeSub + blockedSub + cancelledSub,
-    activeSub: activeSub,
-    blockedSub: blockedSub,
-    cancelledSub: cancelledSub,
-    ptmCount: ptmCount,
-    ptmRevenue: ptmRevenue,
-    totalRevenueDtpk: totalRevenueDtpk,
-    regionStats: regionStats,
-    packageDistribution: packageDistribution,
-    lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
-  };
 }
