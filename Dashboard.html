@@ -129,7 +129,7 @@
   </div>
 
   <!-- ========================================== -->
-  <!-- TAB 2: DASHBOARD DOANH THU (CHUYÊN SÂU DTPK) -->
+  <!-- TAB 2: DASHBOARD DOANH THU (TÁCH 2 BIỂU ĐỒ) -->
   <!-- ========================================== -->
   <section id="paneRevenue" class="hidden max-w-7xl mx-auto px-4 py-4">
     
@@ -169,18 +169,37 @@
       </div>
     </div>
 
-    <!-- BIỂU ĐỒ CỘT NGANG ĐÔI TRỰC QUAN (HORIZONTAL BAR) -->
-    <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow mb-5">
-      <div class="flex items-center justify-between mb-3">
-        <div>
-          <h2 class="text-sm sm:text-base font-bold text-slate-900">Phân rã Doanh thu Phân kỳ (DTPK) theo 6 Cụm Địa bàn</h2>
-          <p class="text-xs text-slate-500">Biểu đồ cột ngang thể hiện song song Doanh thu Hiện hữu và Doanh thu PTM</p>
+    <!-- KHỐI TÁCH RỜI 2 BIỂU ĐỒ DOANH THU ĐỘC LẬP -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+      
+      <!-- Biểu đồ 1: DT Hiện Hữu (Cột Xanh Dương) -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900">Doanh thu Hiện hữu (DTPK) theo 6 Địa bàn</h2>
+            <p class="text-xs text-slate-500">Dòng tiền nền tảng từ khách hàng đang duy trì</p>
+          </div>
+          <span class="text-[11px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-semibold">DT Hiện hữu</span>
         </div>
-        <span class="text-[11px] bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-medium">VNĐ</span>
+        <div class="h-64 sm:h-72 relative">
+          <canvas id="chartRevCurrent"></canvas>
+        </div>
       </div>
-      <div class="h-80 relative">
-        <canvas id="revChart"></canvas>
+
+      <!-- Biểu đồ 2: DT PTM (Cột Xanh Lá - Thang đo chuẩn nhìn rõ từng ngàn đồng) -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900">Doanh thu PTM (DTPK) theo 6 Địa bàn</h2>
+            <p class="text-xs text-slate-500">Doanh thu phát sinh mới từ thuê bao PTM kỳ này</p>
+          </div>
+          <span class="text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-semibold">DT PTM Mới</span>
+        </div>
+        <div class="h-64 sm:h-72 relative">
+          <canvas id="chartRevPtm"></canvas>
+        </div>
       </div>
+
     </div>
 
     <!-- BẢNG CHI TIẾT DOANH THU 6 KHU VỰC (CÓ DÒNG TỔNG CỘNG) -->
@@ -195,8 +214,8 @@
               <th class="px-4 py-3">STT</th>
               <th class="px-4 py-3">Khu vực / Cụm</th>
               <th class="px-4 py-3 text-right">DT Hiện hữu (VNĐ)</th>
-              <th class="px-4 py-3 text-right">DT PTM (VNĐ)</th>
-              <th class="px-4 py-3 text-right">Tổng DTPK (VNĐ)</th>
+              <th class="px-4 py-3 text-right text-emerald-600 font-bold">DT PTM (VNĐ)</th>
+              <th class="px-4 py-3 text-right font-bold">Tổng DTPK (VNĐ)</th>
               <th class="px-4 py-3 text-right">Tỷ trọng (%)</th>
             </tr>
           </thead>
@@ -208,7 +227,7 @@
   </section>
 
   <!-- ========================================== -->
-  <!-- TAB 3: DASHBOARD THUÊ BAO (CHUYÊN SÂU BIẾN ĐỘNG) -->
+  <!-- TAB 3: DASHBOARD THUÊ BAO (TÁCH 2 BIỂU ĐỒ) -->
   <!-- ========================================== -->
   <section id="paneSub" class="hidden max-w-7xl mx-auto px-4 py-4">
     
@@ -241,24 +260,43 @@
       </div>
     </div>
 
-    <!-- BIỂU ĐỒ THUÊ BAO TẬP TRUNG PTM & GÓI CƯỚC -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+    <!-- KHỐI TÁCH RỜI 2 BIỂU ĐỒ THUÊ BAO ĐỘC LẬP -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
       
-      <!-- BIỂU ĐỒ TRỤC KÉP FOCUS PTM CHO LÃNH ĐẠO -->
-      <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 card-shadow">
+      <!-- Biểu đồ 1 (Focus cho Lãnh đạo): Thuê Bao PTM (Thang đo nhỏ, chuẩn xác từng TB) -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h2 class="text-sm sm:text-base font-bold text-slate-900">Chiến dịch PTM & Quy mô Thuê bao theo Địa bàn</h2>
-            <p class="text-xs text-slate-500">Cột xanh lá: Thuê bao PTM (Trục trái) | Đường xanh dương: Tổng TB Hiện hữu (Trục phải)</p>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900">Chiến dịch Thuê bao PTM theo 6 Địa bàn</h2>
+            <p class="text-xs text-slate-500">Đánh giá năng lực phát triển mới độc lập giữa các đơn vị</p>
           </div>
-          <span class="text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-bold">Focus PTM</span>
+          <span class="text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-bold">🎯 Trọng tâm PTM</span>
         </div>
-        <div class="h-72 relative">
-          <canvas id="subChart"></canvas>
+        <div class="h-64 sm:h-72 relative">
+          <canvas id="chartSubPtm"></canvas>
         </div>
       </div>
 
-      <!-- Danh sách gói cước PTM -->
+      <!-- Biểu đồ 2: Quy mô Thuê Bao Hiện Hữu (Thang đo lớn) -->
+      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900">Quy mô Thuê bao Hiện hữu theo 6 Địa bàn</h2>
+            <p class="text-xs text-slate-500">Số lượng khách hàng đang duy trì hợp đồng hoạt động</p>
+          </div>
+          <span class="text-[11px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-semibold">Quy mô TB</span>
+        </div>
+        <div class="h-64 sm:h-72 relative">
+          <canvas id="chartSubCurrent"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- KHỐI DANH SÁCH GÓI CƯỚC PTM VÀ BẢNG THUÊ BAO -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+      
+      <!-- Cơ cấu Gói cước PTM -->
       <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow flex flex-col justify-between">
         <div>
           <div class="flex items-center justify-between mb-3">
@@ -271,39 +309,44 @@
           Sắp xếp theo số lượng đăng ký PTM giảm dần
         </div>
       </div>
-    </div>
 
-    <!-- BẢNG CHI TIẾT THUÊ BAO 6 KHU VỰC (CÓ DÒNG TỔNG CỘNG) -->
-    <div class="bg-white rounded-xl border border-slate-200 card-shadow overflow-hidden">
-      <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/50">
-        <h3 class="text-sm font-bold text-slate-900">Bảng Tổng Hợp Số Lượng Thuê Bao theo Địa Bàn</h3>
+      <!-- Bảng Tổng Hợp Số Lượng Thuê Bao theo Địa Bàn (2 cột) -->
+      <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 card-shadow overflow-hidden flex flex-col justify-between">
+        <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/50">
+          <h3 class="text-sm font-bold text-slate-900">Bảng Tổng Hợp Số Lượng Thuê Bao theo Địa Bàn</h3>
+        </div>
+        <div class="overflow-x-auto flex-1">
+          <table class="w-full text-left text-xs sm:text-sm text-slate-600">
+            <thead class="bg-slate-50 text-[11px] text-slate-500 uppercase tracking-wider border-b border-slate-200">
+              <tr>
+                <th class="px-4 py-3">STT</th>
+                <th class="px-4 py-3">Khu vực / Cụm</th>
+                <th class="px-4 py-3 text-center">TB Hiện hữu</th>
+                <th class="px-4 py-3 text-center text-emerald-600 font-bold">TB PTM</th>
+                <th class="px-4 py-3 text-center">Tổng TB Hoạt động</th>
+                <th class="px-4 py-3 text-right">Tỷ trọng TB (%)</th>
+              </tr>
+            </thead>
+            <tbody id="subTableBody" class="divide-y divide-slate-200 font-medium"></tbody>
+            <tfoot id="subTableFoot" class="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300"></tfoot>
+          </table>
+        </div>
       </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs sm:text-sm text-slate-600">
-          <thead class="bg-slate-50 text-[11px] text-slate-500 uppercase tracking-wider border-b border-slate-200">
-            <tr>
-              <th class="px-4 py-3">STT</th>
-              <th class="px-4 py-3">Khu vực / Cụm</th>
-              <th class="px-4 py-3 text-center">TB Hiện hữu</th>
-              <th class="px-4 py-3 text-center text-emerald-600 font-bold">TB PTM</th>
-              <th class="px-4 py-3 text-center">Tổng TB Hoạt động</th>
-              <th class="px-4 py-3 text-right">Tỷ trọng TB (%)</th>
-            </tr>
-          </thead>
-          <tbody id="subTableBody" class="divide-y divide-slate-200 font-medium"></tbody>
-          <tfoot id="subTableFoot" class="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300"></tfoot>
-        </table>
-      </div>
+
     </div>
   </section>
 
-  <!-- JAVASCRIPT ĐIỀU PHỐI SPA TOÀN DIỆN -->
+  <!-- JAVASCRIPT ĐIỀU PHỐI SPA CHUẨN XÁC -->
   <script>
     var activeMainTab = 'lookup';
     var currentPeriod = 'month';
     var cachedMetrics = null;
-    var revChartInstance = null;
-    var subChartInstance = null;
+
+    // 4 Biểu đồ độc lập
+    var chartRevCurrentInst = null;
+    var chartRevPtmInst = null;
+    var chartSubCurrentInst = null;
+    var chartSubPtmInst = null;
 
     var periodNames = {
       'week': 'Tuần này',
@@ -321,7 +364,6 @@
       return Number(num || 0).toLocaleString('vi-VN') + ' đ';
     }
 
-    // CHUYỂN TABS CHÍNH AN TOÀN TUYỆT ĐỐI
     function switchMainTab(tab) {
       try {
         activeMainTab = tab;
@@ -348,7 +390,6 @@
           if (!cachedMetrics) {
             changePeriod(currentPeriod);
           } else {
-            // Cho container hiển thị trước khi khởi tạo Canvas Chart
             setTimeout(function() {
               if (tab === 'revenue') renderRevenueDashboard(cachedMetrics);
               if (tab === 'subscriber') renderSubscriberDashboard(cachedMetrics);
@@ -360,7 +401,6 @@
       }
     }
 
-    // CHUYỂN KỲ BÁO CÁO
     function changePeriod(p) {
       try {
         currentPeriod = p;
@@ -401,7 +441,7 @@
       }
     }
 
-    // RENDER DASHBOARD DOANH THU
+    // RENDER 2 BIỂU ĐỒ DOANH THU RIÊNG BIỆT
     function renderRevenueDashboard(data) {
       try {
         if (!data || !data.summary) return;
@@ -416,46 +456,63 @@
         if (elPtm) elPtm.innerText = formatCurrency(data.summary.revenuePtm);
         if (elUp) elUp.innerText = 'Cập nhật: ' + (data.lastUpdated || '');
 
-        // Vẽ biểu đồ Cột Ngang
-        if (typeof Chart !== 'undefined') {
-          var labels = data.regionStats.map(function(r) { return r.name; });
-          var valCurrent = data.regionStats.map(function(r) { return r.currentDtpk; });
-          var valPtm = data.regionStats.map(function(r) { return r.ptmDtpk; });
+        var labels = data.regionStats.map(function(r) { return r.name; });
+        var valCurrent = data.regionStats.map(function(r) { return r.currentDtpk; });
+        var valPtm = data.regionStats.map(function(r) { return r.ptmDtpk; });
 
-          if (revChartInstance) revChartInstance.destroy();
-          var canvas = document.getElementById('revChart');
-          if (canvas) {
-            var ctx = canvas.getContext('2d');
-            revChartInstance = new Chart(ctx, {
+        if (typeof Chart !== 'undefined') {
+          // 1. Biểu đồ DT Hiện Hữu
+          if (chartRevCurrentInst) chartRevCurrentInst.destroy();
+          var cvCur = document.getElementById('chartRevCurrent');
+          if (cvCur) {
+            chartRevCurrentInst = new Chart(cvCur.getContext('2d'), {
               type: 'bar',
               data: {
                 labels: labels,
-                datasets: [
-                  {
-                    label: 'DT Hiện hữu',
-                    data: valCurrent,
-                    backgroundColor: '#3b82f6',
-                    borderRadius: 4
-                  },
-                  {
-                    label: 'DT PTM',
-                    data: valPtm,
-                    backgroundColor: '#10b981',
-                    borderRadius: 4
-                  }
-                ]
+                datasets: [{
+                  label: 'DT Hiện hữu (VNĐ)',
+                  data: valCurrent,
+                  backgroundColor: '#3b82f6',
+                  borderRadius: 6
+                }]
               },
               options: {
-                indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'top' } },
+                plugins: { legend: { display: false } },
                 scales: {
-                  x: {
+                  y: {
                     beginAtZero: true,
-                    ticks: {
-                      callback: function(v) { return (v / 1000000).toFixed(1) + 'M'; }
-                    }
+                    ticks: { callback: function(v) { return (v / 1000000).toFixed(1) + 'M'; } }
+                  }
+                }
+              }
+            });
+          }
+
+          // 2. Biểu đồ DT PTM Mới
+          if (chartRevPtmInst) chartRevPtmInst.destroy();
+          var cvPtm = document.getElementById('chartRevPtm');
+          if (cvPtm) {
+            chartRevPtmInst = new Chart(cvPtm.getContext('2d'), {
+              type: 'bar',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'DT PTM (VNĐ)',
+                  data: valPtm,
+                  backgroundColor: '#10b981',
+                  borderRadius: 6
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: { callback: function(v) { return (v / 1000).toFixed(0) + 'k'; } }
                   }
                 }
               }
@@ -508,7 +565,7 @@
       }
     }
 
-    // RENDER DASHBOARD THUÊ BAO
+    // RENDER 2 BIỂU ĐỒ THUÊ BAO RIÊNG BIỆT
     function renderSubscriberDashboard(data) {
       try {
         if (!data || !data.summary) return;
@@ -527,58 +584,61 @@
         if (elKhyc) elKhyc.innerText = data.summary.subKhyc.toLocaleString('vi-VN');
         if (elBadge) elBadge.innerText = data.summary.subPtm + ' TB PTM';
 
-        // Biểu đồ Trục Kép
-        if (typeof Chart !== 'undefined') {
-          var labels = data.regionStats.map(function(r) { return r.name; });
-          var valCurrentSub = data.regionStats.map(function(r) { return r.currentSub; });
-          var valPtmSub = data.regionStats.map(function(r) { return r.ptmSub; });
+        var labels = data.regionStats.map(function(r) { return r.name; });
+        var valCurrentSub = data.regionStats.map(function(r) { return r.currentSub; });
+        var valPtmSub = data.regionStats.map(function(r) { return r.ptmSub; });
 
-          if (subChartInstance) subChartInstance.destroy();
-          var canvas = document.getElementById('subChart');
-          if (canvas) {
-            var ctx = canvas.getContext('2d');
-            subChartInstance = new Chart(ctx, {
+        if (typeof Chart !== 'undefined') {
+          // 1. Biểu đồ Thuê Bao PTM (Focus cho Lãnh Đạo - Thang đo 0..5 TB)
+          if (chartSubPtmInst) chartSubPtmInst.destroy();
+          var cvSubPtm = document.getElementById('chartSubPtm');
+          if (cvSubPtm) {
+            chartSubPtmInst = new Chart(cvSubPtm.getContext('2d'), {
               type: 'bar',
               data: {
                 labels: labels,
-                datasets: [
-                  {
-                    type: 'bar',
-                    label: 'Thuê bao PTM (Tập trung)',
-                    data: valPtmSub,
-                    backgroundColor: '#10b981',
-                    borderRadius: 6,
-                    yAxisID: 'yPTM'
-                  },
-                  {
-                    type: 'line',
-                    label: 'TB Hiện hữu (Quy mô)',
-                    data: valCurrentSub,
-                    borderColor: '#3b82f6',
-                    backgroundColor: '#93c5fd',
-                    pointRadius: 4,
-                    yAxisID: 'yCurrent'
-                  }
-                ]
+                datasets: [{
+                  label: 'Thuê bao PTM',
+                  data: valPtmSub,
+                  backgroundColor: '#10b981',
+                  borderRadius: 6
+                }]
               },
               options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'top' } },
+                plugins: { legend: { display: false } },
                 scales: {
-                  yPTM: {
-                    type: 'linear',
-                    position: 'left',
+                  y: {
                     beginAtZero: true,
-                    title: { display: true, text: 'Số TB PTM' }
-                  },
-                  yCurrent: {
-                    type: 'linear',
-                    position: 'right',
-                    beginAtZero: true,
-                    grid: { drawOnChartArea: false },
-                    title: { display: true, text: 'Số TB Hiện hữu' }
+                    ticks: { stepSize: 1 }
                   }
+                }
+              }
+            });
+          }
+
+          // 2. Biểu đồ Thuê Bao Hiện Hữu (Quy mô mạng lưới)
+          if (chartSubCurrentInst) chartSubCurrentInst.destroy();
+          var cvSubCur = document.getElementById('chartSubCurrent');
+          if (cvSubCur) {
+            chartSubCurrentInst = new Chart(cvSubCur.getContext('2d'), {
+              type: 'bar',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'TB Hiện hữu',
+                  data: valCurrentSub,
+                  backgroundColor: '#3b82f6',
+                  borderRadius: 6
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                  y: { beginAtZero: true }
                 }
               }
             });
