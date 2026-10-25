@@ -2,9 +2,9 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * FILE        : WebApp_API.gs
- * PHIÊN BẢN   : 5.0 (Hỗ trợ Tra cứu USER, Tách Nợ cước/KHYC & Dual-View Analytics)
+ * PHIÊN BẢN   : 5.1 (Chuẩn hóa API Tra cứu USER, Tách Nợ cước/KHYC & Dashboard)
  * NGÀY TẠO    : 24/10/2026 20:15:00 (GMT+7)
- * NGÀY CẬP NHẬT: 25/10/2026 10:00:00 (GMT+7)
+ * NGÀY CẬP NHẬT: 25/10/2026 10:15:00 (GMT+7)
  * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
@@ -28,7 +28,7 @@ function safeParseCurrency(val) {
 function doGet(e) {
   return HtmlService.createTemplateFromFile('Dashboard')
     .evaluate()
-    .setTitle('MobiFiber Portal - MobiFone Lâm Đồng')
+    .setTitle('MobiFiber Management Portal - MobiFone Lâm Đồng')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -90,7 +90,7 @@ function getDateRangeByPeriod(periodType) {
 }
 
 /**
- * API BÓC TÁCH DỮ LIỆU DASHBOARD CHO CẢ DOANH THU & THUÊ BAO
+ * 1. API BÓC TÁCH DỮ LIỆU DASHBOARD
  */
 function getDashboardMetrics(periodType = 'month') {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -136,7 +136,6 @@ function getDashboardMetrics(periodType = 'month') {
 
   const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
   const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
-  const idxUser = headers.findIndex(h => h === 'user');
   const idxLoaiKH = headers.findIndex(h => h === 'loại khách hàng');
   const idxNhuCau = headers.findIndex(h => h === 'nhu cầu hòa mạng');
   const idxGoiCuoc = headers.findIndex(h => h === 'gói cước');
@@ -200,7 +199,6 @@ function getDashboardMetrics(periodType = 'month') {
     let dtpk = safeParseCurrency(r[idxDtpk]);
     if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
 
-    // Xác định Khu vực chuẩn
     const maNV = normalizeHeader(String(r[idxMaNV] || ''));
     let khuVuc = 'TT.KDVT';
     if (maNV && staffRegionMap.has(maNV)) {
@@ -209,7 +207,7 @@ function getDashboardMetrics(periodType = 'month') {
     let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc)) || 'TT.KDVT';
     const regStat = regionMap.get(matchedRegion);
 
-    // 1. RULE PTM CHUẨN
+    // Rule PTM chuẩn[cite: 1]
     const isPtmDemand = (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi');
     const isPtmActive = (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong');
     let ptmDate = null;
@@ -232,7 +230,7 @@ function getDashboardMetrics(periodType = 'month') {
 
     const isPtmInPeriod = ptmDate && (ptmDate >= dateStart && ptmDate <= dateEnd);
 
-    // 2. RULE DOANH THU & HIỆN HỮU CHUẨN
+    // Rule Doanh thu & Hiện hữu chuẩn
     const isNormalActive = !isNghiepVu && 
                            (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
                            (statusChan === 'bình thường' || statusChan === 'binh thuong' || !statusChan);
@@ -306,7 +304,7 @@ function getDashboardMetrics(periodType = 'month') {
 }
 
 /**
- * 3. API TRA CỨU HỒ SƠ 360° (ĐÃ BỔ SUNG TÌM KIẾM THEO USER)
+ * 2. API TRA CỨU HỒ SƠ 360° (QUÉT CẢ CỘT USER)
  */
 function apiSearchSubscriber(keyword) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -366,7 +364,6 @@ function apiSearchSubscriber(keyword) {
     const sdt = String(row[idxSDT] || '').replace(/[^0-9]/g, '');
     const serial = String(row[idxSerial] || '').replace(/[\s\uFEFF\xA0]+/g, '').toLowerCase();
 
-    // Bổ sung tìm kiếm theo USER
     const matchMaKH = qDigits && maKH.includes(qDigits);
     const matchUser = userStr && userStr.includes(qClean);
     const matchSDT = qDigits && sdt.includes(qDigits);
