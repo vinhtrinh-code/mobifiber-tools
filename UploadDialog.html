@@ -6,16 +6,20 @@
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; margin: 0; background: #f8fafc; font-size: 13px; color: #1e293b; }
     .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .drop-zone { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 26px 16px; text-align: center; cursor: pointer; transition: all 0.2s ease; background: #f8fafc; }
+    .drop-zone { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.2s ease; background: #f8fafc; }
     .drop-zone.dragover { border-color: #2563eb; background: #eff6ff; transform: scale(1.01); }
     .btn { display: inline-block; width: 100%; padding: 10px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; margin-top: 10px; }
     .btn-primary { background: #2563eb; color: white; }
     .btn-primary:hover { background: #1d4ed8; }
     .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-close { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-top: 8px; }
     .status-box { display: none; margin-top: 12px; padding: 10px; border-radius: 8px; font-size: 12px; text-align: center; }
     .status-loading { background: #dbeafe; color: #1e40af; }
     .status-success { background: #dcfce7; color: #15803d; }
     .status-error { background: #fee2e2; color: #b91c1c; }
+    .alert-card { display: none; margin-top: 12px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px; text-align: left; }
+    .alert-title { font-weight: bold; color: #b45309; font-size: 12px; margin-bottom: 4px; }
+    .alert-list { font-size: 11px; color: #92400e; line-height: 1.5; max-height: 90px; overflow-y: auto; }
   </style>
 </head>
 <body>
@@ -33,8 +37,20 @@
 
     <div id="statusBox" class="status-box"></div>
 
+    <!-- KHUNG CẢNH BÁO THAM SỐ MỚI PHÁT SINH -->
+    <div id="alertBox" class="alert-card">
+      <div class="alert-title">⚠️ PHÁT HIỆN NHÂN SỰ MỚI CẦN PHÂN BỔ KHU VỰC:</div>
+      <div class="alert-list" id="alertList"></div>
+      <div style="font-size: 11px; color: #b45309; margin-top: 6px; font-style: italic;">
+        👉 Hệ thống đã tự động bổ sung vào sheet <b>thamso_caidat</b> (bôi đỏ). Vui lòng vào gán Khu vực để báo cáo chuẩn xác!
+      </div>
+    </div>
+
     <button id="btnUpload" class="btn btn-primary" onclick="startProcess()" disabled>
       Tiến hành Cập nhật & Đối soát
+    </button>
+    <button id="btnClose" class="btn btn-close" style="display: none;" onclick="google.script.host.close()">
+      Đóng cửa sổ
     </button>
   </div>
 
@@ -42,7 +58,6 @@
     let rawSheetData = null;
     const dropZone = document.getElementById('dropZone');
 
-    // 1. NGĂN CHẶN HÀNH VI MẶC ĐỊNH CỦA TRÌNH DUYỆT (CHỐNG MỞ FILE SANG TAB MỚI)
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
       dropZone.addEventListener(eventName, preventDefaults, false);
       document.body.addEventListener(eventName, preventDefaults, false);
@@ -53,7 +68,6 @@
       e.stopPropagation();
     }
 
-    // 2. HIỆU ỨNG THỊ GIÁC KHI KÉO FILE VÀO / RA KHỎI KHUNG
     ['dragenter', 'dragover'].forEach(eventName => {
       dropZone.addEventListener(eventName, () => {
         dropZone.classList.add('dragover');
@@ -67,7 +81,6 @@
       }, false);
     });
 
-    // 3. XỬ LÝ SỰ KIỆN KHI THẢ (DROP) FILE VÀO KHUNG
     dropZone.addEventListener('drop', (e) => {
       const dt = e.dataTransfer;
       const files = dt.files;
@@ -76,7 +89,6 @@
       }
     }, false);
 
-    // 4. HÀM ĐỌC VÀ BÓC TÁCH DỮ LIỆU EXCEL QUA SHEETJS
     function handleFileSelect(file) {
       if (!file) return;
 
@@ -114,13 +126,12 @@
       reader.readAsArrayBuffer(file);
     }
 
-    // 5. TIẾN HÀNH ĐỐI SOÁT VÀ GHI DỮ LIỆU
     function startProcess() {
       if (!rawSheetData) return;
       const btn = document.getElementById('btnUpload');
       btn.disabled = true;
-      btn.innerText = '⏳ Đang đối soát và ghi nhật ký...';
-      showStatus('Hệ thống đang đối soát dữ liệu trên RAM và ghi vào bảng tính...', 'loading');
+      btn.innerText = '⏳ Đang đối soát và quét tham số...';
+      showStatus('Hệ thống đang đối soát dữ liệu và quét danh mục nhân sự mới...', 'loading');
 
       let headerRowIndex = 0;
       for (let i = 0; i < Math.min(rawSheetData.length, 10); i++) {
@@ -133,9 +144,21 @@
 
       google.script.run
         .withSuccessHandler(function(res) {
-          btn.innerText = 'Hoàn tất';
+          btn.style.display = 'none';
+          document.getElementById('btnClose').style.display = 'block';
           showStatus(`✅ Đã cập nhật xong! Thêm mới: ${res.insertedCount} TB | Cập nhật: ${res.updatedCustCount} TB.`, 'success');
-          setTimeout(() => { google.script.host.close(); }, 2000);
+
+          // Hiển thị danh sách nhân sự mới phát hiện
+          if (res.newStaffList && res.newStaffList.length > 0) {
+            const alertBox = document.getElementById('alertBox');
+            const alertList = document.getElementById('alertList');
+            alertBox.style.display = 'block';
+            alertList.innerHTML = res.newStaffList.map((s, idx) => 
+              `• <b>${s.maNV}</b> - ${s.tenNV} (${s.tenCH})`
+            ).join('<br>');
+          } else if (res.newParamsCount === 0) {
+            setTimeout(() => { google.script.host.close(); }, 2500);
+          }
         })
         .withFailureHandler(function(err) {
           btn.disabled = false;
