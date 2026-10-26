@@ -19,7 +19,7 @@
     .status-error { background: #fee2e2; color: #b91c1c; }
     .alert-card { display: none; margin-top: 12px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px; text-align: left; }
     .alert-title { font-weight: bold; color: #b45309; font-size: 12px; margin-bottom: 4px; }
-    .alert-list { font-size: 11px; color: #92400e; line-height: 1.5; max-height: 90px; overflow-y: auto; }
+    .alert-list { font-size: 11px; color: #92400e; line-height: 1.5; max-height: 100px; overflow-y: auto; }
   </style>
 </head>
 <body>
@@ -27,7 +27,6 @@
     <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px; color: #0f172a;">Cập nhật danh sách thuê bao MobiFiber</div>
     <div style="font-size: 11px; color: #64748b; margin-bottom: 12px;">Hỗ trợ tệp định dạng Excel (.xlsx, .xls) trích xuất từ hệ thống cước.</div>
 
-    <!-- KHUNG KÉO THẢ HOÀN THIỆN -->
     <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
       <div style="font-size: 32px; margin-bottom: 6px;" id="dropIcon">📂</div>
       <div id="dropText" style="font-weight: 600; color: #334155;">Nhấp hoặc kéo thả file Excel vào đây</div>
@@ -37,12 +36,11 @@
 
     <div id="statusBox" class="status-box"></div>
 
-    <!-- KHUNG CẢNH BÁO THAM SỐ MỚI PHÁT SINH -->
     <div id="alertBox" class="alert-card">
       <div class="alert-title">⚠️ PHÁT HIỆN NHÂN SỰ MỚI CẦN PHÂN BỔ KHU VỰC:</div>
       <div class="alert-list" id="alertList"></div>
       <div style="font-size: 11px; color: #b45309; margin-top: 6px; font-style: italic;">
-        👉 Hệ thống đã tự động bổ sung vào sheet <b>thamso_caidat</b> (bôi đỏ). Vui lòng vào gán Khu vực để báo cáo chuẩn xác!
+        👉 Hệ thống đã tự động thêm vào sheet <b>thamso_caidat</b> (bôi đỏ). Vui lòng vào gán Khu vực để báo cáo chuẩn xác!
       </div>
     </div>
 
@@ -148,16 +146,15 @@
           document.getElementById('btnClose').style.display = 'block';
           showStatus(`✅ Đã cập nhật xong! Thêm mới: ${res.insertedCount} TB | Cập nhật: ${res.updatedCustCount} TB.`, 'success');
 
-          // Hiển thị danh sách nhân sự mới phát hiện
           if (res.newStaffList && res.newStaffList.length > 0) {
             const alertBox = document.getElementById('alertBox');
             const alertList = document.getElementById('alertList');
             alertBox.style.display = 'block';
             alertList.innerHTML = res.newStaffList.map((s, idx) => 
-              `• <b>${s.maNV}</b> - ${s.tenNV} (${s.tenCH})`
+              `• Mã NV: <b>${s.maNV}</b> - ${s.tenNV} (Mã KH: ${s.maKH} - ${s.tenTB})`
             ).join('<br>');
-          } else if (res.newParamsCount === 0) {
-            setTimeout(() => { google.script.host.close(); }, 2500);
+          } else {
+            setTimeout(() => { google.script.host.close(); }, 2000);
           }
         })
         .withFailureHandler(function(err) {
