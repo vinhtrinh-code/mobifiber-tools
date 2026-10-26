@@ -6,8 +6,8 @@
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; margin: 0; background: #f8fafc; font-size: 13px; color: #1e293b; }
     .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .drop-zone { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.2s; background: #f1f5f9; }
-    .drop-zone:hover { border-color: #3b82f6; background: #eff6ff; }
+    .drop-zone { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 26px 16px; text-align: center; cursor: pointer; transition: all 0.2s ease; background: #f8fafc; }
+    .drop-zone.dragover { border-color: #2563eb; background: #eff6ff; transform: scale(1.01); }
     .btn { display: inline-block; width: 100%; padding: 10px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; margin-top: 10px; }
     .btn-primary { background: #2563eb; color: white; }
     .btn-primary:hover { background: #1d4ed8; }
@@ -23,11 +23,12 @@
     <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px; color: #0f172a;">Cập nhật danh sách thuê bao MobiFiber</div>
     <div style="font-size: 11px; color: #64748b; margin-bottom: 12px;">Hỗ trợ tệp định dạng Excel (.xlsx, .xls) trích xuất từ hệ thống cước.</div>
 
-    <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
-      <div style="font-size: 28px; margin-bottom: 4px;">📂</div>
+    <!-- KHUNG KÉO THẢ HOÀN THIỆN -->
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div style="font-size: 32px; margin-bottom: 6px;" id="dropIcon">📂</div>
       <div id="dropText" style="font-weight: 600; color: #334155;">Nhấp hoặc kéo thả file Excel vào đây</div>
-      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Tối đa 1 file mỗi lần cập nhật</div>
-      <input type="file" id="fileInput" accept=".xlsx, .xls" style="display: none;" onchange="onFileSelected(this)">
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;" id="dropSubText">Tối đa 1 file mỗi lần cập nhật (.xlsx, .xls)</div>
+      <input type="file" id="fileInput" accept=".xlsx, .xls" style="display: none;" onchange="handleFileSelect(this.files[0])">
     </div>
 
     <div id="statusBox" class="status-box"></div>
@@ -39,12 +40,55 @@
 
   <script>
     let rawSheetData = null;
+    const dropZone = document.getElementById('dropZone');
 
-    function onFileSelected(input) {
-      const file = input.files[0];
+    // 1. NGĂN CHẶN HÀNH VI MẶC ĐỊNH CỦA TRÌNH DUYỆT (CHỐNG MỞ FILE SANG TAB MỚI)
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
+      document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    // 2. HIỆU ỨNG THỊ GIÁC KHI KÉO FILE VÀO / RA KHỎI KHUNG
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => {
+        dropZone.classList.add('dragover');
+        document.getElementById('dropText').innerText = 'Thả file vào đây ngay';
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => {
+        dropZone.classList.remove('dragover');
+      }, false);
+    });
+
+    // 3. XỬ LÝ SỰ KIỆN KHI THẢ (DROP) FILE VÀO KHUNG
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files && files.length > 0) {
+        handleFileSelect(files[0]);
+      }
+    }, false);
+
+    // 4. HÀM ĐỌC VÀ BÓC TÁCH DỮ LIỆU EXCEL QUA SHEETJS
+    function handleFileSelect(file) {
       if (!file) return;
 
-      document.getElementById('dropText').innerText = '📄 ' + file.name;
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext !== 'xlsx' && ext !== 'xls') {
+        showStatus('Định dạng tệp không hợp lệ! Vui lòng chỉ chọn file Excel (.xlsx, .xls)', 'error');
+        return;
+      }
+
+      document.getElementById('dropIcon').innerText = '📄';
+      document.getElementById('dropText').innerText = file.name;
+      document.getElementById('dropSubText').innerText = 'Kích thước: ' + (file.size / 1024).toFixed(1) + ' KB';
       showStatus('Đang đọc cấu trúc file Excel...', 'loading');
 
       const reader = new FileReader();
@@ -70,14 +114,14 @@
       reader.readAsArrayBuffer(file);
     }
 
+    // 5. TIẾN HÀNH ĐỐI SOÁT VÀ GHI DỮ LIỆU
     function startProcess() {
       if (!rawSheetData) return;
       const btn = document.getElementById('btnUpload');
       btn.disabled = true;
       btn.innerText = '⏳ Đang đối soát và ghi nhật ký...';
-      showStatus('Hệ thống đang ghi dữ liệu vào raw_mobifiber và đối soát thay đổi...', 'loading');
+      showStatus('Hệ thống đang đối soát dữ liệu trên RAM và ghi vào bảng tính...', 'loading');
 
-      // Tự động tìm dòng tiêu đề (chứa MÃ KHÁCH HÀNG)
       let headerRowIndex = 0;
       for (let i = 0; i < Math.min(rawSheetData.length, 10); i++) {
         const rowStr = (rawSheetData[i] || []).join(' ').toLowerCase();
