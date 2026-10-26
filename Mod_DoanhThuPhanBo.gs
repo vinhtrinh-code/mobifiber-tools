@@ -1,279 +1,457 @@
 /**
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
- * FILE        : Mod_DoanhThuPhanBo.gs
- * PHIÊN BẢN   : 3.0 (High-Performance Engine: In-Memory Aggregation & Matrix Formatting)
- * NGÀY TẠO    : 21/09/2026 08:30:00 (GMT+7)
- * NGÀY CẬP NHẬT: 24/10/2026 19:15:00 (GMT+7)
- * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
- * MÔ TẢ       : Module tổng hợp Báo cáo Doanh thu Phân bổ (DTPK) theo Khu vực & Địa bàn
+ * MODULE       : Mod_DoanhThuPhanBo.gs
+ * PHIÊN BẢN    : 2.2 (Khôi phục tùy chọn Khoảng ngày, Fix lỗi parseCurrency & Nút Tải Excel)
+ * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
 
 function showRevenueAllocationDialog() {
-  const currentMonth = Utilities.formatDate(new Date(), 'Asia/Saigon', 'MM/yyyy');
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <base target="_top">
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 18px; margin: 0; font-size: 13px; color: #202124; background: #fff; }
-        .form-group { margin-bottom: 14px; }
-        label { display: block; font-weight: 600; margin-bottom: 6px; color: #3c4043; }
-        input[type="text"] { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid #dadce0; border-radius: 6px; font-size: 14px; outline: none; }
-        input[type="text"]:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
-        .hint { font-size: 11px; color: #70757a; margin-top: 4px; }
-        .btn-container { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
-        button { padding: 8px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; border: none; font-size: 13px; }
-        .btn-cancel { background: #f1f3f4; color: #3c4043; }
-        .btn-submit { background: #1a73e8; color: #fff; }
-        .btn-submit:disabled { background: #dadce0; cursor: not-allowed; }
-      </style>
-    </head>
-    <body>
-      <div class="form-group">
-        <label>Tháng phân bổ doanh thu (MM/YYYY):</label>
-        <input type="text" id="monthInput" value="${currentMonth}" placeholder="Ví dụ: 10/2026">
-        <div class="hint">Báo cáo sẽ tổng hợp TB Hiện hữu, PTM và tính tỷ trọng DTPK theo từng Khu vực.</div>
-      </div>
-      <div class="btn-container">
-        <button class="btn-cancel" onclick="google.script.host.close()">Hủy</button>
-        <button class="btn-submit" id="btnSubmit" onclick="runAllocation()">Khởi tạo báo cáo</button>
-      </div>
-      <script>
-        function runAllocation() {
-          const val = document.getElementById('monthInput').value.trim();
-          if (!/^\\d{2}\\/\\d{4}$/.test(val)) {
-            alert('Vui lòng nhập đúng định dạng MM/YYYY (Ví dụ: 10/2026)');
-            return;
-          }
-          document.getElementById('btnSubmit').disabled = true;
-          document.getElementById('btnSubmit').innerText = 'Đang xử lý...';
-          google.script.run
-            .withSuccessHandler(function(res) {
-              google.script.host.close();
-            })
-            .withFailureHandler(function(err) {
-              alert('Lỗi: ' + err.message);
-              document.getElementById('btnSubmit').disabled = false;
-              document.getElementById('btnSubmit').innerText = 'Khởi tạo báo cáo';
-            })
-            .generateRevenueAllocationReport(val);
-        }
-      </script>
-    </body>
-    </html>
-  `;
-  const ui = HtmlService.createHtmlOutput(html).setWidth(380).setHeight(190);
-  SpreadsheetApp.getUi().showModalDialog(ui, '📊 Báo cáo Doanh thu Phân bổ (DTPK)');
+  const html = HtmlService.createHtmlOutput(getRevenueAllocationDialogHtml())
+    .setWidth(500)
+    .setHeight(480)
+    .setTitle('Báo cáo Doanh thu Phân bổ (DTPK)');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Báo cáo Doanh thu Phân bổ MobiFiber');
 }
 
 /**
- * XỬ LÝ TỔNG HỢP VÀ TẠO BÁO CÁO DTPB TỐI ƯU TRONG BỘ NHỚ
+ * XỬ LÝ KẾT XUẤT BẢNG TỔNG HỢP DOANH THU PHÂN BỔ (DTPK)
  */
-function generateRevenueAllocationReport(targetMonthStr) {
-  const startTime = new Date().getTime();
+function processRevenueAllocationSummary(params) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
   if (!rawSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
 
-  const parts = targetMonthStr.split('/');
-  const targetMonth = parseInt(parts[0], 10);
-  const targetYear = parseInt(parts[1], 10);
-  const sheetTargetName = `DTPB_T${parts[0]}_${parts[1]}`;
-
-  // 1. ĐỌC DỮ LIỆU ĐẦU VÀO VÀ THAM SỐ (1 LẦN TRONG RAM)
-  const lastCol = rawSheet.getLastColumn();
   const lastRow = rawSheet.getLastRow();
-  if (lastRow < CONFIG.DATA_START_ROW_TARGET) throw new Error('Sheet raw_mobifiber chưa có dữ liệu!');
+  const lastCol = rawSheet.getLastColumn();
+  if (lastRow < CONFIG.DATA_START_ROW_TARGET) throw new Error('Bảng raw_mobifiber chưa có dữ liệu.');
 
-  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
+  const mapping = loadThamSoMapping();
+
+  let startDate, endDate, timeTitle, timeCode, summarySheetName;
+  if (params.type === 'month') {
+    const month = parseInt(params.month, 10);
+    const year = parseInt(params.year, 10);
+    const mStr = month < 10 ? '0' + month : '' + month;
+    startDate = new Date(year, month - 1, 1, 0, 0, 0);
+    endDate = new Date(year, month, 0, 23, 59, 59);
+    timeTitle = `THÁNG ${mStr}/${year}`;
+    timeCode = `T${mStr}_${year}`;
+    summarySheetName = `DTPB_${timeCode}`;
+  } else {
+    const startParts = params.from.split('/');
+    const endParts = params.to.split('/');
+    startDate = new Date(parseInt(startParts[2], 10), parseInt(startParts[1], 10) - 1, parseInt(startParts[0], 10), 0, 0, 0);
+    endDate = new Date(parseInt(endParts[2], 10), parseInt(endParts[1], 10) - 1, parseInt(endParts[0], 10), 23, 59, 59);
+    const d1 = startParts[0] + startParts[1];
+    const d2 = endParts[0] + endParts[1];
+    timeTitle = `TỪ ${params.from} ĐẾN ${params.to}`;
+    timeCode = `${d1}_${d2}_${endParts[2]}`;
+    summarySheetName = `DTPB_${timeCode}`;
+  }
+
+  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol)
+    .getValues()[0].map(h => normalizeHeader(h));
+
   const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
-  const idxTenTB = headers.findIndex(h => h === 'tên thuê bao');
+  const idxLoaiKH = headers.findIndex(h => h === 'loại khách hàng');
   const idxGiaCuoc = headers.findIndex(h => h === 'giá cước');
   const idxChuKy = headers.findIndex(h => h === 'chu kỳ sử dụng');
   const idxDtpk = headers.findIndex(h => h === 'dtpk');
   const idxNgayDauNoi = headers.findIndex(h => h === 'ngày đấu nối');
+  const idxNgayThiCong = headers.findIndex(h => h === 'ngày hoàn tất thi công');
   const idxNgayBatDau = headers.findIndex(h => h === 'ngày băt đầu gói cước' || h === 'ngày bắt đầu gói cước');
   const idxNgayKetThuc = headers.findIndex(h => h === 'ngày kết thúc gói cước');
   const idxTinhTrangHD = headers.findIndex(h => h === 'tình trạng hợp đồng');
+  const idxChanCat = headers.findIndex(h => h === 'tình trạng chặn cắt');
+  const idxNhuCau = headers.findIndex(h => h === 'nhu cầu hòa mạng');
   const idxMaNV = headers.findIndex(h => h === 'mã nhân viên');
 
-  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
+  const numRows = lastRow - CONFIG.DATA_START_ROW_TARGET + 1;
+  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, numRows, lastCol).getValues();
 
-  // Đọc danh mục phân bổ khu vực
-  const staffRegionMap = new Map();
-  const thamSoSheet = ss.getSheetByName('thamso_caidat');
-  if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
-    const tsData = thamSoSheet.getRange(4, 10, thamSoSheet.getLastRow() - 3, 4).getValues(); // Cột J:M (Khu vực, Mã CH, Mã NV, Tên NV)
-    tsData.forEach(r => {
-      const kv = String(r[0] || '').trim();
-      const maNV = normalizeHeader(String(r[2] || ''));
-      if (maNV && kv) staffRegionMap.set(maNV, kv);
-    });
-  }
+  const regionMap = {};
+  let grandTotalOldTB = 0;
+  let grandTotalOldDtpk = 0;
+  let grandTotalNewTB = 0;
+  let grandTotalNewRevenue = 0;
 
-  // 2. KHỞI TẠO MẢNG THỐNG KÊ TRÊN RAM
-  const regionMap = new Map(); // Key: Tên Khu vực -> { currentSub: 0, currentDtpk: 0, ptmSub: 0, ptmRevenue: 0, totalDtpk: 0 }
-  
-  let totalCurrentSub = 0;
-  let totalCurrentDtpk = 0;
-  let totalPtmSub = 0;
-  let totalPtmRevenue = 0;
-  let grandTotalDtpk = 0;
-
-  const monthStartDate = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0);
-  const monthEndDate = new Date(targetYear, targetMonth, 0, 23, 59, 59);
-
-  // 3. TÍNH TOÁN IN-MEMORY
   for (let i = 0; i < rawData.length; i++) {
     const row = rawData[i];
-    const statusHD = normalizeHeader(String(row[idxTinhTrangHD] || ''));
 
-    // Bỏ qua hợp đồng đã hủy/chấm dứt
-    if (statusHD.includes('hủy') || statusHD.includes('huy') || statusHD.includes('thanh lý') || statusHD.includes('chấm dứt')) {
-      continue;
-    }
+    const loaiKH = normalizeHeader(row[idxLoaiKH]);
+    if (loaiKH === 'thuê bao nghiệp vụ' || loaiKH === 'thue bao nghiep vu') continue;
+
+    const tinhTrangHD = normalizeHeader(row[idxTinhTrangHD]);
+    if (tinhTrangHD !== 'đang hoạt động' && tinhTrangHD !== 'dang hoat dong') continue;
+
+    const chanCat = normalizeHeader(row[idxChanCat]);
+    if (chanCat !== 'bình thường' && chanCat !== 'binh thuong' && chanCat !== '') continue;
+
+    const chuKyRaw = row[idxChuKy];
+    const chuKy = chuKyRaw ? parseInt(chuKyRaw, 10) : 0;
+    const giaCuoc = parseCurrencyToInteger(row[idxGiaCuoc]) || 0;
+    const dtpk = parseCurrencyToInteger(row[idxDtpk]) || (chuKy > 0 ? Math.round(giaCuoc / chuKy) : 0);
 
     const dDauNoi = parseToDate(row[idxNgayDauNoi]);
+    const dThiCong = parseToDate(row[idxNgayThiCong]);
     const dBatDau = parseToDate(row[idxNgayBatDau]);
     const dKetThuc = parseToDate(row[idxNgayKetThuc]);
-    const checkDate = dDauNoi || dBatDau;
+    const nhuCau = normalizeHeader(row[idxNhuCau]);
 
-    const giaCuoc = parseCurrency(row[idxGiaCuoc]);
-    const chuKy = parseInt(row[idxChuKy], 10) || 1;
-    let dtpk = parseCurrency(row[idxDtpk]);
-    if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
+    let isPtmInPeriod = false;
+    if (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi') {
+      let ptmDate = null;
+      if (chuKy === 1) {
+        if (dDauNoi && dThiCong) {
+          ptmDate = (dThiCong.getTime() > dDauNoi.getTime()) ? dThiCong : dDauNoi;
+        } else {
+          ptmDate = dThiCong || dDauNoi || dBatDau;
+        }
+      } else {
+        ptmDate = dBatDau;
+      }
 
-    // Xác định khu vực
-    const maNV = normalizeHeader(String(row[idxMaNV] || ''));
-    let khuVuc = 'Chưa phân bổ KV';
-    if (maNV && staffRegionMap.has(maNV)) {
-      khuVuc = staffRegionMap.get(maNV);
-    }
-
-    if (!regionMap.has(khuVuc)) {
-      regionMap.set(khuVuc, { currentSub: 0, currentDtpk: 0, ptmSub: 0, ptmRevenue: 0, totalDtpk: 0 });
-    }
-    const regStat = regionMap.get(khuVuc);
-
-    // Phân loại PTM hay Hiện hữu
-    const isPtm = checkDate && checkDate >= monthStartDate && checkDate <= monthEndDate;
-
-    if (isPtm) {
-      regStat.ptmSub++;
-      regStat.ptmRevenue += giaCuoc;
-      regStat.totalDtpk += dtpk;
-      totalPtmSub++;
-      totalPtmRevenue += giaCuoc;
-      grandTotalDtpk += dtpk;
-    } else {
-      // Thuê bao hiện hữu còn hiệu lực gói cước
-      const isValidCurrent = !dKetThuc || dKetThuc >= monthStartDate;
-      if (isValidCurrent) {
-        regStat.currentSub++;
-        regStat.currentDtpk += dtpk;
-        regStat.totalDtpk += dtpk;
-        totalCurrentSub++;
-        totalCurrentDtpk += dtpk;
-        grandTotalDtpk += dtpk;
+      if (ptmDate && ptmDate >= startDate && ptmDate <= endDate) {
+        isPtmInPeriod = true;
       }
     }
+
+    let isRetainedInPeriod = false;
+    if (!isPtmInPeriod) {
+      if (chuKy === 1) {
+        isRetainedInPeriod = true;
+      } else {
+        if (dKetThuc && dKetThuc >= startDate) {
+          isRetainedInPeriod = true;
+        }
+      }
+    }
+
+    if (!isPtmInPeriod && !isRetainedInPeriod) continue;
+
+    const rawMaNV = String(row[idxMaNV] || '').trim();
+    let khuVuc = 'Chưa phân bổ KV';
+    if (rawMaNV && mapping.staffRegion && mapping.staffRegion.has(normalizeHeader(rawMaNV))) {
+      const staffInfo = mapping.staffRegion.get(normalizeHeader(rawMaNV));
+      if (staffInfo.khuVuc && !staffInfo.khuVuc.includes('Chưa phân bổ')) {
+        khuVuc = staffInfo.khuVuc;
+      }
+    }
+
+    if (!regionMap[khuVuc]) {
+      regionMap[khuVuc] = { oldTB: 0, oldDtpk: 0, newTB: 0, newRevenue: 0 };
+    }
+
+    if (isPtmInPeriod) {
+      regionMap[khuVuc].newTB += 1;
+      regionMap[khuVuc].newRevenue += dtpk;
+      grandTotalNewTB += 1;
+      grandTotalNewRevenue += dtpk;
+    } else if (isRetainedInPeriod) {
+      regionMap[khuVuc].oldTB += 1;
+      regionMap[khuVuc].oldDtpk += dtpk;
+      grandTotalOldTB += 1;
+      grandTotalOldDtpk += dtpk;
+    }
   }
 
-  // 4. XÂY DỰNG SHEET BÁO CÁO MỚI (BULK WRITE & BULK FORMAT)
-  let reportSheet = ss.getSheetByName(sheetTargetName);
-  if (reportSheet) {
-    reportSheet.clear();
-  } else {
-    reportSheet = ss.insertSheet(sheetTargetName);
-  }
+  const grandTotalDtpk = grandTotalOldDtpk + grandTotalNewRevenue;
+  const grandTotalAllTB = grandTotalOldTB + grandTotalNewTB;
 
-  const nowFormatted = Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm');
+  // Tạo Sheet Tổng hợp
+  let destSheet = ss.getSheetByName(summarySheetName);
+  if (!destSheet) destSheet = ss.insertSheet(summarySheetName);
+  else destSheet.clear();
 
-  // Khối Header & KPI Cards
-  const headerMatrix = [
-    [`BÁO CÁO DOANH THU PHÂN BỔ MOBIFIBER - THÁNG ${targetMonthStr}`, '', '', '', '', '', '', ''],
-    [`🎯 TỔNG DTPK TOÀN TỈNH: ${grandTotalDtpk.toLocaleString('vi-VN')} VNĐ`, '', '', '', '', `🕒 Ngày lập: ${nowFormatted}`, '', ''],
-    [`📊 TỔNG THUÊ BAO: ${totalCurrentSub + totalPtmSub} TB (Hiện hữu: ${totalCurrentSub} | PTM: ${totalPtmSub})`, '', '', '', '', '', '', ''],
-    ['KHU VỰC', 'TB HIỆN HỮU', 'DTPK HIỆN HỮU', 'TB PTM', 'DOANH THU PTM', 'TỔNG SỐ TB', 'TỔNG DTPK (VNĐ)', 'TỶ TRỌNG (%)']
+  const ssId = ss.getId();
+  const sheetId = destSheet.getSheetId();
+  const directExportUrl = `https://docs.google.com/spreadsheets/d/${ssId}/export?format=xlsx&gid=${sheetId}`;
+
+  // Tiêu đề & KPI
+  destSheet.getRange('A1:H1').merge()
+    .setValue(`  BÁO CÁO DOANH THU PHÂN BỔ MOBIFIBER - ${timeTitle}`)
+    .setFontWeight('bold').setFontSize(13).setBackground('#1B365D').setFontColor('#FFFFFF')
+    .setHorizontalAlignment('left').setVerticalAlignment('middle');
+
+  destSheet.getRange('A2:E2').merge()
+    .setValue(`  🎯 TỔNG DTPK TOÀN TỈNH: ${grandTotalDtpk.toLocaleString('vi-VN')} VNĐ`)
+    .setFontWeight('bold').setFontSize(11).setBackground('#D2E3FC').setFontColor('#174EA6')
+    .setHorizontalAlignment('left').setVerticalAlignment('middle');
+
+  destSheet.getRange('F2:H2').merge()
+    .setValue(`🕒 Ngày lập: ${Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')}`)
+    .setFontSize(10).setBackground('#D2E3FC').setFontColor('#5F6368')
+    .setHorizontalAlignment('right').setVerticalAlignment('middle');
+
+  destSheet.getRange('A3:H3').merge()
+    .setValue(`  📊 TỔNG THUÊ BAO: ${grandTotalAllTB} TB (Hiện hữu: ${grandTotalOldTB} TB | PTM mới: ${grandTotalNewTB} TB)`)
+    .setFontWeight('bold').setFontSize(11).setBackground('#E8F0FE').setFontColor('#174EA6')
+    .setHorizontalAlignment('left').setVerticalAlignment('middle');
+
+  // Nút Thao tác trên Sheet
+  destSheet.getRange('A4:D4').merge()
+    .setFormula(`=HYPERLINK("#gid=${sheetId}&action=detail"; "📋 KẾT XUẤT DANH SÁCH CHI TIẾT")`)
+    .setFontWeight('bold').setFontSize(11).setBackground('#00558F').setFontColor('#FFFFFF')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+
+  destSheet.getRange('E4:H4').merge()
+    .setFormula(`=HYPERLINK("${directExportUrl}"; "📥 TẢI FILE EXCEL TỔNG HỢP")`)
+    .setFontWeight('bold').setFontSize(11).setBackground('#1A73E8').setFontColor('#FFFFFF')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+
+  const tableHeaders = [
+    'KHU VỰC', 'TB HIỆN HỮU', 'DTPK HIỆN HỮU', 'TB PTM', 'DOANH THU PTM', 'TỔNG SỐ TB', 'TỔNG DTPK (VNĐ)', 'TỶ TRỌNG (%)'
   ];
 
-  // Khối Dữ liệu từng Khu vực
-  const dataMatrix = [];
-  const sortedRegions = Array.from(regionMap.keys()).sort();
+  destSheet.getRange(6, 1, 1, tableHeaders.length).setValues([tableHeaders])
+    .setFontWeight('bold').setBackground('#1B365D').setFontColor('#FFFFFF').setHorizontalAlignment('center').setVerticalAlignment('middle');
+  destSheet.setFrozenRows(6);
 
-  sortedRegions.forEach(regName => {
-    const s = regionMap.get(regName);
-    const totalSub = s.currentSub + s.ptmSub;
-    const ratio = grandTotalDtpk > 0 ? (s.totalDtpk / grandTotalDtpk) : 0;
+  const regionRows = Object.keys(regionMap).map(kv => {
+    const d = regionMap[kv];
+    const totalTbKv = d.oldTB + d.newTB;
+    const totalDtpkKv = d.oldDtpk + d.newRevenue;
+    const share = grandTotalDtpk > 0 ? (totalDtpkKv / grandTotalDtpk) : 0;
+    return [
+      ' ' + kv,
+      d.oldTB,
+      d.oldDtpk,
+      d.newTB,
+      d.newRevenue,
+      totalTbKv,
+      totalDtpkKv,
+      share
+    ];
+  }).sort((a, b) => b[6] - a[6]);
 
-    dataMatrix.push([
-      regName,
-      s.currentSub,
-      s.currentDtpk,
-      s.ptmSub,
-      s.ptmRevenue,
-      totalSub,
-      s.totalDtpk,
-      ratio
-    ]);
-  });
+  let curRow = 7;
+  if (regionRows.length > 0) {
+    destSheet.getRange(curRow, 1, regionRows.length, tableHeaders.length).setValues(regionRows);
+    destSheet.getRange(curRow, 1, regionRows.length, 1).setHorizontalAlignment('left');
+    destSheet.getRange(curRow, 2, regionRows.length, 1).setHorizontalAlignment('center');
+    destSheet.getRange(curRow, 3, regionRows.length, 1).setNumberFormat('#,##0').setHorizontalAlignment('right');
+    destSheet.getRange(curRow, 4, regionRows.length, 1).setHorizontalAlignment('center');
+    destSheet.getRange(curRow, 5, regionRows.length, 1).setNumberFormat('#,##0').setHorizontalAlignment('right');
+    destSheet.getRange(curRow, 6, regionRows.length, 1).setHorizontalAlignment('center');
+    destSheet.getRange(curRow, 7, regionRows.length, 1).setNumberFormat('#,##0').setHorizontalAlignment('right');
+    destSheet.getRange(curRow, 8, regionRows.length, 1).setNumberFormat('0.0%').setHorizontalAlignment('right');
+    curRow += regionRows.length;
+  }
 
-  // Hàng Tổng Cộng
-  const totalRatio = grandTotalDtpk > 0 ? 1 : 0;
-  dataMatrix.push([
-    'TỔNG CỘNG',
-    totalCurrentSub,
-    totalCurrentDtpk,
-    totalPtmSub,
-    totalPtmRevenue,
-    totalCurrentSub + totalPtmSub,
+  // Dòng Tổng Cộng
+  const summaryTotalRow = [
+    ' TỔNG CỘNG TOÀN TỈNH',
+    grandTotalOldTB,
+    grandTotalOldDtpk,
+    grandTotalNewTB,
+    grandTotalNewRevenue,
+    grandTotalAllTB,
     grandTotalDtpk,
-    totalRatio
-  ]);
+    1.0
+  ];
 
-  // Ghi toàn bộ dữ liệu 1 lần
-  reportSheet.getRange(1, 1, 4, 8).setValues(headerMatrix);
-  reportSheet.getRange(5, 1, dataMatrix.length, 8).setValues(dataMatrix);
+  destSheet.getRange(curRow, 1, 1, tableHeaders.length).setValues([summaryTotalRow])
+    .setFontWeight('bold').setBackground('#E8F0FE').setFontColor('#174EA6');
+  destSheet.getRange(curRow, 1).setHorizontalAlignment('left');
+  destSheet.getRange(curRow, 2).setHorizontalAlignment('center');
+  destSheet.getRange(curRow, 3).setNumberFormat('#,##0').setHorizontalAlignment('right');
+  destSheet.getRange(curRow, 4).setHorizontalAlignment('center');
+  destSheet.getRange(curRow, 5).setNumberFormat('#,##0').setHorizontalAlignment('right');
+  destSheet.getRange(curRow, 6).setHorizontalAlignment('center');
+  destSheet.getRange(curRow, 7).setNumberFormat('#,##0').setHorizontalAlignment('right');
+  destSheet.getRange(curRow, 8).setNumberFormat('0.0%').setHorizontalAlignment('right');
 
-  // Merge các ô tiêu đề
-  reportSheet.getRange('A1:H1').merge();
-  reportSheet.getRange('A2:E2').merge();
-  reportSheet.getRange('F2:H2').merge();
-  reportSheet.getRange('A3:H3').merge();
+  const exactWidths = [160, 110, 130, 100, 130, 110, 140, 124];
+  for (let c = 0; c < exactWidths.length; c++) destSheet.setColumnWidth(c + 1, exactWidths[c]);
 
-  // Định dạng Matrix Format 1 lần duy nhất
-  reportSheet.getRange('A1:H1').setBackground('#1a73e8').setFontColor('#ffffff').setFontWeight('bold').setFontSize(13).setHorizontalAlignment('center');
-  reportSheet.getRange('A2:H2').setBackground('#e8f0fe').setFontColor('#174ea6').setFontWeight('bold');
-  reportSheet.getRange('A3:H3').setBackground('#f1f3f4').setFontColor('#3c4043').setFontStyle('italic');
-  reportSheet.getRange('A4:H4').setBackground('#34a853').setFontColor('#ffffff').setFontWeight('bold').setHorizontalAlignment('center');
+  ss.setActiveSheet(destSheet);
 
-  // Định dạng số tiền và tỷ lệ %
-  reportSheet.getRange(5, 2, dataMatrix.length, 1).setNumberFormat('#,##0');
-  reportSheet.getRange(5, 3, dataMatrix.length, 1).setNumberFormat('#,##0" đ"');
-  reportSheet.getRange(5, 4, dataMatrix.length, 1).setNumberFormat('#,##0');
-  reportSheet.getRange(5, 5, dataMatrix.length, 1).setNumberFormat('#,##0" đ"');
-  reportSheet.getRange(5, 6, dataMatrix.length, 1).setNumberFormat('#,##0');
-  reportSheet.getRange(5, 7, dataMatrix.length, 1).setNumberFormat('#,##0" đ"');
-  reportSheet.getRange(5, 8, dataMatrix.length, 1).setNumberFormat('0.00%');
+  return {
+    success: true,
+    sheetName: summarySheetName,
+    timeCode: timeCode,
+    totalDtpk: grandTotalDtpk.toLocaleString('vi-VN'),
+    totalTB: grandTotalAllTB,
+    oldTB: grandTotalOldTB,
+    newTB: grandTotalNewTB,
+    downloadUrl: directExportUrl
+  };
+}
 
-  // Hàng Tổng Cộng cuối cùng
-  const lastReportRow = 4 + dataMatrix.length;
-  reportSheet.getRange(lastReportRow, 1, 1, 8).setBackground('#ea4335').setFontColor('#ffffff').setFontWeight('bold');
+/**
+ * GIAO DIỆN DIALOG DOANH THU PHÂN BỔ (DTPK)
+ */
+function getRevenueAllocationDialogHtml() {
+  const now = new Date();
+  const curMonth = now.getMonth() + 1;
+  const curYear = now.getFullYear();
 
-  // Căn chỉnh độ rộng cột
-  reportSheet.setColumnWidth(1, 160);
-  reportSheet.setColumnWidth(2, 110);
-  reportSheet.setColumnWidth(3, 140);
-  reportSheet.setColumnWidth(4, 100);
-  reportSheet.setColumnWidth(5, 140);
-  reportSheet.setColumnWidth(6, 110);
-  reportSheet.setColumnWidth(7, 150);
-  reportSheet.setColumnWidth(8, 110);
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 14px; margin: 0; background: #f8fafc; font-size: 13px; color: #1e293b; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+    .section-title { font-weight: bold; color: #1e40af; margin-bottom: 8px; font-size: 13px; }
+    .radio-label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer; }
+    .inputs { margin-top: 6px; padding-left: 24px; }
+    .hint { font-size: 11px; color: #64748b; margin-top: 4px; font-style: italic; }
+    input[type="text"] { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
+    input[type="text"]:focus { border-color: #2563eb; }
+    .btn { width: 100%; border: none; padding: 10px; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; text-align: center; display: block; box-sizing: border-box; }
+    .btn-primary { background: #2563eb; color: white; margin-top: 8px; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-download { background: #16a34a; color: white; margin-top: 10px; text-decoration: none; }
+    .btn-download:hover { background: #15803d; }
+    .btn-close { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-top: 8px; }
+    .btn-close:hover { background: #e2e8f0; }
+    .alert-banner { display: none; background: #fee2e2; border: 1px solid #fecaca; color: #b91c1c; padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 10px; }
+    .status { font-size: 12px; margin-top: 8px; padding: 8px; border-radius: 6px; display: none; text-align: center; }
+    .status.info { background: #dbeafe; color: #1e40af; display: block; }
+    #successView { display: none; text-align: center; padding: 6px 4px; }
+    .success-title { font-size: 15px; font-weight: bold; color: #15803d; margin-bottom: 8px; }
+    .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 6px; text-align: left; }
+  </style>
+</head>
+<body>
+  <div id="formView">
+    <div id="errorBanner" class="alert-banner"></div>
+    <div class="card">
+      <div class="section-title">Chọn kỳ phân bổ doanh thu:</div>
+      
+      <!-- LỰA CHỌN 1: THEO THÁNG (KHÔI PHỤC ĐẦY ĐỦ) -->
+      <label class="radio-label">
+        <input type="radio" name="reportType" value="month" checked onchange="toggleType()">
+        <span>Theo Tháng phân bổ (MM/YYYY)</span>
+      </label>
+      <div class="inputs" id="monthBox">
+        <span>Tháng:</span>
+        <input type="text" id="monthVal" value="${curMonth < 10 ? '0' + curMonth : curMonth}" style="width: 45px; text-align: center;"> /
+        <span>Năm:</span>
+        <input type="text" id="yearVal" value="${curYear}" style="width: 65px; text-align: center;">
+        <div class="hint">💡 Báo cáo sẽ tổng hợp TB Hiện hữu, PTM và tính tỷ trọng DTPK theo từng Khu vực.</div>
+      </div>
 
-  const duration = ((new Date().getTime() - startTime) / 1000).toFixed(2);
-  Logger.log(`⚡ Tạo báo cáo DTPB hoàn tất trong ${duration}s!`);
-  ss.setActiveSheet(reportSheet);
+      <!-- LỰA CHỌN 2: TỪ NGÀY ĐẾN NGÀY (KHÔI PHỤC ĐẦY ĐỦ) -->
+      <label class="radio-label" style="margin-top: 10px;">
+        <input type="radio" name="reportType" value="range" onchange="toggleType()">
+        <span>Theo Khoảng ngày tùy chọn</span>
+      </label>
+      <div class="inputs" id="rangeBox" style="opacity: 0.5; pointer-events: none;">
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+          <span style="width: 65px;">Từ ngày:</span>
+          <input type="text" id="fromDate" placeholder="01/10/${curYear}" style="width: 110px;">
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px;">
+          <span style="width: 65px;">Đến ngày:</span>
+          <input type="text" id="toDate" placeholder="31/10/${curYear}" style="width: 110px;">
+        </div>
+      </div>
+    </div>
+
+    <button id="btnRun" class="btn btn-primary" onclick="runReport()">🚀 Khởi tạo báo cáo DTPK</button>
+    <div id="statusBox" class="status"></div>
+  </div>
+
+  <div id="successView">
+    <div class="success-title">🎉 KHỞI TẠO BÁO CÁO THÀNH CÔNG!</div>
+    <div class="kpi-card">
+      <div style="font-weight: bold; color: #1e40af;" id="resSheetName">Bảng tổng hợp: ...</div>
+      <div style="margin-top: 6px; font-size: 13px; line-height: 1.7;">
+        📈 <b>Tổng DTPK toàn tỉnh:</b> <span id="resDtpk" style="color: #b45309; font-weight: bold;">0</span> VNĐ<br>
+        📊 <b>Tổng số thuê bao:</b> <span id="resTotalTB" style="color: #1e40af; font-weight: bold;">0</span> TB<br>
+        🏛️ <b>Thuê bao Hiện hữu:</b> <span id="resOldTB" style="color: #334155; font-weight: bold;">0</span> TB<br>
+        🚀 <b>Thuê bao PTM mới:</b> <span id="resNewTB" style="color: #15803d; font-weight: bold;">0</span> TB
+      </div>
+    </div>
+
+    <!-- NÚT TẢI FILE EXCEL TRỰC TIẾP TRÊN DIALOG -->
+    <button id="btnDownload" class="btn btn-download" onclick="downloadExcel()">📥 Tải file Excel (.xlsx) về máy</button>
+    <button class="btn btn-close" onclick="google.script.host.close()">Đóng cửa sổ</button>
+  </div>
+
+  <iframe id="downloadFrame" style="display:none;"></iframe>
+
+  <script>
+    let currentDownloadUrl = '';
+
+    function showError(msg) {
+      const b = document.getElementById('errorBanner');
+      b.innerText = '⚠️ ' + msg;
+      b.style.display = 'block';
+    }
+    function hideError() {
+      document.getElementById('errorBanner').style.display = 'none';
+    }
+    function toggleType() {
+      hideError();
+      const isMonth = document.querySelector('input[name="reportType"]:checked').value === 'month';
+      document.getElementById('monthBox').style.opacity = isMonth ? '1' : '0.5';
+      document.getElementById('monthBox').style.pointerEvents = isMonth ? 'auto' : 'none';
+      document.getElementById('rangeBox').style.opacity = isMonth ? '0.5' : '1';
+      document.getElementById('rangeBox').style.pointerEvents = isMonth ? 'none' : 'auto';
+    }
+
+    function runReport() {
+      hideError();
+      const type = document.querySelector('input[name="reportType"]:checked').value;
+      const btn = document.getElementById('btnRun');
+      const status = document.getElementById('statusBox');
+
+      let params = { type: type };
+      if (type === 'month') {
+        const m = document.getElementById('monthVal').value.trim();
+        const y = document.getElementById('yearVal').value.trim();
+        if (!m || !y) { showError('Vui lòng nhập đầy đủ Tháng và Năm!'); return; }
+        params.month = m;
+        params.year = y;
+      } else {
+        const f = document.getElementById('fromDate').value.trim();
+        const t = document.getElementById('toDate').value.trim();
+        if (!f || !t) { showError('Vui lòng nhập đầy đủ Từ ngày và Đến ngày!'); return; }
+        params.from = f;
+        params.to = t;
+      }
+
+      btn.disabled = true;
+      btn.innerText = '⏳ Đang tính toán doanh thu...';
+      status.className = 'status info';
+      status.innerText = 'Hệ thống đang tổng hợp DTPK theo từng Khu vực...';
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          currentDownloadUrl = res.downloadUrl;
+          document.getElementById('formView').style.display = 'none';
+          document.getElementById('resSheetName').innerText = '📁 Bảng tổng hợp: ' + res.sheetName;
+          document.getElementById('resDtpk').innerText = res.totalDtpk;
+          document.getElementById('resTotalTB').innerText = res.totalTB;
+          document.getElementById('resOldTB').innerText = res.oldTB;
+          document.getElementById('resNewTB').innerText = res.newTB;
+          document.getElementById('successView').style.display = 'block';
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerText = '🚀 Khởi tạo báo cáo DTPK';
+          status.style.display = 'none';
+          showError(err.message);
+        })
+        .processRevenueAllocationSummary(params);
+    }
+
+    function downloadExcel() {
+      if (currentDownloadUrl) {
+        document.getElementById('downloadFrame').src = currentDownloadUrl;
+      } else {
+        alert('Không tìm thấy đường link tải file!');
+      }
+    }
+  </script>
+</body>
+</html>
+  `;
 }
