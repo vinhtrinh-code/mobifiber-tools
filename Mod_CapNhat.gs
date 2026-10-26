@@ -309,3 +309,88 @@ function initLogSheet(ss) {
   }
   return logSheet;
 }
+
+/**
+ * TỰ ĐỘNG BẮT PHÁT SINH THAM SỐ MỚI TỪ DỮ LIỆU CẬP NHẬT
+ * Quét Cửa hàng & Nhân viên mới -> Bổ sung vào thamso_caidat -> Gán [Chưa phân bổ KV]
+ */
+function autoDetectAndSyncNewParameters(newRows, colIndices) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tsSheet = ss.getSheetByName('thamso_caidat');
+  if (!tsSheet) return { newParamsCount: 0, details: '' };
+
+  const lastRow = tsSheet.getLastRow();
+  
+  // 1. Nạp danh mục nhân viên hiện có từ cột L (Mã NV)
+  const existingStaffCodes = new Set();
+  if (lastRow >= 4) {
+    const staffData = tsSheet.getRange(4, 12, lastRow - 3, 1).getValues(); // Cột L: Mã NV
+    staffData.forEach(r => {
+      const code = normalizeHeader(String(r[0] || ''));
+      if (code) existingStaffCodes.add(code);
+    });
+  }
+
+  // 2. Nạp danh mục cửa hàng hiện có từ cột F (Mã CH)
+  const existingStoreCodes = new Set();
+  if (lastRow >= 4) {
+    const storeData = tsSheet.getRange(4, 6, lastRow - 3, 1).getValues(); // Cột F: Mã CH
+    storeData.forEach(r => {
+      const code = normalizeHeader(String(r[0] || ''));
+      if (code) existingStoreCodes.add(code);
+    });
+  }
+
+  const newStaffToAppend = [];
+  const newStoresToAppend = [];
+  const addedStaffKeys = new Set();
+  const addedStoreKeys = new Set();
+
+  newRows.forEach(row => {
+    const maNV = String(row[colIndices.idxMaNV] || '').trim();
+    const tenNV = String(row[colIndices.idxTenNV] || '').trim();
+    const maCH = String(row[colIndices.idxMaCH] || '').trim();
+    const tenCH = String(row[colIndices.idxTenCH] || '').trim();
+
+    // Kiểm tra Nhân viên mới
+    const normMaNV = normalizeHeader(maNV);
+    if (normMaNV && !existingStaffCodes.has(normMaNV) && !addedStaffKeys.has(normMaNV)) {
+      addedStaffKeys.add(normMaNV);
+      // Cột J: Khu vực, Cột K: Đơn vị/Cửa hàng, Cột L: Mã NV, Cột M: Tên NV
+      newStaffToAppend.push(['[Chưa phân bổ KV]', tenCH || 'Chưa rõ', "'" + maNV, tenNV]);
+    }
+
+    // Kiểm tra Cửa hàng mới
+    const normMaCH = normalizeHeader(maCH);
+    if (normMaCH && !existingStoreCodes.has(normMaCH) && !addedStoreKeys.has(normMaCH)) {
+      addedStoreKeys.add(normMaCH);
+      // Cột F: Mã CH, Cột G: Tên CH, Cột H: Tên CH rút gọn
+      newStoresToAppend.push(["'" + maCH, tenCH, tenCH]);
+    }
+  });
+
+  let totalNew = 0;
+  let alertDetails = [];
+
+  // Ghi thêm Nhân viên mới vào cột J:M
+  if (newStaffToAppend.length > 0) {
+    const startRowStaff = Math.max(tsSheet.getLastRow() + 1, 4);
+    tsSheet.getRange(startRowStaff, 10, newStaffToAppend.length, 4).setValues(newStaffToAppend);
+    tsSheet.getRange(startRowStaff, 10, newStaffToAppend.length, 1).setBackground('#FCE8E6').setFontColor('#C5221F'); // Đánh dấu đỏ cần phân bổ KV
+    totalNew += newStaffToAppend.length;
+    alertDetails.push(`${newStaffToAppend.length} Nhân viên mới`);
+  }
+
+  // Ghi thêm Cửa hàng mới vào cột F:H
+  if (newStoresToAppend.length > 0) {
+    const startRowStore = Math.max(tsSheet.getLastRow() + 1, 4);
+    tsSheet.getRange(startRowStore, 6, newStoresToAppend.length, 3).setValues(newStoresToAppend);
+    totalNew += newStoresToAppend.length;
+    alertDetails.push(`${newStoresToAppend.length} Cửa hàng mới`);
+  }
+
+  return {
+    newParamsCount: totalNew,
+    details: alertDetails.join(', ')
+  };
+}

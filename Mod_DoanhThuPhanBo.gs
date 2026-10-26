@@ -455,3 +455,71 @@ function getRevenueAllocationDialogHtml() {
 </html>
   `;
 }
+
+/**
+ * TIỆN ÍCH TỰ ĐỘNG TÌM VÀ BẬT BẢNG CẢNH BÁO 2 THUÊ BAO CHƯA PHÂN BỔ KV
+ */
+function findUnmappedSubscribers() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
+  const tsSheet = ss.getSheetByName('thamso_caidat');
+  const ui = SpreadsheetApp.getUi();
+
+  if (!rawSheet || !tsSheet) return;
+
+  const mapping = loadThamSoMapping();
+  const lastRow = rawSheet.getLastRow();
+  const lastCol = rawSheet.getLastColumn();
+  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
+
+  const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
+  const idxTenTB = headers.findIndex(h => h === 'tên thuê bao');
+  const idxMaNV = headers.findIndex(h => h === 'mã nhân viên');
+  const idxTenNV = headers.findIndex(h => h === 'tên nhân viên');
+  const idxMaCH = headers.findIndex(h => h === 'mã cửa hàng');
+  const idxTenCH = headers.findIndex(h => h === 'tên cửa hàng');
+  const idxLoaiKH = headers.findIndex(h => h === 'loại khách hàng');
+  const idxTinhTrangHD = headers.findIndex(h => h === 'tình trạng hợp đồng');
+
+  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
+  const unmappedList = [];
+
+  for (let i = 0; i < rawData.length; i++) {
+    const row = rawData[i];
+    const loaiKH = normalizeHeader(row[idxLoaiKH]);
+    if (loaiKH === 'thuê bao nghiệp vụ' || loaiKH === 'thue bao nghiep vu') continue;
+    const tinhTrangHD = normalizeHeader(row[idxTinhTrangHD]);
+    if (tinhTrangHD !== 'đang hoạt động' && tinhTrangHD !== 'dang hoat dong') continue;
+
+    const rawMaNV = String(row[idxMaNV] || '').trim();
+    let khuVuc = 'Chưa phân bổ KV';
+    if (rawMaNV && mapping.staffRegion && mapping.staffRegion.has(normalizeHeader(rawMaNV))) {
+      const staffInfo = mapping.staffRegion.get(normalizeHeader(rawMaNV));
+      if (staffInfo.khuVuc && !staffInfo.khuVuc.includes('Chưa phân bổ')) {
+        khuVuc = staffInfo.khuVuc;
+      }
+    }
+
+    if (khuVuc === 'Chưa phân bổ KV') {
+      unmappedList.push({
+        row: CONFIG.DATA_START_ROW_TARGET + i,
+        maKH: row[idxMaKH],
+        tenTB: row[idxTenTB],
+        maNV: rawMaNV || '(Trống Mã NV)',
+        tenNV: row[idxTenNV] || '(Trống)',
+        tenCH: row[idxTenCH] || '(Trống)'
+      });
+    }
+  }
+
+  if (unmappedList.length === 0) {
+    ui.alert('✅ Tất cả thuê bao đang hoạt động đều đã được gán Khu vực đầy đủ!');
+  } else {
+    let msg = `⚠️ Phát hiện ${unmappedList.length} thuê bao chưa được phân bổ Khu vực:\n\n`;
+    unmappedList.forEach((item, idx) => {
+      msg += `${idx + 1}. Dòng ${item.row}: Mã KH [${item.maKH}] - ${item.tenTB}\n   👉 Mã NV: [${item.maNV}] | Tên NV: ${item.tenNV} | CH: ${item.tenCH}\n\n`;
+    });
+    msg += `Vui lòng vào sheet "thamso_caidat" để bổ sung Khu vực cho các Mã NV trên, sau đó chạy lại báo cáo.`;
+    ui.alert(msg);
+  }
+}
