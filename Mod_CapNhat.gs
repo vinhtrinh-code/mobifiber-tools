@@ -2,7 +2,7 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * MODULE       : Mod_CapNhat.gs
- * PHIÊN BẢN    : 2.7 (Tích hợp suggestShortModel, Quét tham số toàn diện & An toàn)
+ * PHIÊN BẢN    : 2.8 (Quét trực tiếp từ Source Header, Chèn đúng dòng Bảng 4 thamso_caidat)
  * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
@@ -15,9 +15,6 @@ function showUploadDialog() {
   SpreadsheetApp.getUi().showModalDialog(html, 'Cập nhật dữ liệu MobiFiber');
 }
 
-/**
- * HÀM GỢI Ý TÊN VIẾT TẮT RÚT GỌN CHO MÔ HÌNH TRIỂN KHAI (FIX TRIỆT ĐỂ LỖI)
- */
 function suggestShortModel(modelName) {
   if (!modelName) return '';
   const str = String(modelName).trim();
@@ -35,7 +32,6 @@ function suggestShortModel(modelName) {
   if (lower.includes('cá nhân') || lower.includes('tư nhân') || lower.includes('vie')) return 'VIE';
   if (lower.includes('dn-cty') || lower.includes('doanh nghiệp')) return 'DN-CTy';
 
-  // Mặc định lấy chữ hoa đầu từ nếu dài quá 15 ký tự
   if (str.length > 15) {
     return str.split(/[\s_-]+/).map(w => w.charAt(0).toUpperCase()).join('');
   }
@@ -123,7 +119,7 @@ function isValueChanged(fieldName, val1, val2) {
 }
 
 /**
- * XỬ LÝ TRUNG TÂM CẬP NHẬT DỮ LIỆU
+ * XỬ LÝ TRUNG TÂM CẬP NHẬT DỮ LIỆU & QUÉT THAM SỐ TOÀN DIỆN
  */
 function processDataUpdate(sourceRawData, headerRowIndex) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -133,17 +129,24 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
   const sourceHeaders = sourceRawData[headerRowIndex].map(h => String(h || '').trim());
   const rawDataRows = sourceRawData.slice(headerRowIndex + 1);
 
-  const sourceKeyColIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
-  if (sourceKeyColIdx === -1) throw new Error(`File nguồn không chứa cột "${CONFIG.KEY_COLUMN_NAME}"!`);
+  // Chỉ số cột trên file Excel nguồn (Source Indices)
+  const srcKeyIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
+  if (srcKeyIdx === -1) throw new Error(`File nguồn không chứa cột "${CONFIG.KEY_COLUMN_NAME}"!`);
 
-  const sourceNameColIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.NAME_COLUMN_NAME));
-  const sourceGiaCuocIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'giá cước');
-  const sourceChuKyIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'chu kỳ sử dụng');
-  const sourceDtpkIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'dtpk');
+  const srcNameIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.NAME_COLUMN_NAME));
+  const srcGiaCuocIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'giá cước');
+  const srcChuKyIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'chu kỳ sử dụng');
+  const srcDtpkIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'dtpk');
+  const srcMaNVIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'mã nhân viên');
+  const srcTenNVIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'tên nhân viên');
+  const srcMaCHIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'mã cửa hàng');
+  const srcTenCHIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'tên cửa hàng');
+  const srcMoHinhIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'loại mô hình triển khai');
 
+  // Lọc dòng dữ liệu hợp lệ
   const sourceDataRows = rawDataRows.filter(r => {
     if (!r || r.length === 0) return false;
-    const rawCode = r[sourceKeyColIdx];
+    const rawCode = r[srcKeyIdx];
     return isValidSubscriberRow(rawCode, r);
   });
 
@@ -156,15 +159,7 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
   const dtpkTargetColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === 'dtpk');
   const ngaySinhTargetColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === 'ngày sinh');
 
-  const colIndicesForSync = {
-    idxLoaiKH: targetHeaders.findIndex(h => normalizeHeader(h) === 'loại khách hàng'),
-    idxMoHinh: targetHeaders.findIndex(h => normalizeHeader(h) === 'loại mô hình triển khai'),
-    idxTenCH: targetHeaders.findIndex(h => normalizeHeader(h) === 'tên cửa hàng'),
-    idxMaCH: targetHeaders.findIndex(h => normalizeHeader(h) === 'mã cửa hàng'),
-    idxMaNV: targetHeaders.findIndex(h => normalizeHeader(h) === 'mã nhân viên'),
-    idxTenNV: targetHeaders.findIndex(h => normalizeHeader(h) === 'tên nhân viên')
-  };
-
+  // Bản đồ ánh xạ cột Target -> Source
   const colMapping = {};
   targetHeaders.forEach((tHead, tIdx) => {
     if (tHead) {
@@ -188,37 +183,51 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
   const nowStr = Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm');
   const logs = [];
   const newRowsToAppend = [];
-  const allRowsToScan = [];
+
+  // Mảng gom các thông tin tham số để quét (Lấy trực tiếp từ các cột nguồn của dòng)
+  const itemsForParamSync = [];
 
   let updatedCustCount = 0, updatedFieldsCount = 0;
 
   sourceDataRows.forEach(srcRow => {
-    const rawSrcCustId = srcRow[sourceKeyColIdx];
+    const rawSrcCustId = srcRow[srcKeyIdx];
     const normSrcCustId = normalizeCustomerId(rawSrcCustId);
     if (!normSrcCustId) return;
 
-    const custName = (sourceNameColIdx !== -1 && srcRow[sourceNameColIdx]) ? String(srcRow[sourceNameColIdx]).trim() : '';
+    const custName = (srcNameIdx !== -1 && srcRow[srcNameIdx]) ? String(srcRow[srcNameIdx]).trim() : '';
     let cleanDisplayCustId = String(rawSrcCustId).replace(/[^0-9]/g, '').trim();
     if (cleanDisplayCustId.length === 8) cleanDisplayCustId = '00' + cleanDisplayCustId;
     else if (cleanDisplayCustId.length < 10) cleanDisplayCustId = cleanDisplayCustId.padStart(10, '0');
 
     let derivedDtpk = '';
-    const rawGiaCuoc = (sourceGiaCuocIdx !== -1) ? parseCurrencyToInteger(srcRow[sourceGiaCuocIdx]) : '';
-    const rawChuKy = (sourceChuKyIdx !== -1) ? parseInt(srcRow[sourceChuKyIdx], 10) : '';
+    const rawGiaCuoc = (srcGiaCuocIdx !== -1) ? parseCurrencyToInteger(srcRow[srcGiaCuocIdx]) : '';
+    const rawChuKy = (srcChuKyIdx !== -1) ? parseInt(srcRow[srcChuKyIdx], 10) : '';
     if (typeof rawGiaCuoc === 'number' && typeof rawChuKy === 'number' && rawChuKy > 0) {
       derivedDtpk = Math.round(rawGiaCuoc / rawChuKy);
     }
 
-    const normalizedTargetRow = new Array(lastTargetCol).fill('');
-    for (const [tColIdxStr, sColIdx] of Object.entries(colMapping)) {
-      const tColIdx = parseInt(tColIdxStr, 10);
-      normalizedTargetRow[tColIdx] = formatValueByFieldType(targetHeaders[tColIdx], srcRow[sColIdx]);
+    // Thu thập tham số nhân sự từ dòng nguồn
+    const itemMaNV = srcMaNVIdx !== -1 ? String(srcRow[srcMaNVIdx] || '').trim() : '';
+    const itemTenNV = srcTenNVIdx !== -1 ? String(srcRow[srcTenNVIdx] || '').trim() : '';
+    const itemMaCH = srcMaCHIdx !== -1 ? String(srcRow[srcMaCHIdx] || '').trim() : '';
+    const itemTenCH = srcTenCHIdx !== -1 ? String(srcRow[srcTenCHIdx] || '').trim() : '';
+    const itemMoHinh = srcMoHinhIdx !== -1 ? String(srcRow[srcMoHinhIdx] || '').trim() : '';
+
+    if (itemMaNV || itemTenCH || itemMoHinh) {
+      itemsForParamSync.push({
+        maNV: itemMaNV,
+        tenNV: itemTenNV,
+        maCH: itemMaCH,
+        tenCH: itemTenCH,
+        moHinh: itemMoHinh,
+        maKH: cleanDisplayCustId,
+        tenTB: custName
+      });
     }
 
-    // Đưa vào mảng quét tham số
-    allRowsToScan.push(normalizedTargetRow);
-
+    // Xử lý ghi dữ liệu vào bảng tính
     if (customerRowMap.has(normSrcCustId)) {
+      // 1. CẬP NHẬT THUÊ BAO ĐÃ TỒN TẠI
       const { rowIndex, dataIndex } = customerRowMap.get(normSrcCustId);
       const existingRow = targetData[dataIndex];
       let custHasChange = false;
@@ -231,7 +240,7 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
         if (tColIdx === targetKeyColIdx) continue;
 
         const oldVal = existingRow[tColIdx];
-        let formattedNewVal = normalizedTargetRow[tColIdx];
+        let formattedNewVal = formatValueByFieldType(fieldName, srcRow[sColIdx]);
 
         if (normField === 'dtpk' && (formattedNewVal === '' || formattedNewVal === null || formattedNewVal === undefined)) {
           formattedNewVal = derivedDtpk;
@@ -264,10 +273,16 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
       }
       if (custHasChange) updatedCustCount++;
     } else {
-      if (dtpkTargetColIdx !== -1 && (normalizedTargetRow[dtpkTargetColIdx] === '' || normalizedTargetRow[dtpkTargetColIdx] === null)) {
-        normalizedTargetRow[dtpkTargetColIdx] = derivedDtpk;
+      // 2. THÊM THUÊ BAO MỚI
+      const newRow = new Array(lastTargetCol).fill('');
+      for (const [tColIdxStr, sColIdx] of Object.entries(colMapping)) {
+        const tColIdx = parseInt(tColIdxStr, 10);
+        newRow[tColIdx] = formatValueByFieldType(targetHeaders[tColIdx], srcRow[sColIdx]);
       }
-      newRowsToAppend.push({ custId: cleanDisplayCustId, custName: custName, rowData: normalizedTargetRow });
+      if (dtpkTargetColIdx !== -1 && (newRow[dtpkTargetColIdx] === '' || newRow[dtpkTargetColIdx] === null)) {
+        newRow[dtpkTargetColIdx] = derivedDtpk;
+      }
+      newRowsToAppend.push({ custId: cleanDisplayCustId, custName: custName, rowData: newRow });
     }
   });
 
@@ -292,11 +307,11 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
     });
   }
 
-  // TỰ ĐỘNG BẮT PHÁT SINH THAM SỐ TOÀN DIỆN
+  // TỰ ĐỘNG QUÉT VÀ ĐỒNG BỘ THAM SỐ VÀO thamso_caidat (DỰA TRÊN TẤT CẢ DÒNG NẠP VÀO)
   let syncResult = { newParamsCount: 0, details: '', newStaffList: [] };
   try {
-    if (allRowsToScan.length > 0) {
-      syncResult = autoDetectAndSyncNewParameters(allRowsToScan, colIndicesForSync);
+    if (itemsForParamSync.length > 0) {
+      syncResult = autoDetectAndSyncNewParameters(itemsForParamSync);
     }
   } catch (syncErr) {
     console.error('Lỗi tự động đồng bộ tham số:', syncErr);
@@ -336,43 +351,50 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
 }
 
 /**
- * TỰ ĐỘNG ĐỒNG BỘ THAM SỐ VÀO thamso_caidat (QUÉT CẢ 4 BẢNG DANH MỤC)
+ * TỰ ĐỘNG ĐỒNG BỘ THAM SỐ VÀO thamso_caidat
+ * Đọc và chèn chuẩn xác vào từng bảng danh mục
  */
-function autoDetectAndSyncNewParameters(rowsToScan, colIndices) {
+function autoDetectAndSyncNewParameters(paramItems) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const tsSheet = ss.getSheetByName('thamso_caidat');
   if (!tsSheet) return { newParamsCount: 0, details: '', newStaffList: [] };
 
-  const lastRow = tsSheet.getLastRow();
+  const maxRows = tsSheet.getMaxRows();
 
-  // 1. Nạp danh mục Mã NV hiện có từ Cột L (cột 12)
+  // 1. Đọc danh mục Mã NV hiện có từ Cột L (cột 12)
+  const staffColVals = tsSheet.getRange(4, 12, Math.max(maxRows - 3, 1), 1).getValues();
   const existingStaffCodes = new Set();
-  if (lastRow >= 4) {
-    const staffData = tsSheet.getRange(4, 12, lastRow - 3, 1).getValues();
-    staffData.forEach(r => {
-      const code = normalizeHeader(String(r[0] || ''));
-      if (code) existingStaffCodes.add(code);
-    });
+  let lastStaffRow = 3;
+  for (let i = 0; i < staffColVals.length; i++) {
+    const val = String(staffColVals[i][0] || '').trim();
+    if (val) {
+      existingStaffCodes.add(normalizeHeader(val));
+      lastStaffRow = 4 + i;
+    }
   }
 
-  // 2. Nạp danh mục Tên Cửa hàng hiện có từ Cột F (cột 6)
+  // 2. Đọc danh mục Tên Cửa hàng từ Cột F (cột 6)
+  const storeColVals = tsSheet.getRange(4, 6, Math.max(maxRows - 3, 1), 1).getValues();
   const existingStoreNames = new Set();
-  if (lastRow >= 4) {
-    const storeData = tsSheet.getRange(4, 6, lastRow - 3, 1).getValues();
-    storeData.forEach(r => {
-      const name = normalizeHeader(String(r[0] || ''));
-      if (name) existingStoreNames.add(name);
-    });
+  let lastStoreRow = 3;
+  for (let i = 0; i < storeColVals.length; i++) {
+    const val = String(storeColVals[i][0] || '').trim();
+    if (val) {
+      existingStoreNames.add(normalizeHeader(val));
+      lastStoreRow = 4 + i;
+    }
   }
 
-  // 3. Nạp danh mục Mô hình triển khai từ Cột C (cột 3)
+  // 3. Đọc danh mục Mô hình triển khai từ Cột C (cột 3)
+  const modelColVals = tsSheet.getRange(4, 3, Math.max(maxRows - 3, 1), 1).getValues();
   const existingModels = new Set();
-  if (lastRow >= 4) {
-    const modelData = tsSheet.getRange(4, 3, lastRow - 3, 1).getValues();
-    modelData.forEach(r => {
-      const m = normalizeHeader(String(r[0] || ''));
-      if (m) existingModels.add(m);
-    });
+  let lastModelRow = 3;
+  for (let i = 0; i < modelColVals.length; i++) {
+    const val = String(modelColVals[i][0] || '').trim();
+    if (val) {
+      existingModels.add(normalizeHeader(val));
+      lastModelRow = 4 + i;
+    }
   }
 
   const newStaffToAppend = [];
@@ -383,23 +405,23 @@ function autoDetectAndSyncNewParameters(rowsToScan, colIndices) {
   const addedModelKeys = new Set();
   const newStaffDetails = [];
 
-  rowsToScan.forEach(row => {
-    const maNV = String(row[colIndices.idxMaNV] || '').trim();
-    const tenNV = String(row[colIndices.idxTenNV] || '').trim();
-    const maCH = String(row[colIndices.idxMaCH] || '').trim();
-    const tenCH = String(row[colIndices.idxTenCH] || '').trim();
-    const moHinh = colIndices.idxMoHinh !== -1 ? String(row[colIndices.idxMoHinh] || '').trim() : '';
+  paramItems.forEach(item => {
+    const maNV = item.maNV;
+    const tenNV = item.tenNV;
+    const maCH = item.maCH;
+    const tenCH = item.tenCH;
+    const moHinh = item.moHinh;
 
-    // Bắt Nhân viên mới
+    // 1. Kiểm tra Nhân viên mới
     const normMaNV = normalizeHeader(maNV);
     if (normMaNV && !existingStaffCodes.has(normMaNV) && !addedStaffKeys.has(normMaNV)) {
       addedStaffKeys.add(normMaNV);
       // Cột J: Khu vực | Cột K: Cửa hàng | Cột L: Mã NV | Cột M: Tên NV
       newStaffToAppend.push(['[Chưa phân bổ KV]', tenCH || 'Chưa rõ', "'" + maNV, tenNV]);
-      newStaffDetails.push({ maNV: maNV, tenNV: tenNV, tenCH: tenCH });
+      newStaffDetails.push({ maNV: maNV, tenNV: tenNV, tenCH: tenCH, maKH: item.maKH, tenTB: item.tenTB });
     }
 
-    // Bắt Cửa hàng mới
+    // 2. Kiểm tra Cửa hàng mới
     const normTenCH = normalizeHeader(tenCH);
     if (normTenCH && !existingStoreNames.has(normTenCH) && !addedStoreKeys.has(normTenCH)) {
       addedStoreKeys.add(normTenCH);
@@ -407,7 +429,7 @@ function autoDetectAndSyncNewParameters(rowsToScan, colIndices) {
       newStoresToAppend.push([tenCH, tenCH]);
     }
 
-    // Bắt Mô hình mới
+    // 3. Kiểm tra Mô hình mới
     const normMoHinh = normalizeHeader(moHinh);
     if (normMoHinh && !existingModels.has(normMoHinh) && !addedModelKeys.has(normMoHinh)) {
       addedModelKeys.add(normMoHinh);
@@ -422,19 +444,25 @@ function autoDetectAndSyncNewParameters(rowsToScan, colIndices) {
 
   // Ghi Nhân viên mới vào sheet thamso_caidat (Cột J:M)
   if (newStaffToAppend.length > 0) {
-    const startRowStaff = Math.max(tsSheet.getLastRow() + 1, 4);
+    const startRowStaff = lastStaffRow + 1;
+    if (startRowStaff + newStaffToAppend.length - 1 > tsSheet.getMaxRows()) {
+      tsSheet.insertRowsAfter(tsSheet.getMaxRows(), newStaffToAppend.length + 5);
+    }
     tsSheet.getRange(startRowStaff, 10, newStaffToAppend.length, 4).setValues(newStaffToAppend);
     tsSheet.getRange(startRowStaff, 10, newStaffToAppend.length, 1)
       .setBackground('#FCE8E6')
       .setFontColor('#C5221F')
-      .setFontWeight('bold');
+      .setFontWeight('bold'); // Bôi đỏ cảnh báo cần phân bổ KV
     totalNew += newStaffToAppend.length;
     alertDetails.push(`${newStaffToAppend.length} Nhân viên mới`);
   }
 
   // Ghi Cửa hàng mới vào sheet thamso_caidat (Cột F:G)
   if (newStoresToAppend.length > 0) {
-    const startRowStore = Math.max(tsSheet.getLastRow() + 1, 4);
+    const startRowStore = lastStoreRow + 1;
+    if (startRowStore + newStoresToAppend.length - 1 > tsSheet.getMaxRows()) {
+      tsSheet.insertRowsAfter(tsSheet.getMaxRows(), newStoresToAppend.length + 5);
+    }
     tsSheet.getRange(startRowStore, 6, newStoresToAppend.length, 2).setValues(newStoresToAppend);
     totalNew += newStoresToAppend.length;
     alertDetails.push(`${newStoresToAppend.length} Cửa hàng mới`);
@@ -442,7 +470,10 @@ function autoDetectAndSyncNewParameters(rowsToScan, colIndices) {
 
   // Ghi Mô hình mới vào sheet thamso_caidat (Cột C:D)
   if (newModelsToAppend.length > 0) {
-    const startRowModel = Math.max(tsSheet.getLastRow() + 1, 4);
+    const startRowModel = lastModelRow + 1;
+    if (startRowModel + newModelsToAppend.length - 1 > tsSheet.getMaxRows()) {
+      tsSheet.insertRowsAfter(tsSheet.getMaxRows(), newModelsToAppend.length + 5);
+    }
     tsSheet.getRange(startRowModel, 3, newModelsToAppend.length, 2).setValues(newModelsToAppend);
     totalNew += newModelsToAppend.length;
     alertDetails.push(`${newModelsToAppend.length} Mô hình mới`);
