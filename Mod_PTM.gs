@@ -2,15 +2,15 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * MODULE       : Mod_PTM.gs
- * PHIÊN BẢN    : 2.7 (Fix triệt để ReferenceError parseCurrency & Tự động format tiền tệ)
+ * PHIÊN BẢN    : 2.8 (Khôi phục nút Tải Excel trên Dialog, Căn trái Dòng 1-2, Nối 2 cột A-B Khu vực)
  * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
 
 function showPtmReportDialog() {
   const html = HtmlService.createHtmlOutput(getPtmDialogHtml())
-    .setWidth(490)
-    .setHeight(450)
+    .setWidth(500)
+    .setHeight(470)
     .setTitle('Báo cáo PTM');
   SpreadsheetApp.getUi().showModalDialog(html, 'Báo cáo Thuê bao Phát triển mới (PTM)');
 }
@@ -201,48 +201,89 @@ function processPtmReport(params) {
   const sheetId = destSheet.getSheetId();
   const directExportUrl = `https://docs.google.com/spreadsheets/d/${ssId}/export?format=xlsx&gid=${sheetId}`;
 
-  // Tiêu đề & Nút tải
+  // =========================================================================
+  // DÒNG 1: TIÊU ĐỀ LỚN (CĂN TRÁI THEO YÊU CẦU)
+  // =========================================================================
   destSheet.getRange(1, 1, 1, 18).merge()
-    .setValue(`BÁO CÁO THUÊ BAO MOBIFIBER PHÁT TRIỂN MỚI (PTM) - ${sheetTitleSuffix}`)
-    .setFontWeight('bold').setFontSize(13).setBackground('#1B365D').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    .setValue(`  BÁO CÁO THUÊ BAO MOBIFIBER PHÁT TRIỂN MỚI (PTM) - ${sheetTitleSuffix}`)
+    .setFontWeight('bold')
+    .setFontSize(13)
+    .setBackground('#1B365D')
+    .setFontColor('#FFFFFF')
+    .setHorizontalAlignment('left')
+    .setVerticalAlignment('middle');
 
+  // =========================================================================
+  // DÒNG 2: TỔNG QUAN KPI (CĂN TRÁI THEO YÊU CẦU) & NÚT TẢI EXCEL
+  // =========================================================================
   destSheet.getRange(2, 1, 1, 15).merge()
-    .setValue(`🎯 Tổng số thuê bao PTM: ${ptmRowsData.length} TB | 💰 Tổng doanh thu: ${totalRevenue.toLocaleString('vi-VN')} VNĐ | 📈 Tổng DTPK: ${totalDtpk.toLocaleString('vi-VN')} VNĐ`)
-    .setFontWeight('bold').setFontSize(11).setBackground('#D2E3FC').setFontColor('#174EA6').setHorizontalAlignment('center');
+    .setValue(`  🎯 Tổng số thuê bao PTM: ${ptmRowsData.length} TB | 💰 Tổng doanh thu: ${totalRevenue.toLocaleString('vi-VN')} VNĐ | 📈 Tổng DTPK: ${totalDtpk.toLocaleString('vi-VN')} VNĐ`)
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setBackground('#D2E3FC')
+    .setFontColor('#174EA6')
+    .setHorizontalAlignment('left')
+    .setVerticalAlignment('middle');
 
   destSheet.getRange(2, 16, 1, 3).merge()
     .setFormula(`=HYPERLINK("${directExportUrl}"; "📥 TẢI FILE EXCEL")`)
-    .setFontWeight('bold').setFontSize(11).setBackground('#1A73E8').setFontColor('#FFFFFF')
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setBackground('#1A73E8')
+    .setFontColor('#FFFFFF')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
 
-  // Bảng 1: Khu vực
-  destSheet.getRange(4, 1, 1, 4).merge().setValue('1. CƠ CẤU PHÁT TRIỂN MỚI THEO KHU VỰC')
-    .setFontWeight('bold').setBackground('#E8F0FE').setFontColor('#174EA6');
+  // =========================================================================
+  // BẢNG 1: CƠ CẤU PHÁT TRIỂN MỚI THEO KHU VỰC (GỘP A-B KHU VỰC, C-E LIỀN KỀ)
+  // =========================================================================
+  destSheet.getRange(4, 1, 1, 5).merge()
+    .setValue('1. CƠ CẤU PHÁT TRIỂN MỚI THEO KHU VỰC')
+    .setFontWeight('bold')
+    .setBackground('#E8F0FE')
+    .setFontColor('#174EA6');
 
-  const regHeaders = ['KHU VỰC', 'SỐ THUÊ BAO', 'TỔNG DTPK (VNĐ)', 'TỶ TRỌNG DTPK'];
-  destSheet.getRange(5, 1, 1, 4).setValues([regHeaders]).setFontWeight('bold').setBackground('#1B365D').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+  // Tiêu đề dòng 5: Gộp A5:B5 cho 'KHU VỰC', C5 là 'SỐ THUÊ BAO', D5 là 'TỔNG DTPK', E5 là 'TỶ TRỌNG'
+  destSheet.getRange('A5:B5').merge().setValue('KHU VỰC');
+  destSheet.getRange('C5').setValue('SỐ THUÊ BAO');
+  destSheet.getRange('D5').setValue('TỔNG DTPK (VNĐ)');
+  destSheet.getRange('E5').setValue('TỶ TRỌNG DTPK');
+  
+  destSheet.getRange('A5:E5')
+    .setFontWeight('bold')
+    .setBackground('#1B365D')
+    .setFontColor('#FFFFFF')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
 
-  const regRows = Object.keys(regionSummaryMap).map(k => [
-    ' ' + k,
-    regionSummaryMap[k].count,
-    regionSummaryMap[k].dtpk,
-    totalDtpk > 0 ? (regionSummaryMap[k].dtpk / totalDtpk) : 0
-  ]).sort((a, b) => b[2] - a[2]);
+  const regKeys = Object.keys(regionSummaryMap).sort((a, b) => regionSummaryMap[b].dtpk - regionSummaryMap[a].dtpk);
 
   let detailStartRow = 8;
-  if (regRows.length > 0) {
-    destSheet.getRange(6, 1, regRows.length, 4).setValues(regRows);
-    destSheet.getRange(6, 1, regRows.length, 1).setHorizontalAlignment('left');
-    destSheet.getRange(6, 2, regRows.length, 1).setHorizontalAlignment('center');
-    destSheet.getRange(6, 3, regRows.length, 1).setNumberFormat('#,##0').setHorizontalAlignment('right');
-    destSheet.getRange(6, 4, regRows.length, 1).setNumberFormat('0.0%').setHorizontalAlignment('right');
-    detailStartRow = 6 + regRows.length + 2;
+  if (regKeys.length > 0) {
+    regKeys.forEach((kv, idx) => {
+      const rIdx = 6 + idx;
+      const countVal = regionSummaryMap[kv].count;
+      const dtpkVal = regionSummaryMap[kv].dtpk;
+      const shareVal = totalDtpk > 0 ? (dtpkVal / totalDtpk) : 0;
+
+      // Nối 2 cột A:B cho Khu vực
+      destSheet.getRange(rIdx, 1, 1, 2).merge().setValue(' ' + kv).setHorizontalAlignment('left');
+      destSheet.getRange(rIdx, 3).setValue(countVal).setHorizontalAlignment('center');
+      destSheet.getRange(rIdx, 4).setValue(dtpkVal).setNumberFormat('#,##0').setHorizontalAlignment('right');
+      destSheet.getRange(rIdx, 5).setValue(shareVal).setNumberFormat('0.0%').setHorizontalAlignment('right');
+    });
+
+    detailStartRow = 6 + regKeys.length + 2;
   }
 
-  // Bảng 2: Chi tiết
+  // =========================================================================
+  // BẢNG 2: DANH SÁCH CHI TIẾT THUÊ BAO PHÁT TRIỂN MỚI (PTM)
+  // =========================================================================
   destSheet.getRange(detailStartRow - 1, 1, 1, 18).merge()
     .setValue('2. DANH SÁCH CHI TIẾT THUÊ BAO PHÁT TRIỂN MỚI (PTM)')
-    .setFontWeight('bold').setBackground('#E8F0FE').setFontColor('#174EA6');
+    .setFontWeight('bold')
+    .setBackground('#E8F0FE')
+    .setFontColor('#174EA6');
 
   const detailHeaders = [
     'STT', 'MÃ KHÁCH HÀNG', 'TÊN THUÊ BAO', 'SĐT LIÊN HỆ', 'ĐỊA CHỈ LẮP ĐẶT', 'GÓI CƯỚC',
@@ -250,7 +291,11 @@ function processPtmReport(params) {
     'SERIAL ONT', 'KHU VỰC', 'MÃ CỬA HÀNG', 'MÃ NHÂN VIÊN', 'TÊN CỬA HÀNG', 'TÊN NHÂN VIÊN'
   ];
   destSheet.getRange(detailStartRow, 1, 1, 18).setValues([detailHeaders])
-    .setFontWeight('bold').setBackground('#00558F').setFontColor('#FFFFFF').setHorizontalAlignment('center');
+    .setFontWeight('bold')
+    .setBackground('#00558F')
+    .setFontColor('#FFFFFF')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
 
   destSheet.setFrozenRows(detailStartRow);
 
@@ -278,7 +323,8 @@ function processPtmReport(params) {
     sheetName: sheetName,
     count: ptmRowsData.length,
     revenue: totalRevenue.toLocaleString('vi-VN'),
-    dtpk: totalDtpk.toLocaleString('vi-VN')
+    dtpk: totalDtpk.toLocaleString('vi-VN'),
+    downloadUrl: directExportUrl
   };
 }
 
@@ -301,17 +347,20 @@ function getPtmDialogHtml() {
     .hint { font-size: 11px; color: #64748b; margin-top: 4px; font-style: italic; }
     input[type="text"] { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; }
     input[type="text"]:focus { border-color: #2563eb; }
-    .btn { width: 100%; border: none; padding: 10px; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; text-align: center; }
+    .btn { width: 100%; border: none; padding: 10px; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; text-align: center; display: block; box-sizing: border-box; }
     .btn-primary { background: #2563eb; color: white; margin-top: 8px; }
     .btn-primary:hover { background: #1d4ed8; }
     .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-download { background: #16a34a; color: white; margin-top: 10px; text-decoration: none; }
+    .btn-download:hover { background: #15803d; }
+    .btn-close { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-top: 8px; }
+    .btn-close:hover { background: #e2e8f0; }
     .alert-banner { display: none; background: #fee2e2; border: 1px solid #fecaca; color: #b91c1c; padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 10px; }
     .status { font-size: 12px; margin-top: 8px; padding: 8px; border-radius: 6px; display: none; text-align: center; }
     .status.info { background: #dbeafe; color: #1e40af; display: block; }
     #successView { display: none; text-align: center; padding: 6px 4px; }
     .success-title { font-size: 15px; font-weight: bold; color: #15803d; margin-bottom: 8px; }
-    .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 10px; text-align: left; }
-    .btn-close { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-top: 8px; }
+    .kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 6px; text-align: left; }
   </style>
 </head>
 <body>
@@ -361,10 +410,18 @@ function getPtmDialogHtml() {
         📈 <b>Tổng DTPK:</b> <span id="resDtpk" style="color: #b45309; font-weight: bold;">0</span> VNĐ
       </div>
     </div>
+
+    <!-- NÚT TẢI FILE EXCEL TRÊN DIALOG ĐÃ KHÔI PHỤC -->
+    <button id="btnDownload" class="btn btn-download" onclick="downloadExcel()">📥 Tải file Excel (.xlsx) về máy</button>
     <button class="btn btn-close" onclick="google.script.host.close()">Đóng cửa sổ</button>
   </div>
 
+  <!-- IFRAME PHỤC VỤ DOWNLOAD SẠCH -->
+  <iframe id="downloadFrame" style="display:none;"></iframe>
+
   <script>
+    let currentDownloadUrl = '';
+
     function showError(msg) {
       const b = document.getElementById('errorBanner');
       b.innerText = '⚠️ ' + msg;
@@ -381,6 +438,7 @@ function getPtmDialogHtml() {
       document.getElementById('rangeBox').style.opacity = isMonth ? '0.5' : '1';
       document.getElementById('rangeBox').style.pointerEvents = isMonth ? 'none' : 'auto';
     }
+
     function runReport() {
       hideError();
       const timeType = document.querySelector('input[name="timeType"]:checked').value;
@@ -409,6 +467,7 @@ function getPtmDialogHtml() {
 
       google.script.run
         .withSuccessHandler(function(res) {
+          currentDownloadUrl = res.downloadUrl;
           document.getElementById('formView').style.display = 'none';
           document.getElementById('resSheetName').innerText = '📁 Sheet: ' + res.sheetName;
           document.getElementById('resCount').innerText = res.count;
@@ -423,6 +482,14 @@ function getPtmDialogHtml() {
           showError(err.message);
         })
         .processPtmReport(params);
+    }
+
+    function downloadExcel() {
+      if (currentDownloadUrl) {
+        document.getElementById('downloadFrame').src = currentDownloadUrl;
+      } else {
+        alert('Không tìm thấy đường link tải file!');
+      }
     }
   </script>
 </body>
