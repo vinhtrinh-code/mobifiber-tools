@@ -2,7 +2,7 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * MODULE       : Mod_DoanhThuPhanBo.gs
- * PHIÊN BẢN    : 2.2 (Khôi phục tùy chọn Khoảng ngày, Fix lỗi parseCurrency & Nút Tải Excel)
+ * PHIÊN BẢN    : 3.0 (Chuẩn hóa logic lịch sử gói cước & Xử lý chặn cắt theo kỳ)
  * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
@@ -80,14 +80,16 @@ function processRevenueAllocationSummary(params) {
   for (let i = 0; i < rawData.length; i++) {
     const row = rawData[i];
 
+    // 1. Loại trừ thuê bao nghiệp vụ
     const loaiKH = normalizeHeader(row[idxLoaiKH]);
     if (loaiKH === 'thuê bao nghiệp vụ' || loaiKH === 'thue bao nghiep vu') continue;
 
+    // 2. Kiểm tra tình trạng hợp đồng hủy/chấm dứt
     const tinhTrangHD = normalizeHeader(row[idxTinhTrangHD]);
-    if (tinhTrangHD !== 'đang hoạt động' && tinhTrangHD !== 'dang hoat dong') continue;
-
-    const chanCat = normalizeHeader(row[idxChanCat]);
-    if (chanCat !== 'bình thường' && chanCat !== 'binh thuong' && chanCat !== '') continue;
+    const isCancelled = tinhTrangHD.includes('hủy') || tinhTrangHD.includes('huy') ||
+                        tinhTrangHD.includes('thanh lý') || tinhTrangHD.includes('thanh ly') ||
+                        tinhTrangHD.includes('chấm dứt') || tinhTrangHD.includes('cham dut');
+    if (isCancelled) continue;
 
     const chuKyRaw = row[idxChuKy];
     const chuKy = chuKyRaw ? parseInt(chuKyRaw, 10) : 0;
@@ -99,7 +101,16 @@ function processRevenueAllocationSummary(params) {
     const dBatDau = parseToDate(row[idxNgayBatDau]);
     const dKetThuc = parseToDate(row[idxNgayKetThuc]);
     const nhuCau = normalizeHeader(row[idxNhuCau]);
+    const chanCat = normalizeHeader(row[idxChanCat]);
 
+    // 3. LOGIC XỬ LÝ CHẶN CẮT THEO THỜI ĐIỂM (POINT-IN-TIME):
+    // Chỉ loại bỏ nếu: Bị "1C Nợ cước" VÀ gói cước đã hết hạn trước kỳ báo cáo đang xét
+    const is1CNoCuoc = chanCat.includes('1c') || chanCat.includes('nợ cước') || chanCat.includes('no cuoc');
+    if (is1CNoCuoc && dKetThuc && dKetThuc < startDate) {
+      continue;
+    }
+
+    // 4. KIỂM TRA THUÊ BAO PTM MỚI TRONG KỲ
     let isPtmInPeriod = false;
     if (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi') {
       let ptmDate = null;
@@ -118,11 +129,16 @@ function processRevenueAllocationSummary(params) {
       }
     }
 
+    // 5. KIỂM TRA THUÊ BAO HIỆN HỮU TRONG KỲ
     let isRetainedInPeriod = false;
     if (!isPtmInPeriod) {
       if (chuKy === 1) {
-        isRetainedInPeriod = true;
+        const activeDate = dBatDau || dDauNoi;
+        if (activeDate && activeDate <= endDate) {
+          isRetainedInPeriod = true;
+        }
       } else {
+        // Gói dài kỳ: Còn hạn sử dụng trong hoặc sau tháng báo cáo
         if (dKetThuc && dKetThuc >= startDate) {
           isRetainedInPeriod = true;
         }
@@ -131,6 +147,7 @@ function processRevenueAllocationSummary(params) {
 
     if (!isPtmInPeriod && !isRetainedInPeriod) continue;
 
+    // 6. Ánh xạ Khu vực
     const rawMaNV = String(row[idxMaNV] || '').trim();
     let khuVuc = 'Chưa phân bổ KV';
     if (rawMaNV && mapping.staffRegion && mapping.staffRegion.has(normalizeHeader(rawMaNV))) {
@@ -160,7 +177,7 @@ function processRevenueAllocationSummary(params) {
   const grandTotalDtpk = grandTotalOldDtpk + grandTotalNewRevenue;
   const grandTotalAllTB = grandTotalOldTB + grandTotalNewTB;
 
-  // Tạo Sheet Tổng hợp
+  // 7. Tạo sheet tổng hợp
   let destSheet = ss.getSheetByName(summarySheetName);
   if (!destSheet) destSheet = ss.insertSheet(summarySheetName);
   else destSheet.clear();
@@ -169,12 +186,13 @@ function processRevenueAllocationSummary(params) {
   const sheetId = destSheet.getSheetId();
   const directExportUrl = `https://docs.google.com/spreadsheets/d/${ssId}/export?format=xlsx&gid=${sheetId}`;
 
-  // Tiêu đề & KPI
+  // DÒNG 1: Tiêu đề lớn (Căn trái)
   destSheet.getRange('A1:H1').merge()
     .setValue(`  BÁO CÁO DOANH THU PHÂN BỔ MOBIFIBER - ${timeTitle}`)
     .setFontWeight('bold').setFontSize(13).setBackground('#1B365D').setFontColor('#FFFFFF')
     .setHorizontalAlignment('left').setVerticalAlignment('middle');
 
+  // DÒNG 2: KPI Tổng DTPK (Căn trái) & Thời gian lập
   destSheet.getRange('A2:E2').merge()
     .setValue(`  🎯 TỔNG DTPK TOÀN TỈNH: ${grandTotalDtpk.toLocaleString('vi-VN')} VNĐ`)
     .setFontWeight('bold').setFontSize(11).setBackground('#D2E3FC').setFontColor('#174EA6')
@@ -185,18 +203,14 @@ function processRevenueAllocationSummary(params) {
     .setFontSize(10).setBackground('#D2E3FC').setFontColor('#5F6368')
     .setHorizontalAlignment('right').setVerticalAlignment('middle');
 
+  // DÒNG 3: Tổng số thuê bao
   destSheet.getRange('A3:H3').merge()
     .setValue(`  📊 TỔNG THUÊ BAO: ${grandTotalAllTB} TB (Hiện hữu: ${grandTotalOldTB} TB | PTM mới: ${grandTotalNewTB} TB)`)
     .setFontWeight('bold').setFontSize(11).setBackground('#E8F0FE').setFontColor('#174EA6')
     .setHorizontalAlignment('left').setVerticalAlignment('middle');
 
-  // Nút Thao tác trên Sheet
-  destSheet.getRange('A4:D4').merge()
-    .setFormula(`=HYPERLINK("#gid=${sheetId}&action=detail"; "📋 KẾT XUẤT DANH SÁCH CHI TIẾT")`)
-    .setFontWeight('bold').setFontSize(11).setBackground('#00558F').setFontColor('#FFFFFF')
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
-
-  destSheet.getRange('E4:H4').merge()
+  // DÒNG 4: Nút tải Excel
+  destSheet.getRange('A4:H4').merge()
     .setFormula(`=HYPERLINK("${directExportUrl}"; "📥 TẢI FILE EXCEL TỔNG HỢP")`)
     .setFontWeight('bold').setFontSize(11).setBackground('#1A73E8').setFontColor('#FFFFFF')
     .setHorizontalAlignment('center').setVerticalAlignment('middle');
@@ -324,7 +338,6 @@ function getRevenueAllocationDialogHtml() {
     <div class="card">
       <div class="section-title">Chọn kỳ phân bổ doanh thu:</div>
       
-      <!-- LỰA CHỌN 1: THEO THÁNG (KHÔI PHỤC ĐẦY ĐỦ) -->
       <label class="radio-label">
         <input type="radio" name="reportType" value="month" checked onchange="toggleType()">
         <span>Theo Tháng phân bổ (MM/YYYY)</span>
@@ -337,7 +350,6 @@ function getRevenueAllocationDialogHtml() {
         <div class="hint">💡 Báo cáo sẽ tổng hợp TB Hiện hữu, PTM và tính tỷ trọng DTPK theo từng Khu vực.</div>
       </div>
 
-      <!-- LỰA CHỌN 2: TỪ NGÀY ĐẾN NGÀY (KHÔI PHỤC ĐẦY ĐỦ) -->
       <label class="radio-label" style="margin-top: 10px;">
         <input type="radio" name="reportType" value="range" onchange="toggleType()">
         <span>Theo Khoảng ngày tùy chọn</span>
@@ -370,7 +382,6 @@ function getRevenueAllocationDialogHtml() {
       </div>
     </div>
 
-    <!-- NÚT TẢI FILE EXCEL TRỰC TIẾP TRÊN DIALOG -->
     <button id="btnDownload" class="btn btn-download" onclick="downloadExcel()">📥 Tải file Excel (.xlsx) về máy</button>
     <button class="btn btn-close" onclick="google.script.host.close()">Đóng cửa sổ</button>
   </div>
@@ -454,72 +465,4 @@ function getRevenueAllocationDialogHtml() {
 </body>
 </html>
   `;
-}
-
-/**
- * TIỆN ÍCH TỰ ĐỘNG TÌM VÀ BẬT BẢNG CẢNH BÁO 2 THUÊ BAO CHƯA PHÂN BỔ KV
- */
-function findUnmappedSubscribers() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
-  const tsSheet = ss.getSheetByName('thamso_caidat');
-  const ui = SpreadsheetApp.getUi();
-
-  if (!rawSheet || !tsSheet) return;
-
-  const mapping = loadThamSoMapping();
-  const lastRow = rawSheet.getLastRow();
-  const lastCol = rawSheet.getLastColumn();
-  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
-
-  const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
-  const idxTenTB = headers.findIndex(h => h === 'tên thuê bao');
-  const idxMaNV = headers.findIndex(h => h === 'mã nhân viên');
-  const idxTenNV = headers.findIndex(h => h === 'tên nhân viên');
-  const idxMaCH = headers.findIndex(h => h === 'mã cửa hàng');
-  const idxTenCH = headers.findIndex(h => h === 'tên cửa hàng');
-  const idxLoaiKH = headers.findIndex(h => h === 'loại khách hàng');
-  const idxTinhTrangHD = headers.findIndex(h => h === 'tình trạng hợp đồng');
-
-  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
-  const unmappedList = [];
-
-  for (let i = 0; i < rawData.length; i++) {
-    const row = rawData[i];
-    const loaiKH = normalizeHeader(row[idxLoaiKH]);
-    if (loaiKH === 'thuê bao nghiệp vụ' || loaiKH === 'thue bao nghiep vu') continue;
-    const tinhTrangHD = normalizeHeader(row[idxTinhTrangHD]);
-    if (tinhTrangHD !== 'đang hoạt động' && tinhTrangHD !== 'dang hoat dong') continue;
-
-    const rawMaNV = String(row[idxMaNV] || '').trim();
-    let khuVuc = 'Chưa phân bổ KV';
-    if (rawMaNV && mapping.staffRegion && mapping.staffRegion.has(normalizeHeader(rawMaNV))) {
-      const staffInfo = mapping.staffRegion.get(normalizeHeader(rawMaNV));
-      if (staffInfo.khuVuc && !staffInfo.khuVuc.includes('Chưa phân bổ')) {
-        khuVuc = staffInfo.khuVuc;
-      }
-    }
-
-    if (khuVuc === 'Chưa phân bổ KV') {
-      unmappedList.push({
-        row: CONFIG.DATA_START_ROW_TARGET + i,
-        maKH: row[idxMaKH],
-        tenTB: row[idxTenTB],
-        maNV: rawMaNV || '(Trống Mã NV)',
-        tenNV: row[idxTenNV] || '(Trống)',
-        tenCH: row[idxTenCH] || '(Trống)'
-      });
-    }
-  }
-
-  if (unmappedList.length === 0) {
-    ui.alert('✅ Tất cả thuê bao đang hoạt động đều đã được gán Khu vực đầy đủ!');
-  } else {
-    let msg = `⚠️ Phát hiện ${unmappedList.length} thuê bao chưa được phân bổ Khu vực:\n\n`;
-    unmappedList.forEach((item, idx) => {
-      msg += `${idx + 1}. Dòng ${item.row}: Mã KH [${item.maKH}] - ${item.tenTB}\n   👉 Mã NV: [${item.maNV}] | Tên NV: ${item.tenNV} | CH: ${item.tenCH}\n\n`;
-    });
-    msg += `Vui lòng vào sheet "thamso_caidat" để bổ sung Khu vực cho các Mã NV trên, sau đó chạy lại báo cáo.`;
-    ui.alert(msg);
-  }
 }
