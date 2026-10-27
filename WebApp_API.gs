@@ -2,9 +2,8 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * FILE        : WebApp_API.gs
- * PHIÊN BẢN   : 7.0 (API Xu hướng 12 Tháng cho Biểu đồ Điểm & Chuẩn hóa Lọc Năm/Tháng)
- * NGÀY TẠO    : 24/10/2026 20:15:00 (GMT+7)
- * NGÀY CẬP NHẬT: 25/10/2026 17:00:00 (GMT+7)
+ * PHIÊN BẢN   : 8.0 (Đồng bộ Point-in-Time Lịch sử Gói cước & Biểu đồ 12 Tháng)
+ * NGÀY CẬP NHẬT: 27/10/2026
  * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
@@ -194,7 +193,7 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     const nhuCau = normalizeHeader(String(r[idxNhuCau] || ''));
 
     const isCancelled = statusHD.includes('hủy') || statusHD.includes('huy') || statusHD.includes('thanh lý') || statusHD.includes('chấm dứt');
-    const isDebt = statusChan.includes('nợ') || statusChan.includes('no cuoc') || statusChan.includes('khóa cước');
+    const isDebt = statusChan.includes('1c') || statusChan.includes('nợ') || statusChan.includes('no cuoc') || statusChan.includes('khóa cước');
     const isKhyc = statusChan.includes('khyc') || statusChan.includes('yêu cầu') || statusChan.includes('yeu cau');
     const isNghiepVu = loaiKH.includes('nghiệp vụ') || loaiKH.includes('nghiep vu');
 
@@ -202,14 +201,22 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
       subCancelled++;
       continue;
     }
-    if (isDebt) subDebt++;
-    if (isKhyc) subKhyc++;
 
     const chuKy = parseInt(r[idxChuKy], 10) || 1;
     const giaCuoc = safeParseCurrency(r[idxGiaCuoc]);
     let dtpk = safeParseCurrency(r[idxDtpk]);
     if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
 
+    const dDauNoi = parseToDate(r[idxNgayDauNoi]);
+    const dThiCong = parseToDate(r[idxNgayThiCong]);
+    const dBatDau = parseToDate(r[idxNgayBatDau]);
+    const dKetThuc = parseToDate(r[idxNgayKetThuc]);
+
+    // Thống kê trạng thái tại thời điểm kỳ đang chọn
+    if (isDebt && (!dKetThuc || dKetThuc < dateStart)) subDebt++;
+    if (isKhyc) subKhyc++;
+
+    // Ánh xạ Khu vực
     const maNV = normalizeHeader(String(r[idxMaNV] || ''));
     let khuVuc = 'TT.KDVT';
     if (maNV && staffRegionMap.has(maNV)) {
@@ -218,16 +225,12 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc)) || 'TT.KDVT';
     const regStat = regionMap.get(matchedRegion);
 
-    // Rule PTM chuẩn[cite: 1]
+    // 1. XÉT DUYỆT THUÊ BAO PTM
     const isPtmDemand = (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi');
     const isPtmActive = (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong');
     let ptmDate = null;
 
     if (isPtmDemand && !isNghiepVu && isPtmActive) {
-      const dDauNoi = parseToDate(r[idxNgayDauNoi]);
-      const dThiCong = parseToDate(r[idxNgayThiCong]);
-      const dBatDau = parseToDate(r[idxNgayBatDau]);
-
       if (chuKy === 1) {
         if (dDauNoi && dThiCong) {
           ptmDate = (dThiCong.getTime() > dDauNoi.getTime()) ? dThiCong : dDauNoi;
@@ -239,11 +242,14 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
       }
     }
 
-    // 1. Phân loại theo kỳ hiện tại đang chọn
+    // 2. PHÂN LOẠI THEO KỲ ĐANG CHỌN TRÊN DASHBOARD
     const isPtmInPeriod = ptmDate && (ptmDate >= dateStart && ptmDate <= dateEnd);
-    const isNormalActive = !isNghiepVu && 
-                           (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
-                           (statusChan === 'bình thường' || statusChan === 'binh thuong' || !statusChan);
+
+    // LOGIC CHUẨN: Thuê bao hoạt động hợp lệ không bị nợ cước trước kỳ
+    const isNotExemptDebtInPeriod = !(isDebt && dKetThuc && dKetThuc < dateStart);
+    const isEligibleInPeriod = !isNghiepVu && 
+                               (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
+                               isNotExemptDebtInPeriod;
 
     if (isPtmInPeriod) {
       subPtm++;
@@ -257,11 +263,17 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
       const goiCuoc = String(r[idxGoiCuoc] || 'Khác').trim().toUpperCase();
       ptmPackageMap.set(goiCuoc, (ptmPackageMap.get(goiCuoc) || 0) + 1);
 
-    } else if (isNormalActive) {
-      const dKetThuc = parseToDate(r[idxNgayKetThuc]);
-      const isValidCurrent = !dKetThuc || dKetThuc >= dateStart;
+    } else if (isEligibleInPeriod) {
+      let isRetainedValid = false;
+      if (chuKy === 1) {
+        const activeDate = dBatDau || dDauNoi;
+        if (activeDate && activeDate <= dateEnd) isRetainedValid = true;
+      } else {
+        // Gói dài kỳ: Còn hạn trong hoặc sau mốc bắt đầu kỳ
+        if (!dKetThuc || dKetThuc >= dateStart) isRetainedValid = true;
+      }
 
-      if (isValidCurrent) {
+      if (isRetainedValid) {
         subCurrent++;
         revenueCurrent += dtpk;
 
@@ -272,25 +284,37 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
       }
     }
 
-    // 2. Tính dữ liệu xu hướng 12 tháng của Năm đang chọn
-    if (isNormalActive || ptmDate) {
-      const dBatDauAll = parseToDate(r[idxNgayBatDau]);
-      const dKetThucAll = parseToDate(r[idxNgayKetThuc]);
-
+    // 3. TÍNH DỮ LIỆU XU HƯỚNG 12 THÁNG (THEO TỪNG THÁNG CỦA NĂM ĐANG CHỌN)
+    if (!isNghiepVu && (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong')) {
       for (let m = 0; m <= mTarget; m++) {
         const mStart = new Date(yTarget, m, 1, 0, 0, 0);
         const mEnd = new Date(yTarget, m + 1, 0, 23, 59, 59);
 
+        // Nếu là PTM của tháng m
         if (ptmDate && ptmDate >= mStart && ptmDate <= mEnd) {
           monthlyTrend[m].ptmSub++;
           monthlyTrend[m].ptmDtpk += dtpk;
           monthlyTrend[m].totalDtpk += dtpk;
-        } else if (isNormalActive) {
-          const isAliveInMonth = (!dBatDauAll || dBatDauAll <= mEnd) && (!dKetThucAll || dKetThucAll >= mStart);
-          if (isAliveInMonth) {
-            monthlyTrend[m].currentSub++;
-            monthlyTrend[m].currentDtpk += dtpk;
-            monthlyTrend[m].totalDtpk += dtpk;
+        } else {
+          // Nếu là thuê bao hiện hữu trong tháng m:
+          // Chỉ loại trừ nếu tại tháng m gói cước đã hết hạn VÀ bị 1C Nợ cước
+          const isDebtInMonth = isDebt && dKetThuc && dKetThuc < mStart;
+          if (!isDebtInMonth) {
+            let isAliveInMonth = false;
+            if (chuKy === 1) {
+              const activeDate = dBatDau || dDauNoi;
+              if (activeDate && activeDate <= mEnd) isAliveInMonth = true;
+            } else {
+              if ((!dBatDau || dBatDau <= mEnd) && (!dKetThuc || dKetThuc >= mStart)) {
+                isAliveInMonth = true;
+              }
+            }
+
+            if (isAliveInMonth) {
+              monthlyTrend[m].currentSub++;
+              monthlyTrend[m].currentDtpk += dtpk;
+              monthlyTrend[m].totalDtpk += dtpk;
+            }
           }
         }
       }
