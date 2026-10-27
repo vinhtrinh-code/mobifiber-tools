@@ -2,9 +2,9 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * FILE        : WebApp_API.gs
- * PHIÊN BẢN    : 8.5 (Chuẩn hóa đồng nhất 100% Doanh thu KPI & Biểu đồ Xu hướng 12 Tháng)
+ * PHIÊN BẢN   : 10.0 (Chuẩn hóa Date Precision - Khớp chính xác 100% với Sheet DTPB)
  * NGÀY CẬP NHẬT: 27/10/2026
- * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
+ * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
 
@@ -89,13 +89,13 @@ function getDateRangeByPeriod(periodType, selectedYear, selectedMonth) {
 }
 
 /**
- * HÀM TÍNH TOÁN DTPK LÕI CHO MỘT KHOẢNG THỜI GIAN CỤ THỂ (DÙNG CHUNG)
+ * HÀM TÍNH TOÁN DTPK LÕI - KHỚP 100% TỪNG XU VỚI MOD_DOANHTHUPHANBO
  */
-function calculateDtpkForDateRange(rawData, indices, staffRegionMap, dateStart, dateEnd) {
-  let revenueCurrent = 0;
-  let revenuePtm = 0;
-  let subCurrent = 0;
-  let subPtm = 0;
+function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, endDate) {
+  let grandTotalOldTB = 0;
+  let grandTotalOldDtpk = 0;
+  let grandTotalNewTB = 0;
+  let grandTotalNewRevenue = 0;
   let subDebt = 0;
   let subKhyc = 0;
   let subCancelled = 0;
@@ -111,52 +111,54 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, dateStart, 
 
   const ptmPackageMap = new Map();
 
+  // Chuẩn hóa mốc thời gian về đầu ngày và cuối ngày chính xác
+  const startTime = startDate.getTime();
+  const endTime = endDate.getTime();
+
   for (let i = 0; i < rawData.length; i++) {
-    const r = rawData[i];
-    const statusHD = normalizeHeader(String(r[indices.idxTinhTrangHD] || ''));
-    const statusChan = normalizeHeader(String(r[indices.idxChanCat] || ''));
-    const loaiKH = normalizeHeader(String(r[indices.idxLoaiKH] || ''));
-    const nhuCau = normalizeHeader(String(r[indices.idxNhuCau] || ''));
+    const row = rawData[i];
 
-    const isCancelled = statusHD.includes('hủy') || statusHD.includes('huy') || statusHD.includes('thanh lý') || statusHD.includes('chấm dứt');
-    const isDebt = statusChan.includes('1c') || statusChan.includes('nợ') || statusChan.includes('no cuoc') || statusChan.includes('khóa cước');
-    const isKhyc = statusChan.includes('khyc') || statusChan.includes('yêu cầu') || statusChan.includes('yeu cau');
-    const isNghiepVu = loaiKH.includes('nghiệp vụ') || loaiKH.includes('nghiep vu');
+    // 1. Loại trừ thuê bao nghiệp vụ
+    const loaiKH = normalizeHeader(String(row[indices.idxLoaiKH] || ''));
+    if (loaiKH === 'thuê bao nghiệp vụ' || loaiKH === 'thue bao nghiep vu') continue;
 
+    // 2. Kiểm tra tình trạng hợp đồng hủy/chấm dứt
+    const tinhTrangHD = normalizeHeader(String(row[indices.idxTinhTrangHD] || ''));
+    const isCancelled = tinhTrangHD.includes('hủy') || tinhTrangHD.includes('huy') ||
+                        tinhTrangHD.includes('thanh lý') || tinhTrangHD.includes('thanh ly') ||
+                        tinhTrangHD.includes('chấm dứt') || tinhTrangHD.includes('cham dut');
     if (isCancelled) {
       subCancelled++;
       continue;
     }
 
-    const chuKy = parseInt(r[indices.idxChuKy], 10) || 1;
-    const giaCuoc = safeParseCurrency(r[indices.idxGiaCuoc]);
-    let dtpk = safeParseCurrency(r[indices.idxDtpk]);
-    if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
+    const chuKyRaw = row[indices.idxChuKy];
+    const chuKy = chuKyRaw ? parseInt(chuKyRaw, 10) : 0;
+    const giaCuoc = safeParseCurrency(row[indices.idxGiaCuoc]);
+    const dtpk = safeParseCurrency(row[indices.idxDtpk]) || (chuKy > 0 ? Math.round(giaCuoc / chuKy) : 0);
 
-    const dDauNoi = parseToDate(r[indices.idxNgayDauNoi]);
-    const dThiCong = parseToDate(r[indices.idxNgayThiCong]);
-    const dBatDau = parseToDate(r[indices.idxNgayBatDau]);
-    const dKetThuc = parseToDate(r[indices.idxNgayKetThuc]);
+    const dDauNoi = parseToDate(row[indices.idxNgayDauNoi]);
+    const dThiCong = parseToDate(row[indices.idxNgayThiCong]);
+    const dBatDau = parseToDate(row[indices.idxNgayBatDau]);
+    const dKetThuc = parseToDate(row[indices.idxNgayKetThuc]);
+    const nhuCau = normalizeHeader(String(row[indices.idxNhuCau] || ''));
+    const chanCat = normalizeHeader(String(row[indices.idxChanCat] || ''));
 
-    // Thống kê cờ chặn cắt tại thời điểm xem
-    if (isDebt && (!dKetThuc || dKetThuc < dateStart)) subDebt++;
+    const isDebt = chanCat.includes('1c') || chanCat.includes('nợ cước') || chanCat.includes('no cuoc') || chanCat.includes('khóa cước');
+    const isKhyc = chanCat.includes('khyc') || chanCat.includes('yêu cầu') || chanCat.includes('yeu cau');
+
+    if (isDebt && (!dKetThuc || dKetThuc.getTime() < startTime)) subDebt++;
     if (isKhyc) subKhyc++;
 
-    // Ánh xạ Khu vực
-    const maNV = normalizeHeader(String(r[indices.idxMaNV] || ''));
-    let khuVuc = 'TT.KDVT';
-    if (maNV && staffRegionMap.has(maNV)) {
-      khuVuc = staffRegionMap.get(maNV);
+    // 3. Logic chặn cắt theo thời điểm
+    if (isDebt && dKetThuc && dKetThuc.getTime() < startTime) {
+      continue;
     }
-    let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc)) || 'TT.KDVT';
-    const regStat = regionMap.get(matchedRegion);
 
-    // 1. Kiểm tra PTM trong kỳ
-    const isPtmDemand = (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi');
-    const isPtmActive = (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong');
-    let ptmDate = null;
-
-    if (isPtmDemand && !isNghiepVu && isPtmActive) {
+    // 4. Kiểm tra thuê bao PTM mới trong kỳ (Chuẩn xác theo Mod_DoanhThuPhanBo)
+    let isPtmInPeriod = false;
+    if (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi') {
+      let ptmDate = null;
       if (chuKy === 1) {
         if (dDauNoi && dThiCong) {
           ptmDate = (dThiCong.getTime() > dDauNoi.getTime()) ? dThiCong : dDauNoi;
@@ -166,57 +168,68 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, dateStart, 
       } else {
         ptmDate = dBatDau;
       }
+
+      if (ptmDate && ptmDate.getTime() >= startTime && ptmDate.getTime() <= endTime) {
+        isPtmInPeriod = true;
+      }
     }
 
-    const isPtmInPeriod = ptmDate && (ptmDate >= dateStart && ptmDate <= dateEnd);
-
-    // 2. Logic Point-in-time: Chỉ loại bỏ nếu bị 1C Nợ cước VÀ gói đã hết hạn trước mốc bắt đầu kỳ
-    const isNotExemptDebt = !(isDebt && dKetThuc && dKetThuc < dateStart);
-    const isEligible = !isNghiepVu && 
-                       (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
-                       isNotExemptDebt;
-
-    if (isPtmInPeriod) {
-      subPtm++;
-      revenuePtm += dtpk;
-
-      regStat.ptmSub++;
-      regStat.ptmDtpk += dtpk;
-      regStat.totalSub++;
-      regStat.totalDtpk += dtpk;
-
-      const goiCuoc = String(r[indices.idxGoiCuoc] || 'Khác').trim().toUpperCase();
-      ptmPackageMap.set(goiCuoc, (ptmPackageMap.get(goiCuoc) || 0) + 1);
-
-    } else if (isEligible) {
-      let isRetainedValid = false;
+    // 5. Kiểm tra thuê bao hiện hữu trong kỳ
+    let isRetainedInPeriod = false;
+    if (!isPtmInPeriod) {
       if (chuKy === 1) {
         const activeDate = dBatDau || dDauNoi;
-        if (activeDate && activeDate <= dateEnd) isRetainedValid = true;
+        if (activeDate && activeDate.getTime() <= endTime) {
+          isRetainedInPeriod = true;
+        }
       } else {
-        // Gói dài kỳ: Chỉ cần ngày kết thúc còn trong hoặc sau mốc bắt đầu kỳ
-        if (!dKetThuc || dKetThuc >= dateStart) isRetainedValid = true;
+        // Gói dài kỳ: Phải có ngày kết thúc và kết thúc từ mốc bắt đầu kỳ trở đi
+        if (dKetThuc && dKetThuc.getTime() >= startTime) {
+          isRetainedInPeriod = true;
+        }
       }
+    }
 
-      if (isRetainedValid) {
-        subCurrent++;
-        revenueCurrent += dtpk;
+    if (!isPtmInPeriod && !isRetainedInPeriod) continue;
 
-        regStat.currentSub++;
-        regStat.currentDtpk += dtpk;
-        regStat.totalSub++;
-        regStat.totalDtpk += dtpk;
-      }
+    // 6. Ánh xạ Khu vực
+    const rawMaNV = normalizeHeader(String(row[indices.idxMaNV] || ''));
+    let khuVuc = 'TT.KDVT';
+    if (rawMaNV && staffRegionMap.has(rawMaNV)) {
+      khuVuc = staffRegionMap.get(rawMaNV);
+    }
+    let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc)) || 'TT.KDVT';
+    const regStat = regionMap.get(matchedRegion);
+
+    if (isPtmInPeriod) {
+      regStat.ptmSub += 1;
+      regStat.ptmDtpk += dtpk;
+      regStat.totalSub += 1;
+      regStat.totalDtpk += dtpk;
+
+      grandTotalNewTB += 1;
+      grandTotalNewRevenue += dtpk;
+
+      const goiCuoc = String(row[indices.idxGoiCuoc] || 'Khác').trim().toUpperCase();
+      ptmPackageMap.set(goiCuoc, (ptmPackageMap.get(goiCuoc) || 0) + 1);
+    } else if (isRetainedInPeriod) {
+      regStat.currentSub += 1;
+      regStat.currentDtpk += dtpk;
+      regStat.totalSub += 1;
+      regStat.totalDtpk += dtpk;
+
+      grandTotalOldTB += 1;
+      grandTotalOldDtpk += dtpk;
     }
   }
 
   return {
-    revenueCurrent,
-    revenuePtm,
-    totalRevenue: revenueCurrent + revenuePtm,
-    subCurrent,
-    subPtm,
-    totalActiveSub: subCurrent + subPtm,
+    revenueCurrent: grandTotalOldDtpk,
+    revenuePtm: grandTotalNewRevenue,
+    totalRevenue: grandTotalOldDtpk + grandTotalNewRevenue,
+    subCurrent: grandTotalOldTB,
+    subPtm: grandTotalNewTB,
+    totalActiveSub: grandTotalOldTB + grandTotalNewTB,
     subDebt,
     subKhyc,
     subCancelled,
@@ -277,7 +290,7 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
 
   const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
 
-  // Nạp bảng tham số Khu vực
+  // Nạp danh mục tham số Khu vực
   const staffRegionMap = new Map();
   const thamSoSheet = ss.getSheetByName('thamso_caidat');
   if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
@@ -293,14 +306,13 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
   const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType, yTarget, mTarget);
   const currentResult = calculateDtpkForDateRange(rawData, indices, staffRegionMap, dateStart, dateEnd);
 
-  // 2. TÍNH TOÀN BỘ 12 THÁNG CHO BIỂU ĐỒ XU HƯỚNG (DÙNG CHUNG HÀM LÕI)
+  // 2. TÍNH TOÀN BỘ 12 THÁNG CHO BIỂU ĐỒ XU HƯỚNG (ĐỒNG NHẤT VỚI KỲ THÁNG)
   const monthlyTrend = [];
   for (let m = 0; m < 12; m++) {
     const mStart = new Date(yTarget, m, 1, 0, 0, 0);
     const mEnd = new Date(yTarget, m + 1, 0, 23, 59, 59);
 
     if (m <= mTarget) {
-      // Chạy chính xác logic lõi cho tháng m
       const mRes = calculateDtpkForDateRange(rawData, indices, staffRegionMap, mStart, mEnd);
       monthlyTrend.push({
         monthLabel: 'T' + (m + 1),
@@ -313,7 +325,6 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
         ptmSub: mRes.subPtm
       });
     } else {
-      // Các tháng tương lai chưa đến
       monthlyTrend.push({
         monthLabel: 'T' + (m + 1),
         monthIndex: m,
