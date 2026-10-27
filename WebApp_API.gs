@@ -2,9 +2,9 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * FILE        : WebApp_API.gs
- * PHIÊN BẢN   : 8.0 (Đồng bộ Point-in-Time Lịch sử Gói cước & Biểu đồ 12 Tháng)
+ * PHIÊN BẢN    : 8.5 (Chuẩn hóa đồng nhất 100% Doanh thu KPI & Biểu đồ Xu hướng 12 Tháng)
  * NGÀY CẬP NHẬT: 27/10/2026
- * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
+ * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
 
@@ -89,17 +89,16 @@ function getDateRangeByPeriod(periodType, selectedYear, selectedMonth) {
 }
 
 /**
- * API BÓC TÁCH DỮ LIỆU DASHBOARD & TÍNH XU HƯỚNG 12 THÁNG
+ * HÀM TÍNH TOÁN DTPK LÕI CHO MỘT KHOẢNG THỜI GIAN CỤ THỂ (DÙNG CHUNG)
  */
-function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
-  if (!rawSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
-
-  const lastRow = rawSheet.getLastRow();
-  const lastCol = rawSheet.getLastColumn();
-  const yTarget = parseInt(selectedYear, 10) || new Date().getFullYear();
-  const mTarget = selectedMonth !== undefined ? parseInt(selectedMonth, 10) : new Date().getMonth();
+function calculateDtpkForDateRange(rawData, indices, staffRegionMap, dateStart, dateEnd) {
+  let revenueCurrent = 0;
+  let revenuePtm = 0;
+  let subCurrent = 0;
+  let subPtm = 0;
+  let subDebt = 0;
+  let subKhyc = 0;
+  let subCancelled = 0;
 
   const regionMap = new Map();
   STANDARD_REGIONS.forEach(reg => {
@@ -110,87 +109,14 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     });
   });
 
-  // Mảng 12 tháng xu hướng cho biểu đồ Điểm
-  const monthlyTrend = [];
-  for (let m = 0; m < 12; m++) {
-    monthlyTrend.push({
-      monthLabel: 'T' + (m + 1),
-      monthIndex: m,
-      hasData: m <= mTarget,
-      currentDtpk: 0,
-      ptmDtpk: 0,
-      totalDtpk: 0,
-      ptmSub: 0,
-      currentSub: 0
-    });
-  }
-
-  if (lastRow < CONFIG.DATA_START_ROW_TARGET) {
-    return {
-      period: periodType,
-      selectedYear: yTarget,
-      selectedMonth: mTarget,
-      summary: {
-        totalRevenue: 0, revenueCurrent: 0, revenuePtm: 0,
-        totalActiveSub: 0, subCurrent: 0, subPtm: 0,
-        subDebt: 0, subKhyc: 0, subCancelled: 0
-      },
-      regionStats: STANDARD_REGIONS.map(name => ({
-        name, currentSub: 0, ptmSub: 0, totalSub: 0, currentDtpk: 0, ptmDtpk: 0, totalDtpk: 0
-      })),
-      monthlyTrend: monthlyTrend,
-      packagePtmDistribution: [],
-      lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
-    };
-  }
-
-  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
-  const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
-  const idxLoaiKH = headers.findIndex(h => h === 'loại khách hàng');
-  const idxNhuCau = headers.findIndex(h => h === 'nhu cầu hòa mạng');
-  const idxGoiCuoc = headers.findIndex(h => h === 'gói cước');
-  const idxGiaCuoc = headers.findIndex(h => h === 'giá cước');
-  const idxChuKy = headers.findIndex(h => h === 'chu kỳ sử dụng');
-  const idxDtpk = headers.findIndex(h => h === 'dtpk');
-  const idxTinhTrangHD = headers.findIndex(h => h === 'tình trạng hợp đồng');
-  const idxChanCat = headers.findIndex(h => h === 'tình trạng chặn cắt');
-  const idxMaNV = headers.findIndex(h => h === 'mã nhân viên');
-  const idxNgayDauNoi = headers.findIndex(h => h === 'ngày đấu nối');
-  const idxNgayThiCong = headers.findIndex(h => h === 'ngày hoàn tất thi công');
-  const idxNgayBatDau = headers.findIndex(h => h === 'ngày băt đầu gói cước' || h === 'ngày bắt đầu gói cước');
-  const idxNgayKetThuc = headers.findIndex(h => h === 'ngày kết thúc gói cước');
-
-  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
-
-  const staffRegionMap = new Map();
-  const thamSoSheet = ss.getSheetByName('thamso_caidat');
-  if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
-    const tsData = thamSoSheet.getRange(4, 10, thamSoSheet.getLastRow() - 3, 4).getValues();
-    tsData.forEach(r => {
-      const kv = String(r[0] || '').trim();
-      const maNV = normalizeHeader(String(r[2] || ''));
-      if (maNV && kv) staffRegionMap.set(maNV, kv);
-    });
-  }
-
-  const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType, yTarget, mTarget);
-
-  let subDebt = 0;
-  let subKhyc = 0;
-  let subCancelled = 0;
-  let revenueCurrent = 0;
-  let revenuePtm = 0;
-  let subCurrent = 0;
-  let subPtm = 0;
-
   const ptmPackageMap = new Map();
 
   for (let i = 0; i < rawData.length; i++) {
     const r = rawData[i];
-    const statusHD = normalizeHeader(String(r[idxTinhTrangHD] || ''));
-    const statusChan = normalizeHeader(String(r[idxChanCat] || ''));
-    const loaiKH = normalizeHeader(String(r[idxLoaiKH] || ''));
-    const nhuCau = normalizeHeader(String(r[idxNhuCau] || ''));
+    const statusHD = normalizeHeader(String(r[indices.idxTinhTrangHD] || ''));
+    const statusChan = normalizeHeader(String(r[indices.idxChanCat] || ''));
+    const loaiKH = normalizeHeader(String(r[indices.idxLoaiKH] || ''));
+    const nhuCau = normalizeHeader(String(r[indices.idxNhuCau] || ''));
 
     const isCancelled = statusHD.includes('hủy') || statusHD.includes('huy') || statusHD.includes('thanh lý') || statusHD.includes('chấm dứt');
     const isDebt = statusChan.includes('1c') || statusChan.includes('nợ') || statusChan.includes('no cuoc') || statusChan.includes('khóa cước');
@@ -202,22 +128,22 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
       continue;
     }
 
-    const chuKy = parseInt(r[idxChuKy], 10) || 1;
-    const giaCuoc = safeParseCurrency(r[idxGiaCuoc]);
-    let dtpk = safeParseCurrency(r[idxDtpk]);
+    const chuKy = parseInt(r[indices.idxChuKy], 10) || 1;
+    const giaCuoc = safeParseCurrency(r[indices.idxGiaCuoc]);
+    let dtpk = safeParseCurrency(r[indices.idxDtpk]);
     if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
 
-    const dDauNoi = parseToDate(r[idxNgayDauNoi]);
-    const dThiCong = parseToDate(r[idxNgayThiCong]);
-    const dBatDau = parseToDate(r[idxNgayBatDau]);
-    const dKetThuc = parseToDate(r[idxNgayKetThuc]);
+    const dDauNoi = parseToDate(r[indices.idxNgayDauNoi]);
+    const dThiCong = parseToDate(r[indices.idxNgayThiCong]);
+    const dBatDau = parseToDate(r[indices.idxNgayBatDau]);
+    const dKetThuc = parseToDate(r[indices.idxNgayKetThuc]);
 
-    // Thống kê trạng thái tại thời điểm kỳ đang chọn
+    // Thống kê cờ chặn cắt tại thời điểm xem
     if (isDebt && (!dKetThuc || dKetThuc < dateStart)) subDebt++;
     if (isKhyc) subKhyc++;
 
     // Ánh xạ Khu vực
-    const maNV = normalizeHeader(String(r[idxMaNV] || ''));
+    const maNV = normalizeHeader(String(r[indices.idxMaNV] || ''));
     let khuVuc = 'TT.KDVT';
     if (maNV && staffRegionMap.has(maNV)) {
       khuVuc = staffRegionMap.get(maNV);
@@ -225,7 +151,7 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc)) || 'TT.KDVT';
     const regStat = regionMap.get(matchedRegion);
 
-    // 1. XÉT DUYỆT THUÊ BAO PTM
+    // 1. Kiểm tra PTM trong kỳ
     const isPtmDemand = (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi');
     const isPtmActive = (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong');
     let ptmDate = null;
@@ -242,14 +168,13 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
       }
     }
 
-    // 2. PHÂN LOẠI THEO KỲ ĐANG CHỌN TRÊN DASHBOARD
     const isPtmInPeriod = ptmDate && (ptmDate >= dateStart && ptmDate <= dateEnd);
 
-    // LOGIC CHUẨN: Thuê bao hoạt động hợp lệ không bị nợ cước trước kỳ
-    const isNotExemptDebtInPeriod = !(isDebt && dKetThuc && dKetThuc < dateStart);
-    const isEligibleInPeriod = !isNghiepVu && 
-                               (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
-                               isNotExemptDebtInPeriod;
+    // 2. Logic Point-in-time: Chỉ loại bỏ nếu bị 1C Nợ cước VÀ gói đã hết hạn trước mốc bắt đầu kỳ
+    const isNotExemptDebt = !(isDebt && dKetThuc && dKetThuc < dateStart);
+    const isEligible = !isNghiepVu && 
+                       (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong') && 
+                       isNotExemptDebt;
 
     if (isPtmInPeriod) {
       subPtm++;
@@ -260,16 +185,16 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
       regStat.totalSub++;
       regStat.totalDtpk += dtpk;
 
-      const goiCuoc = String(r[idxGoiCuoc] || 'Khác').trim().toUpperCase();
+      const goiCuoc = String(r[indices.idxGoiCuoc] || 'Khác').trim().toUpperCase();
       ptmPackageMap.set(goiCuoc, (ptmPackageMap.get(goiCuoc) || 0) + 1);
 
-    } else if (isEligibleInPeriod) {
+    } else if (isEligible) {
       let isRetainedValid = false;
       if (chuKy === 1) {
         const activeDate = dBatDau || dDauNoi;
         if (activeDate && activeDate <= dateEnd) isRetainedValid = true;
       } else {
-        // Gói dài kỳ: Còn hạn trong hoặc sau mốc bắt đầu kỳ
+        // Gói dài kỳ: Chỉ cần ngày kết thúc còn trong hoặc sau mốc bắt đầu kỳ
         if (!dKetThuc || dKetThuc >= dateStart) isRetainedValid = true;
       }
 
@@ -283,46 +208,128 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
         regStat.totalDtpk += dtpk;
       }
     }
+  }
 
-    // 3. TÍNH DỮ LIỆU XU HƯỚNG 12 THÁNG (THEO TỪNG THÁNG CỦA NĂM ĐANG CHỌN)
-    if (!isNghiepVu && (statusHD === 'đang hoạt động' || statusHD === 'dang hoat dong')) {
-      for (let m = 0; m <= mTarget; m++) {
-        const mStart = new Date(yTarget, m, 1, 0, 0, 0);
-        const mEnd = new Date(yTarget, m + 1, 0, 23, 59, 59);
+  return {
+    revenueCurrent,
+    revenuePtm,
+    totalRevenue: revenueCurrent + revenuePtm,
+    subCurrent,
+    subPtm,
+    totalActiveSub: subCurrent + subPtm,
+    subDebt,
+    subKhyc,
+    subCancelled,
+    regionMap,
+    ptmPackageMap
+  };
+}
 
-        // Nếu là PTM của tháng m
-        if (ptmDate && ptmDate >= mStart && ptmDate <= mEnd) {
-          monthlyTrend[m].ptmSub++;
-          monthlyTrend[m].ptmDtpk += dtpk;
-          monthlyTrend[m].totalDtpk += dtpk;
-        } else {
-          // Nếu là thuê bao hiện hữu trong tháng m:
-          // Chỉ loại trừ nếu tại tháng m gói cước đã hết hạn VÀ bị 1C Nợ cước
-          const isDebtInMonth = isDebt && dKetThuc && dKetThuc < mStart;
-          if (!isDebtInMonth) {
-            let isAliveInMonth = false;
-            if (chuKy === 1) {
-              const activeDate = dBatDau || dDauNoi;
-              if (activeDate && activeDate <= mEnd) isAliveInMonth = true;
-            } else {
-              if ((!dBatDau || dBatDau <= mEnd) && (!dKetThuc || dKetThuc >= mStart)) {
-                isAliveInMonth = true;
-              }
-            }
+/**
+ * API BÓC TÁCH DỮ LIỆU DASHBOARD & TÍNH XU HƯỚNG 12 THÁNG
+ */
+function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
+  if (!rawSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
 
-            if (isAliveInMonth) {
-              monthlyTrend[m].currentSub++;
-              monthlyTrend[m].currentDtpk += dtpk;
-              monthlyTrend[m].totalDtpk += dtpk;
-            }
-          }
-        }
-      }
+  const lastRow = rawSheet.getLastRow();
+  const lastCol = rawSheet.getLastColumn();
+  const yTarget = parseInt(selectedYear, 10) || new Date().getFullYear();
+  const mTarget = selectedMonth !== undefined ? parseInt(selectedMonth, 10) : new Date().getMonth();
+
+  if (lastRow < CONFIG.DATA_START_ROW_TARGET) {
+    return {
+      period: periodType,
+      selectedYear: yTarget,
+      selectedMonth: mTarget,
+      summary: {
+        totalRevenue: 0, revenueCurrent: 0, revenuePtm: 0,
+        totalActiveSub: 0, subCurrent: 0, subPtm: 0,
+        subDebt: 0, subKhyc: 0, subCancelled: 0
+      },
+      regionStats: STANDARD_REGIONS.map(name => ({
+        name, currentSub: 0, ptmSub: 0, totalSub: 0, currentDtpk: 0, ptmDtpk: 0, totalDtpk: 0
+      })),
+      monthlyTrend: [],
+      packagePtmDistribution: [],
+      lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
+    };
+  }
+
+  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
+  const indices = {
+    idxMaKH: headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME)),
+    idxLoaiKH: headers.findIndex(h => h === 'loại khách hàng'),
+    idxNhuCau: headers.findIndex(h => h === 'nhu cầu hòa mạng'),
+    idxGoiCuoc: headers.findIndex(h => h === 'gói cước'),
+    idxGiaCuoc: headers.findIndex(h => h === 'giá cước'),
+    idxChuKy: headers.findIndex(h => h === 'chu kỳ sử dụng'),
+    idxDtpk: headers.findIndex(h => h === 'dtpk'),
+    idxTinhTrangHD: headers.findIndex(h => h === 'tình trạng hợp đồng'),
+    idxChanCat: headers.findIndex(h => h === 'tình trạng chặn cắt'),
+    idxMaNV: headers.findIndex(h => h === 'mã nhân viên'),
+    idxNgayDauNoi: headers.findIndex(h => h === 'ngày đấu nối'),
+    idxNgayThiCong: headers.findIndex(h => h === 'ngày hoàn tất thi công'),
+    idxNgayBatDau: headers.findIndex(h => h === 'ngày băt đầu gói cước' || h === 'ngày bắt đầu gói cước'),
+    idxNgayKetThuc: headers.findIndex(h => h === 'ngày kết thúc gói cước')
+  };
+
+  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
+
+  // Nạp bảng tham số Khu vực
+  const staffRegionMap = new Map();
+  const thamSoSheet = ss.getSheetByName('thamso_caidat');
+  if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
+    const tsData = thamSoSheet.getRange(4, 10, thamSoSheet.getLastRow() - 3, 4).getValues();
+    tsData.forEach(r => {
+      const kv = String(r[0] || '').trim();
+      const maNV = normalizeHeader(String(r[2] || ''));
+      if (maNV && kv) staffRegionMap.set(maNV, kv);
+    });
+  }
+
+  // 1. TÍNH DỮ LIỆU CHO KỲ ĐANG ĐƯỢC CHỌN TRÊN GIAO DIỆN
+  const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType, yTarget, mTarget);
+  const currentResult = calculateDtpkForDateRange(rawData, indices, staffRegionMap, dateStart, dateEnd);
+
+  // 2. TÍNH TOÀN BỘ 12 THÁNG CHO BIỂU ĐỒ XU HƯỚNG (DÙNG CHUNG HÀM LÕI)
+  const monthlyTrend = [];
+  for (let m = 0; m < 12; m++) {
+    const mStart = new Date(yTarget, m, 1, 0, 0, 0);
+    const mEnd = new Date(yTarget, m + 1, 0, 23, 59, 59);
+
+    if (m <= mTarget) {
+      // Chạy chính xác logic lõi cho tháng m
+      const mRes = calculateDtpkForDateRange(rawData, indices, staffRegionMap, mStart, mEnd);
+      monthlyTrend.push({
+        monthLabel: 'T' + (m + 1),
+        monthIndex: m,
+        hasData: true,
+        currentDtpk: mRes.revenueCurrent,
+        ptmDtpk: mRes.revenuePtm,
+        totalDtpk: mRes.totalRevenue,
+        currentSub: mRes.subCurrent,
+        ptmSub: mRes.subPtm
+      });
+    } else {
+      // Các tháng tương lai chưa đến
+      monthlyTrend.push({
+        monthLabel: 'T' + (m + 1),
+        monthIndex: m,
+        hasData: false,
+        currentDtpk: 0,
+        ptmDtpk: 0,
+        totalDtpk: 0,
+        currentSub: 0,
+        ptmSub: 0
+      });
     }
   }
 
+  // 3. ĐÓNG GÓI SỐ LIỆU ĐỊA BÀN
   const regionStats = STANDARD_REGIONS.map(regName => {
-    const s = regionMap.get(regName);
+    const s = currentResult.regionMap.get(regName);
     return {
       name: regName,
       currentSub: s.currentSub,
@@ -334,11 +341,12 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     };
   });
 
-  const packagePtmDistribution = Array.from(ptmPackageMap.entries())
+  // 4. CƠ CẤU GÓI CƯỚC PTM
+  const packagePtmDistribution = Array.from(currentResult.ptmPackageMap.entries())
     .map(([pkg, count]) => ({
       package: pkg,
       count: count,
-      ratio: subPtm > 0 ? ((count / subPtm) * 100).toFixed(1) : 0
+      ratio: currentResult.subPtm > 0 ? ((count / currentResult.subPtm) * 100).toFixed(1) : 0
     }))
     .sort((a, b) => b.count - a.count);
 
@@ -347,15 +355,15 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     selectedYear: yTarget,
     selectedMonth: mTarget,
     summary: {
-      totalRevenue: revenueCurrent + revenuePtm,
-      revenueCurrent: revenueCurrent,
-      revenuePtm: revenuePtm,
-      totalActiveSub: subCurrent + subPtm,
-      subCurrent: subCurrent,
-      subPtm: subPtm,
-      subDebt: subDebt,
-      subKhyc: subKhyc,
-      subCancelled: subCancelled
+      totalRevenue: currentResult.totalRevenue,
+      revenueCurrent: currentResult.revenueCurrent,
+      revenuePtm: currentResult.revenuePtm,
+      totalActiveSub: currentResult.totalActiveSub,
+      subCurrent: currentResult.subCurrent,
+      subPtm: currentResult.subPtm,
+      subDebt: currentResult.subDebt,
+      subKhyc: currentResult.subKhyc,
+      subCancelled: currentResult.subCancelled
     },
     regionStats: regionStats,
     monthlyTrend: monthlyTrend,
