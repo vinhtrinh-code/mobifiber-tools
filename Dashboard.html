@@ -2,1188 +2,732 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>MobiFiber Management Portal - TTKD Viễn Thông MobiFone Lâm Đồng</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <title>MobiFiber Dashboard</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; }
-    .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
-    .top-tab.active { background-color: #1a73e8; color: #ffffff; font-weight: 600; box-shadow: 0 2px 4px rgba(26,115,232,0.3); }
-    .period-tab.active { background-color: #1a73e8; color: #ffffff; font-weight: 600; }
+    :root { --mf-blue: #1b365d; --mf-light-blue: #e8f0fe; --mf-accent: #2563eb; --mf-green: #059669; --mf-red: #dc2626; --mf-orange: #d97706; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; color: #1e293b; padding-bottom: 30px; }
+    .header-bar { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 12px 24px; position: sticky; top: 0; z-index: 50; display: flex; justify-content: space-between; align-items: center; }
+    .brand-logo { background: #2563eb; color: #fff; font-weight: bold; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; margin-right: 12px; }
+    .filter-bar { background: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    .filter-group { display: flex; align-items: center; gap: 4px; }
+    .filter-item { padding: 6px 12px; cursor: pointer; color: #64748b; border-radius: 20px; transition: 0.2s; white-space: nowrap; }
+    .filter-item:hover { background: #f1f5f9; color: #0f172a; }
+    .filter-item.active { background: #e0e7ff; color: #4338ca; font-weight: 600; }
+    .custom-select { border: 1px solid #cbd5e1; padding: 4px 8px; border-radius: 6px; outline: none; font-size: 13px; color: #334155; }
+    .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    
+    .nav-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; border: none; }
+    .nav-btn.active { background: #2563eb; color: #fff; }
+    .nav-btn.inactive { background: #f1f5f9; color: #475569; }
+    .nav-btn.inactive:hover { background: #e2e8f0; }
+    
+    /* Layout Thẻ KPI Dashboard Thuê bao */
+    .sub-kpi-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .sub-kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; position: relative; }
+    .sub-kpi-card.main { background: #2563eb; color: white; border: none; }
+    .sub-kpi-value { font-size: 28px; font-weight: bold; margin: 4px 0; }
+    .sub-kpi-label { font-size: 12px; text-transform: uppercase; font-weight: 600; }
+    .sub-kpi-subtext { font-size: 11px; opacity: 0.8; }
+    
+    /* Layout Thẻ KPI Dashboard Doanh thu */
+    .rev-kpi-grid { display: grid; grid-template-columns: 2fr 1.5fr 1.5fr; gap: 16px; margin-bottom: 24px; }
+    .rev-kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; position: relative; }
+    .rev-kpi-card.main { background: #2563eb; color: white; border: none; }
+    .rev-kpi-value { font-size: 32px; font-weight: bold; margin: 8px 0; letter-spacing: -0.5px; }
+    .rev-kpi-label { font-size: 12px; text-transform: uppercase; font-weight: 600; }
+    .rev-kpi-subtext { font-size: 12px; opacity: 0.8; }
+    
+    .chart-container { position: relative; height: 320px; width: 100%; margin-top: 16px; }
+    .chart-container-large { position: relative; height: 380px; width: 100%; margin-top: 16px; }
+    
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+    .data-table th { text-align: left; padding: 12px 16px; background: #f8fafc; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 11px; border-bottom: 2px solid #e2e8f0; }
+    .data-table td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #1e293b; }
+    .data-table tr:hover { background: #f8fafc; }
+    .data-table tr:last-child { font-weight: bold; background: #f8fafc; }
+    
+    .search-box { position: relative; display: flex; align-items: center; }
+    .search-input { padding: 8px 12px 8px 36px; border: 1px solid #cbd5e1; border-radius: 20px; font-size: 13px; width: 220px; outline: none; transition: 0.2s; background: #f8fafc; }
+    .search-input:focus { width: 300px; border-color: #2563eb; background: #fff; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .search-icon { position: absolute; left: 12px; color: #64748b; }
+    
+    .modal { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal-content { background: white; border-radius: 16px; width: 900px; max-height: 85vh; overflow-y: auto; position: relative; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: white; z-index: 10; }
+    
+    .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; padding: 24px; }
+    .info-group { background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .info-item { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+    .info-item:last-child { margin-bottom: 0; }
+    .info-label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; }
+    .info-value { font-size: 14px; color: #0f172a; font-weight: 500; }
+    
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-red { background: #fee2e2; color: #991b1b; }
+    .badge-blue { background: #dbeafe; color: #1e40af; }
+    
+    .pkg-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; }
+    .pkg-bar-bg { height: 6px; background: #e2e8f0; border-radius: 3px; flex-grow: 1; margin: 0 12px; overflow: hidden; }
+    .pkg-bar-fill { height: 100%; background: #059669; border-radius: 3px; }
+
+    #loadingOverlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .spinner-border { width: 40px; height: 40px; border: 3px solid #cbd5e1; border-top-color: #2563eb; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
-<body class="text-slate-800 antialiased min-h-screen pb-16">
+<body>
 
-  <!-- TOP HEADER & MAIN NAVIGATION -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-          MF
-        </div>
-        <div>
-          <h1 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">MobiFiber Management Portal</h1>
-          <p class="text-xs text-slate-500">TTKD Viễn thông MobiFone Lâm Đồng</p>
-        </div>
-      </div>
-      
-      <!-- MENU 3 CHẾ ĐỘ -->
-      <div class="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl">
-        <button type="button" onclick="switchMainTab('lookup')" id="btnTabLookup" class="top-tab px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 transition-all flex items-center space-x-1 active">
-          <span>🔍 Tra cứu 360°</span>
-        </button>
-        <button type="button" onclick="switchMainTab('revenue')" id="btnTabRevenue" class="top-tab px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 transition-all flex items-center space-x-1">
-          <span>💰 Dashboard Doanh thu</span>
-        </button>
-        <button type="button" onclick="switchMainTab('subscriber')" id="btnTabSub" class="top-tab px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 transition-all flex items-center space-x-1">
-          <span>👥 Dashboard Thuê bao</span>
-        </button>
+  <!-- Header -->
+  <div class="header-bar">
+    <div style="display: flex; align-items: center;">
+      <div class="brand-logo">MF</div>
+      <div>
+        <div style="font-size: 16px; font-weight: bold; color: #0f172a;">MobiFiber Management Portal</div>
+        <div style="font-size: 12px; color: #64748b;">TTKD Viễn thông MobiFone Lâm Đồng</div>
       </div>
     </div>
-  </header>
-
-  <!-- ========================================== -->
-  <!-- TAB 1: CỔNG TRA CỨU HỒ SƠ THUÊ BAO 360° -->
-  <!-- ========================================== -->
-  <section id="paneLookup" class="max-w-4xl mx-auto px-4 py-6">
-    <div class="bg-white p-5 rounded-2xl border border-slate-200 card-shadow mb-5">
-      <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Nhập thông tin tra cứu hồ sơ</label>
-      <div class="flex flex-col sm:flex-row gap-2">
-        <div class="relative flex-1">
-          <input 
-            type="text" 
-            id="searchInput" 
-            placeholder="Mã khách hàng, USER, Số điện thoại hoặc Serial ONT..." 
-            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-            onkeydown="if(event.key === 'Enter') handleSearch()"
-          >
-          <button type="button" onclick="clearSearch()" id="clearBtn" class="hidden absolute right-3 top-3 text-slate-400 hover:text-slate-600 text-sm">✕</button>
-        </div>
-        <button 
-          type="button"
-          onclick="handleSearch()" 
-          id="btnSearch"
-          class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center space-x-2"
-        >
-          <span>Tìm kiếm</span>
-        </button>
-      </div>
-      <div class="flex flex-wrap items-center gap-2 mt-3 text-[11px] text-slate-400">
-        <span class="bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-medium">⚡ Hỗ trợ tìm kiếm:</span>
-        <span>Mã KH (8 hoặc 10 số), tài khoản USER, số điện thoại liên hệ, hoặc mã serial modem ONT.</span>
-      </div>
-    </div>
-
-    <!-- Loading Spinner -->
-    <div id="loadingBox" class="hidden text-center py-10">
-      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-      <p class="text-xs text-slate-500 mt-2 font-medium">Đang quét cơ sở dữ liệu trên hệ thống...</p>
-    </div>
-
-    <!-- Kết quả -->
-    <div id="resultCount" class="text-xs font-semibold text-slate-500 mb-3 px-1 hidden"></div>
-    <div id="resultList" class="space-y-4"></div>
-
-    <!-- Hướng dẫn mặc định -->
-    <div id="emptyGuide" class="bg-white rounded-2xl border border-slate-200 p-8 text-center card-shadow">
-      <div class="text-4xl mb-3">📱</div>
-      <h3 class="text-sm font-bold text-slate-800 mb-1">Cổng Tra Cứu Thông Tin Khách Hàng MobiFiber</h3>
-      <p class="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-        Nhập thông tin thuê bao vào thanh tìm kiếm phía trên để tra cứu hồ sơ hợp đồng, chu kỳ gói cước, hạn sử dụng và nhân sự phụ trách.
-      </p>
-    </div>
-  </section>
-
-  <!-- ========================================== -->
-  <!-- KHUNG ĐIỀU KHIỂN KỲ LINH HOẠT THÁNG & NĂM -->
-  <!-- ========================================== -->
-  <div id="dashboardPeriodBar" class="hidden max-w-7xl mx-auto px-4 pt-5">
-    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-200">
-      
-      <div class="flex flex-wrap items-center gap-1.5 py-1">
-        <!-- Nút Tuần -->
-        <button type="button" onclick="selectPeriodMode('week')" id="tab-week" class="period-tab px-3 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Tuần này</button>
-        
-        <!-- DROPDOWN 12 THÁNG -->
-        <div class="relative inline-flex items-center">
-          <select id="selectMonth" onchange="onSelectMonthChanged()" class="bg-white border border-slate-300 text-slate-700 text-xs font-semibold rounded-full px-3 py-1 outline-none hover:border-blue-500 focus:border-blue-600 transition-colors cursor-pointer shadow-sm">
-            <option value="0">Tháng 1</option>
-            <option value="1">Tháng 2</option>
-            <option value="2">Tháng 3</option>
-            <option value="3">Tháng 4</option>
-            <option value="4">Tháng 5</option>
-            <option value="5">Tháng 6</option>
-            <option value="6">Tháng 7</option>
-            <option value="7">Tháng 8</option>
-            <option value="8">Tháng 9</option>
-            <option value="9">Tháng 10</option>
-            <option value="10">Tháng 11</option>
-            <option value="11">Tháng 12</option>
-          </select>
-        </div>
-
-        <span class="text-slate-300">|</span>
-        
-        <!-- 4 QUÝ -->
-        <button type="button" onclick="selectPeriodMode('q1')" id="tab-q1" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 1</button>
-        <button type="button" onclick="selectPeriodMode('q2')" id="tab-q2" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 2</button>
-        <button type="button" onclick="selectPeriodMode('q3')" id="tab-q3" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 3</button>
-        <button type="button" onclick="selectPeriodMode('q4')" id="tab-q4" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Quý 4</button>
-        
-        <span class="text-slate-300">|</span>
-
-        <!-- 6T & 9T -->
-        <button type="button" onclick="selectPeriodMode('6tdn')" id="tab-6tdn" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">6T Đầu năm</button>
-        <button type="button" onclick="selectPeriodMode('9tdn')" id="tab-9tdn" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">9T Đầu năm</button>
-        
-        <!-- NĂM (POPOVER CALENDAR PICKER KHẮC PHỤC TRIỆT ĐỂ) -->
-        <div class="relative inline-block text-left">
-          <button type="button" onclick="openYearPickerModal(event)" id="btnYearPicker" class="px-3 py-1 bg-white border border-slate-300 text-slate-700 text-xs font-semibold rounded-full hover:border-blue-500 flex items-center space-x-1 shadow-sm">
-            <span id="currentYearText">Năm 2026</span>
-            <span class="text-[10px]">▼</span>
-          </button>
-        </div>
-
-        <button type="button" onclick="selectPeriodMode('year')" id="tab-year" class="period-tab px-2.5 py-1 rounded-full text-xs text-slate-600 hover:bg-slate-200 whitespace-nowrap transition-colors">Cả năm</button>
-      </div>
-
-      <div class="flex items-center space-x-2">
-        <span id="periodLabelBadge" class="text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-1 rounded-md">Tháng 10/2026</span>
-        <button type="button" onclick="reloadDashboardMetrics()" id="refreshBtn" class="flex items-center space-x-1 px-3 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-md text-xs font-semibold transition-colors shadow-sm">
-          <span>🔄 Làm mới</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL / POPOVER CHỌN NĂM (ĐỘC LẬP NGOÀI VÙNG CUỘN) -->
-  <div id="yearPickerModal" class="hidden fixed inset-0 z-50 flex items-start justify-center pt-28 bg-slate-900/20 backdrop-blur-xs" onclick="closeYearPickerModal()">
-    <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 w-56 transform transition-all" onclick="event.stopPropagation()">
-      <div class="text-xs font-bold text-slate-500 pb-2 border-b border-slate-100 mb-2 flex justify-between items-center">
-        <span>CHỌN NĂM BÁO CÁO</span>
-        <button type="button" onclick="closeYearPickerModal()" class="text-slate-400 hover:text-slate-600">✕</button>
-      </div>
-      <div class="grid grid-cols-2 gap-1.5 text-center text-xs" id="yearGridList">
-        <!-- Render động qua JS -->
-      </div>
-    </div>
-  </div>
-
-  <!-- ========================================== -->
-  <!-- TAB 2: DASHBOARD DOANH THU (BIỂU ĐỒ ĐIỂM ĐÁY TRANG) -->
-  <!-- ========================================== -->
-  <section id="paneRevenue" class="hidden max-w-7xl mx-auto px-4 py-4">
     
-    <!-- 3 CARDS DOANH THU -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-      <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-5 rounded-xl card-shadow flex flex-col justify-between">
-        <div>
-          <div class="text-xs uppercase font-medium tracking-wider text-blue-100">Tổng Doanh thu DTPK Toàn tỉnh</div>
-          <div class="text-2xl sm:text-3xl font-extrabold mt-1 tracking-tight" id="revTotal">--- đ</div>
-        </div>
-        <div class="text-[11px] text-blue-200 mt-3 pt-2 border-t border-white/10 flex justify-between">
-          <span>✓ DT Hiện hữu + DT PTM</span>
-          <span id="revUpdateTime">Cập nhật: --:--</span>
-        </div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div class="search-box">
+        <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        <input type="text" id="searchInput" class="search-input" placeholder="Tra cứu 360°..." onkeypress="handleSearch(event)">
       </div>
-
-      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow flex flex-col justify-between">
-        <div class="flex justify-between items-start">
-          <div>
-            <div class="text-xs uppercase font-semibold text-slate-500 tracking-wider">Doanh thu Hiện hữu (DTPK)</div>
-            <div class="text-xl sm:text-2xl font-bold text-slate-900 mt-1" id="revCurrent">--- đ</div>
-          </div>
-          <span class="p-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold">🏛️</span>
-        </div>
-        <div class="text-xs text-slate-500 mt-2">Duy trì từ các hợp đồng đang hoạt động</div>
-      </div>
-
-      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow flex flex-col justify-between">
-        <div class="flex justify-between items-start">
-          <div>
-            <div class="text-xs uppercase font-semibold text-emerald-600 tracking-wider">Doanh thu PTM (DTPK)</div>
-            <div class="text-xl sm:text-2xl font-bold text-emerald-600 mt-1" id="revPtm">--- đ</div>
-          </div>
-          <span class="p-2 bg-emerald-50 text-emerald-600 rounded-lg text-sm font-bold">🚀</span>
-        </div>
-        <div class="text-xs text-slate-500 mt-2">Đóng góp từ thuê bao mới trong kỳ</div>
+      
+      <div style="display: flex; gap: 8px; background: #f1f5f9; padding: 4px; border-radius: 10px;">
+        <button id="btnNavRevenue" class="nav-btn active" onclick="switchDashboard('revenue')">💰 Dashboard Doanh thu</button>
+        <button id="btnNavSub" class="nav-btn inactive" onclick="switchDashboard('subscriber')">👥 Dashboard Thuê bao</button>
       </div>
     </div>
+  </div>
 
-    <!-- 2 BIỂU ĐỒ CỘT DOANH THU 6 ĐỊA BÀN -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
-        <div class="flex items-center justify-between mb-2">
-          <div>
-            <h2 class="text-sm sm:text-base font-bold text-slate-900">Doanh thu Hiện hữu (DTPK) theo 6 Địa bàn</h2>
-            <p class="text-xs text-slate-500">Dòng tiền nền tảng từ khách hàng đang duy trì</p>
-          </div>
-          <span class="text-[11px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-semibold">DT Hiện hữu</span>
-        </div>
-        <div class="h-64 sm:h-72 relative">
-          <canvas id="chartRevCurrent"></canvas>
-        </div>
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span style="color: #64748b; margin-right: 8px;">Tuần này</span>
+      <div class="filter-item" data-period="month" onclick="selectPeriod('month', this)">Tháng
+        <select id="monthSelect" class="custom-select ml-1" onchange="triggerLoad()" onclick="event.stopPropagation()">
+          <option value="0">1</option><option value="1">2</option><option value="2">3</option>
+          <option value="3">4</option><option value="4">5</option><option value="5">6</option>
+          <option value="6">7</option><option value="7">8</option><option value="8">9</option>
+          <option value="9">10</option><option value="10">11</option><option value="11">12</option>
+        </select>
       </div>
-
-      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
-        <div class="flex items-center justify-between mb-2">
-          <div>
-            <h2 class="text-sm sm:text-base font-bold text-slate-900">Doanh thu PTM (DTPK) theo 6 Địa bàn</h2>
-            <p class="text-xs text-slate-500">Doanh thu phát sinh mới từ thuê bao PTM kỳ này</p>
-          </div>
-          <span class="text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-semibold">DT PTM Mới</span>
-        </div>
-        <div class="h-64 sm:h-72 relative">
-          <canvas id="chartRevPtm"></canvas>
-        </div>
+      <span style="color: #cbd5e1; margin: 0 4px;">|</span>
+      <div class="filter-item" data-period="q1" onclick="selectPeriod('q1', this)">Quý 1</div>
+      <div class="filter-item" data-period="q2" onclick="selectPeriod('q2', this)">Quý 2</div>
+      <div class="filter-item" data-period="q3" onclick="selectPeriod('q3', this)">Quý 3</div>
+      <div class="filter-item" data-period="q4" onclick="selectPeriod('q4', this)">Quý 4</div>
+      <span style="color: #cbd5e1; margin: 0 4px;">|</span>
+      <div class="filter-item" data-period="6tdn" onclick="selectPeriod('6tdn', this)">6T Đầu năm</div>
+      <div class="filter-item" data-period="9tdn" onclick="selectPeriod('9tdn', this)">9T Đầu năm</div>
+      <div class="filter-item active" data-period="year" onclick="selectPeriod('year', this)">Năm
+        <select id="yearSelect" class="custom-select ml-1" onchange="triggerLoad()" onclick="event.stopPropagation()">
+          <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
+        </select>
       </div>
+      <div class="filter-item" data-period="all" onclick="selectPeriod('all', this)">Cả năm</div>
     </div>
+    
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+      <div id="filterStatus" style="font-weight: 600; color: #2563eb; background: #e0e7ff; padding: 6px 12px; border-radius: 20px;"></div>
+      <button onclick="loadData()" class="nav-btn inactive" style="padding: 6px 12px; font-size: 12px;">🔄 Làm mới</button>
+    </div>
+  </div>
 
-    <!-- BẢNG CHI TIẾT DOANH THU 6 KHU VỰC -->
-    <div class="bg-white rounded-xl border border-slate-200 card-shadow overflow-hidden mb-5">
-      <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/50">
-        <h3 class="text-sm font-bold text-slate-900">Bảng Tổng Hợp Doanh Thu Phân Kỳ theo Địa Bàn</h3>
+  <div class="max-w-7xl mx-auto px-6 py-6">
+    
+    <!-- DASHBOARD DOANH THU -->
+    <div id="viewRevenue">
+      <!-- KPI Doanh thu -->
+      <div class="rev-kpi-grid">
+        <div class="rev-kpi-card main">
+          <div class="rev-kpi-label">TỔNG DOANH THU DTPK TOÀN TỈNH</div>
+          <div class="rev-kpi-value" id="kpiTotalDtpk">0 đ</div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.2);">
+            <div class="rev-kpi-subtext">✓ DT Hiện hữu + DT PTM</div>
+            <div class="rev-kpi-subtext" id="kpiRevDate">Cập nhật: --/--/----</div>
+          </div>
+        </div>
+        <div class="rev-kpi-card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div class="rev-kpi-label" style="color: #64748b;">DOANH THU HIỆN HỮU (DTPK)</div>
+              <div class="rev-kpi-value" id="kpiOldDtpk">0 đ</div>
+              <div class="rev-kpi-subtext" style="color: #64748b; margin-top: 12px;">Duy trì từ các hợp đồng đang hoạt động</div>
+            </div>
+            <div style="padding: 8px; background: #f1f5f9; border-radius: 8px; font-size: 20px;">🏛️</div>
+          </div>
+        </div>
+        <div class="rev-kpi-card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <div class="rev-kpi-label" style="color: #059669;">DOANH THU PTM (DTPK)</div>
+              <div class="rev-kpi-value" style="color: #059669;" id="kpiNewDtpk">0 đ</div>
+              <div class="rev-kpi-subtext" style="color: #64748b; margin-top: 12px;">Đóng góp từ thuê bao mới trong kỳ</div>
+            </div>
+            <div style="padding: 8px; background: #dcfce7; border-radius: 8px; font-size: 20px;">🚀</div>
+          </div>
+        </div>
       </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs sm:text-sm text-slate-600">
-          <thead class="bg-slate-50 text-[11px] text-slate-500 uppercase tracking-wider border-b border-slate-200">
+
+      <!-- Biểu đồ Doanh thu Cơ cấu -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="font-size: 16px; font-weight: bold;">Doanh thu Hiện hữu (DTPK) theo 6 Địa bàn</h3>
+              <p style="font-size: 12px; color: #64748b;">Dòng tiền nền tảng từ khách hàng đang duy trì</p>
+            </div>
+            <span class="badge badge-blue">DT Hiện hữu</span>
+          </div>
+          <div class="chart-container"><canvas id="chartRevOld"></canvas></div>
+        </div>
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="font-size: 16px; font-weight: bold;">Doanh thu PTM (DTPK) theo 6 Địa bàn</h3>
+              <p style="font-size: 12px; color: #64748b;">Doanh thu phát sinh mới từ thuê bao PTM kỳ này</p>
+            </div>
+            <span class="badge badge-green">DT PTM Mới</span>
+          </div>
+          <div class="chart-container"><canvas id="chartRevNew"></canvas></div>
+        </div>
+      </div>
+      
+      <!-- Biểu đồ Trend 12 Tháng -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 16px; font-weight: bold;">Xu hướng Doanh thu Phân kỳ (DTPK) qua 12 Tháng</h3>
+            <p style="font-size: 12px; color: #64748b;">Biểu đồ điểm uốn lượn thể hiện quỹ đạo tăng trưởng doanh thu (tháng tương lai nét mờ)</p>
+          </div>
+          <span class="badge badge-blue" style="background: #e0e7ff;" id="trendYearLabel">Xu hướng Năm</span>
+        </div>
+        <div class="chart-container-large"><canvas id="chartRevTrend"></canvas></div>
+      </div>
+
+      <!-- Bảng Tổng hợp Doanh thu -->
+      <div class="card">
+        <h3 style="font-size: 15px; font-weight: bold; margin-bottom: 12px;">Bảng Tổng Hợp Doanh Thu Phân Kỳ theo Địa Bàn</h3>
+        <table class="data-table">
+          <thead>
             <tr>
-              <th class="px-4 py-3">STT</th>
-              <th class="px-4 py-3">Khu vực / Cụm</th>
-              <th class="px-4 py-3 text-right">DT Hiện hữu (VNĐ)</th>
-              <th class="px-4 py-3 text-right text-emerald-600 font-bold">DT PTM (VNĐ)</th>
-              <th class="px-4 py-3 text-right font-bold">Tổng DTPK (VNĐ)</th>
-              <th class="px-4 py-3 text-right">Tỷ trọng (%)</th>
+              <th style="width: 50px;">STT</th>
+              <th>KHU VỰC / CỤM</th>
+              <th style="text-align: right;">DT HIỆN HỮU (VNĐ)</th>
+              <th style="text-align: right; color: #059669;">DT PTM (VNĐ)</th>
+              <th style="text-align: right; color: #1e40af;">TỔNG DTPK (VNĐ)</th>
+              <th style="text-align: right;">TỶ TRỌNG (%)</th>
             </tr>
           </thead>
-          <tbody id="revTableBody" class="divide-y divide-slate-200 font-medium"></tbody>
-          <tfoot id="revTableFoot" class="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300"></tfoot>
+          <tbody id="tblRevenue"></tbody>
         </table>
       </div>
     </div>
 
-    <!-- BIỂU ĐỒ ĐIỂM (SMOOTH SPLINE POINT CHART): XU HƯỚNG DOANH THU 12 THÁNG -->
-    <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
-      <div class="flex items-center justify-between mb-2">
-        <div>
-          <h2 class="text-sm sm:text-base font-bold text-slate-900">Xu hướng Doanh thu Phân kỳ (DTPK) qua 12 Tháng</h2>
-          <p class="text-xs text-slate-500">Biểu đồ điểm uốn lượn thể hiện quỹ đạo tăng trưởng doanh thu (tháng tương lai nét mờ)</p>
+    <!-- DASHBOARD THUÊ BAO -->
+    <div id="viewSubscriber" style="display: none;">
+      <!-- KPI Thuê bao (Cấu trúc 4 Thẻ Phân loại Chặn cắt) -->
+      <div class="sub-kpi-grid">
+        <div class="sub-kpi-card main">
+          <div class="sub-kpi-label">TỔNG TB ĐANG HĐ</div>
+          <div class="sub-kpi-value" id="kpiTotalSub">0</div>
+          <div class="sub-kpi-subtext">Hiện hữu + PTM (Bình thường)</div>
         </div>
-        <span class="text-[11px] bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-semibold">Xu hướng Năm <span id="revYearTrendLabel">2026</span></span>
+        <div class="sub-kpi-card" style="border-bottom: 4px solid #d97706;">
+          <div class="sub-kpi-label" style="color: #d97706;">TƯ VẤN GIA HẠN</div>
+          <div class="sub-kpi-value" style="color: #d97706;" id="kpiNeedRenew">0</div>
+          <div class="sub-kpi-subtext" style="color: #64748b;">Hết hạn gói Dài kỳ</div>
+        </div>
+        <div class="sub-kpi-card" style="border-bottom: 4px solid #dc2626;">
+          <div class="sub-kpi-label" style="color: #dc2626;">THU HỒI NỢ CƯỚC</div>
+          <div class="sub-kpi-value" style="color: #dc2626;" id="kpiRealDebt">0</div>
+          <div class="sub-kpi-subtext" style="color: #64748b;">Nợ cước gói Đơn kỳ</div>
+        </div>
+        <div class="sub-kpi-card" style="border-bottom: 4px solid #64748b;">
+          <div class="sub-kpi-label" style="color: #475569;">TẠM NGƯNG KHYC</div>
+          <div class="sub-kpi-value" style="color: #475569;" id="kpiKhyc">0</div>
+          <div class="sub-kpi-subtext" style="color: #64748b;">Khách hàng yêu cầu</div>
+        </div>
       </div>
-      <div class="h-64 sm:h-72 relative">
-        <canvas id="chartRevMonthlyTrend"></canvas>
-      </div>
-    </div>
-  </section>
 
-  <!-- ========================================== -->
-  <!-- TAB 3: DASHBOARD THUÊ BAO (BIỂU ĐỒ ĐIỂM ĐÁY TRANG) -->
-  <!-- ========================================== -->
-  <section id="paneSub" class="hidden max-w-7xl mx-auto px-4 py-4">
-    
-    <!-- 5 CARDS THUÊ BAO -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
-      <div class="bg-white p-4 rounded-xl border border-slate-200 card-shadow">
-        <div class="text-[11px] uppercase font-semibold text-slate-500">Tổng TB Đang HĐ</div>
-        <div class="text-xl sm:text-2xl font-extrabold text-blue-600 mt-1" id="subActiveTotal">---</div>
-        <div class="text-[10px] text-slate-400 mt-1">Hiện hữu + PTM</div>
+      <!-- Biểu đồ Quy mô & Chiến dịch -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="font-size: 16px; font-weight: bold;">Quy mô Thuê bao Hiện hữu theo 6 Địa bàn</h3>
+              <p style="font-size: 12px; color: #64748b;">Số lượng khách hàng đang duy trì hợp đồng hoạt động</p>
+            </div>
+            <span class="badge badge-blue" style="background: #e0e7ff;">Quy mô TB</span>
+          </div>
+          <div class="chart-container"><canvas id="chartSubOld"></canvas></div>
+        </div>
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="font-size: 16px; font-weight: bold;">Chiến dịch Thuê bao PTM theo 6 Địa bàn</h3>
+              <p style="font-size: 12px; color: #64748b;">Đánh giá năng lực phát triển mới độc lập giữa các đơn vị</p>
+            </div>
+            <span class="badge badge-green">🎯 Trọng tâm PTM</span>
+          </div>
+          <div class="chart-container"><canvas id="chartSubNew"></canvas></div>
+        </div>
       </div>
-      <div class="bg-white p-4 rounded-xl border border-slate-200 card-shadow">
-        <div class="text-[11px] uppercase font-semibold text-slate-500">TB Hiện hữu</div>
-        <div class="text-xl sm:text-2xl font-extrabold text-slate-800 mt-1" id="subCurrentVal">---</div>
-        <div class="text-[10px] text-slate-400 mt-1">Duy trì ổn định</div>
-      </div>
-      <div class="bg-white p-4 rounded-xl border border-slate-200 card-shadow">
-        <div class="text-[11px] uppercase font-semibold text-emerald-600">Thuê bao PTM</div>
-        <div class="text-xl sm:text-2xl font-extrabold text-emerald-600 mt-1" id="subPtmVal">---</div>
-        <div class="text-[10px] text-slate-400 mt-1">Phát triển mới kỳ này</div>
-      </div>
-      <div class="bg-white p-4 rounded-xl border border-slate-200 card-shadow">
-        <div class="text-[11px] uppercase font-semibold text-amber-600">Chặn nợ cước</div>
-        <div class="text-xl sm:text-2xl font-extrabold text-amber-600 mt-1" id="subDebtVal">---</div>
-        <div class="text-[10px] text-slate-400 mt-1">Cần đôn đốc cước</div>
-      </div>
-      <div class="bg-white p-4 rounded-xl border border-slate-200 card-shadow">
-        <div class="text-[11px] uppercase font-semibold text-orange-600">Tạm ngưng KHYC</div>
-        <div class="text-xl sm:text-2xl font-extrabold text-orange-600 mt-1" id="subKhycVal">---</div>
-        <div class="text-[10px] text-slate-400 mt-1">Khách hàng yêu cầu</div>
-      </div>
-    </div>
 
-    <!-- 2 BIỂU ĐỒ THUÊ BAO ĐỘC LẬP: TRÁI HIỆN HỮU, PHẢI PTM -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-      
-      <!-- Biểu đồ 1: TB Hiện Hữu (Bên Trái) -->
-      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
-        <div class="flex items-center justify-between mb-2">
+      <!-- Biểu đồ Trend 12 Tháng Thuê bao -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <h2 class="text-sm sm:text-base font-bold text-slate-900">Quy mô Thuê bao Hiện hữu theo 6 Địa bàn</h2>
-            <p class="text-xs text-slate-500">Số lượng khách hàng đang duy trì hợp đồng hoạt động</p>
+            <h3 style="font-size: 16px; font-weight: bold;">Tăng trưởng Lượng Thuê bao qua 12 Tháng</h3>
+            <p style="font-size: 12px; color: #64748b;">Quy mô khách hàng tích lũy duy trì trên mạng</p>
           </div>
-          <span class="text-[11px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-semibold">Quy mô TB</span>
+          <span class="badge badge-blue" style="background: #e0e7ff;" id="trendYearLabelSub">Xu hướng Năm</span>
         </div>
-        <div class="h-64 sm:h-72 relative">
-          <canvas id="chartSubCurrent"></canvas>
-        </div>
+        <div class="chart-container-large"><canvas id="chartSubTrend"></canvas></div>
       </div>
 
-      <!-- Biểu đồ 2: TB PTM (Bên Phải - Focus Lãnh Đạo) -->
-      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
-        <div class="flex items-center justify-between mb-2">
-          <div>
-            <h2 class="text-sm sm:text-base font-bold text-slate-900">Chiến dịch Thuê bao PTM theo 6 Địa bàn</h2>
-            <p class="text-xs text-slate-500">Đánh giá năng lực phát triển mới độc lập giữa các đơn vị</p>
-          </div>
-          <span class="text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-bold">🎯 Trọng tâm PTM</span>
+      <!-- Bảng Tổng hợp Thuê bao -->
+      <div style="display: grid; grid-template-columns: 3fr 7fr; gap: 24px;">
+        <div class="card">
+          <h3 style="font-size: 15px; font-weight: bold; margin-bottom: 4px;">Cơ cấu Gói cước PTM</h3>
+          <p style="font-size: 11px; color: #64748b; margin-bottom: 16px;">Tỷ trọng gói cước bán ra kỳ này</p>
+          <div id="pkgList" style="max-height: 400px; overflow-y: auto; padding-right: 8px;"></div>
         </div>
-        <div class="h-64 sm:h-72 relative">
-          <canvas id="chartSubPtm"></canvas>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- GÓI CƯỚC PTM & BẢNG THUÊ BAO -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
-      <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow flex flex-col justify-between">
-        <div>
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-sm sm:text-base font-bold text-slate-900">Cơ cấu Gói cước PTM</h2>
-            <span class="text-[11px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded" id="subPtmBadge">0 TB</span>
-          </div>
-          <div id="subPackageList" class="space-y-3 max-h-64 overflow-y-auto pr-1"></div>
-        </div>
-        <div class="text-[11px] text-slate-400 text-center pt-3 border-t border-slate-100 mt-2">
-          Sắp xếp theo số lượng đăng ký PTM giảm dần
-        </div>
-      </div>
-
-      <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 card-shadow overflow-hidden flex flex-col justify-between">
-        <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/50">
-          <h3 class="text-sm font-bold text-slate-900">Bảng Tổng Hợp Số Lượng Thuê Bao theo Địa Bàn</h3>
-        </div>
-        <div class="overflow-x-auto flex-1">
-          <table class="w-full text-left text-xs sm:text-sm text-slate-600">
-            <thead class="bg-slate-50 text-[11px] text-slate-500 uppercase tracking-wider border-b border-slate-200">
+        <div class="card">
+          <h3 style="font-size: 15px; font-weight: bold; margin-bottom: 12px;">Bảng Tổng Hợp Số Lượng Thuê Bao theo Địa Bàn</h3>
+          <table class="data-table">
+            <thead>
               <tr>
-                <th class="px-4 py-3">STT</th>
-                <th class="px-4 py-3">Khu vực / Cụm</th>
-                <th class="px-4 py-3 text-center">TB Hiện hữu</th>
-                <th class="px-4 py-3 text-center text-emerald-600 font-bold">TB PTM</th>
-                <th class="px-4 py-3 text-center">Tổng TB Hoạt động</th>
-                <th class="px-4 py-3 text-right">Tỷ trọng TB (%)</th>
+                <th style="width: 50px;">STT</th>
+                <th>KHU VỰC / CỤM</th>
+                <th style="text-align: center;">TB HIỆN HỮU</th>
+                <th style="text-align: center; color: #059669;">TB PTM</th>
+                <th style="text-align: center; color: #1e40af;">TỔNG TB HOẠT ĐỘNG</th>
+                <th style="text-align: right;">TỶ TRỌNG TB (%)</th>
               </tr>
             </thead>
-            <tbody id="subTableBody" class="divide-y divide-slate-200 font-medium"></tbody>
-            <tfoot id="subTableFoot" class="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300"></tfoot>
+            <tbody id="tblSubscriber"></tbody>
           </table>
         </div>
       </div>
     </div>
+    
+  </div>
 
-    <!-- BIỂU ĐỒ ĐIỂM (POINT / LINE CHART): XU HƯỚNG THUÊ BAO PTM 12 THÁNG -->
-    <div class="bg-white p-5 rounded-xl border border-slate-200 card-shadow">
-      <div class="flex items-center justify-between mb-2">
+  <!-- Modal Tra cứu 360 -->
+  <div id="searchModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
         <div>
-          <h2 class="text-sm sm:text-base font-bold text-slate-900">Xu hướng Thuê bao Phát triển mới (PTM) qua 12 Tháng</h2>
-          <p class="text-xs text-slate-500">Biểu đồ đường điểm thể hiện nhịp sóng phát triển khách hàng mới (tháng tương lai nét mờ)</p>
+          <h2 style="font-size: 18px; font-weight: bold; color: #0f172a;">Kết quả Tra cứu Hồ sơ (360°)</h2>
+          <div style="font-size: 12px; color: #64748b; margin-top: 4px;" id="searchCount">Đang tìm kiếm...</div>
         </div>
-        <span class="text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-semibold">Xu hướng PTM Năm <span id="subYearTrendLabel">2026</span></span>
+        <button class="nav-btn inactive" onclick="closeModal()">Đóng ✕</button>
       </div>
-      <div class="h-64 sm:h-72 relative">
-        <canvas id="chartSubMonthlyTrend"></canvas>
-      </div>
+      <div id="searchResults" style="padding: 16px 24px; background: #f1f5f9;"></div>
     </div>
-  </section>
+  </div>
 
-  <!-- JAVASCRIPT ĐIỀU PHỐI SPA, POPOVER NĂM & BIỂU ĐỒ ĐIỂM -->
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay">
+    <div class="spinner-border"></div>
+    <div style="font-weight: 600; color: #1e40af; font-size: 15px;">Đang nạp dữ liệu phân bổ từ máy chủ...</div>
+    <div style="font-size: 12px; color: #64748b; margin-top: 6px;">Vui lòng đợi trong giây lát</div>
+  </div>
+
   <script>
-    var activeMainTab = 'lookup';
-    var currentPeriodMode = 'month';
-    var selectedYear = 2026;
-    var selectedMonth = 9; // Tháng 10 (0-indexed)
-    var cachedMetrics = null;
+    let currentPeriod = 'month';
+    let currentView = 'revenue';
+    let charts = {};
+    let gData = null;
 
-    var chartRevCurrentInst = null;
-    var chartRevPtmInst = null;
-    var chartRevMonthlyTrendInst = null;
-    var chartSubCurrentInst = null;
-    var chartSubPtmInst = null;
-    var chartSubMonthlyTrendInst = null;
+    Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    Chart.defaults.color = '#64748b';
 
-    var periodNames = {
-      'week': 'Tuần này',
-      'month': 'Tháng',
-      'q1': 'Quý 1',
-      'q2': 'Quý 2',
-      'q3': 'Quý 3',
-      'q4': 'Quý 4',
-      '6tdn': '6T Đầu năm',
-      '9tdn': '9T Đầu năm',
-      'year': 'Cả năm'
+    window.onload = () => {
+      const now = new Date();
+      document.getElementById('monthSelect').value = now.getMonth();
+      document.getElementById('yearSelect').value = now.getFullYear();
+      loadData();
     };
 
-    function formatCurrency(num) {
-      return Number(num || 0).toLocaleString('vi-VN') + ' đ';
+    function selectPeriod(period, el) {
+      document.querySelectorAll('.filter-item').forEach(e => e.classList.remove('active'));
+      el.classList.add('active');
+      currentPeriod = period;
+      loadData();
     }
 
-    function formatCompactCurrency(val) {
-      if (!val || val === 0) return '0';
-      if (val >= 1000000) return (val / 1000000).toFixed(1).replace('.0', '') + 'M';
-      if (val >= 1000) return (val / 1000).toFixed(0) + 'k';
+    function triggerLoad() {
+      loadData();
+    }
+
+    function switchDashboard(view) {
+      currentView = view;
+      document.getElementById('btnNavRevenue').className = (view === 'revenue') ? 'nav-btn active' : 'nav-btn inactive';
+      document.getElementById('btnNavSub').className = (view === 'subscriber') ? 'nav-btn active' : 'nav-btn inactive';
+      
+      document.getElementById('viewRevenue').style.display = (view === 'revenue') ? 'block' : 'none';
+      document.getElementById('viewSubscriber').style.display = (view === 'subscriber') ? 'block' : 'none';
+    }
+
+    function formatVND(val) {
+      if (!val) return '0 đ';
+      return Math.round(val).toLocaleString('vi-VN') + ' đ';
+    }
+    function formatNumCompact(val) {
+      if (!val) return '0';
+      if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+      if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
       return val.toString();
     }
 
-    // PLUGIN VẼ DATA LABELS TRÊN ĐỈNH CỘT CHO BIỂU ĐỒ KHU VỰC
-    var topLabelPlugin = {
-      id: 'topLabelPlugin',
-      afterDatasetsDraw: function(chart) {
-        var ctx = chart.ctx;
-        chart.data.datasets.forEach(function(dataset, i) {
-          var meta = chart.getDatasetMeta(i);
-          meta.data.forEach(function(bar, index) {
-            var val = dataset.data[index];
-            if (val === undefined || val === null) return;
-            var text = (chart.canvas.id.indexOf('chartRev') !== -1)
-              ? formatCompactCurrency(val)
-              : (val || 0) + ' TB';
+    function loadData() {
+      document.getElementById('loadingOverlay').style.display = 'flex';
+      const year = document.getElementById('yearSelect').value;
+      const month = document.getElementById('monthSelect').value;
 
-            ctx.save();
-            ctx.fillStyle = '#475569';
-            ctx.font = 'bold 11px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText(text, bar.x, bar.y - 4);
-            ctx.restore();
-          });
-        });
-      }
-    };
-
-    function switchMainTab(tab) {
-      try {
-        activeMainTab = tab;
-        
-        var pLookup = document.getElementById('paneLookup');
-        var pRev = document.getElementById('paneRevenue');
-        var pSub = document.getElementById('paneSub');
-        var pBar = document.getElementById('dashboardPeriodBar');
-
-        var bLookup = document.getElementById('btnTabLookup');
-        var bRev = document.getElementById('btnTabRevenue');
-        var bSub = document.getElementById('btnTabSub');
-
-        if (pLookup) pLookup.classList.toggle('hidden', tab !== 'lookup');
-        if (pRev) pRev.classList.toggle('hidden', tab !== 'revenue');
-        if (pSub) pSub.classList.toggle('hidden', tab !== 'subscriber');
-        if (pBar) pBar.classList.toggle('hidden', tab === 'lookup');
-
-        if (bLookup) bLookup.classList.toggle('active', tab === 'lookup');
-        if (bRev) bRev.classList.toggle('active', tab === 'revenue');
-        if (bSub) bSub.classList.toggle('active', tab === 'subscriber');
-
-        if (tab !== 'lookup') {
-          if (!cachedMetrics) {
-            reloadDashboardMetrics();
-          } else {
-            setTimeout(function() {
-              if (tab === 'revenue') renderRevenueDashboard(cachedMetrics);
-              if (tab === 'subscriber') renderSubscriberDashboard(cachedMetrics);
-            }, 50);
-          }
-        }
-      } catch (err) {
-        console.error('Lỗi switchMainTab:', err);
-      }
+      google.script.run
+        .withSuccessHandler(res => {
+          gData = res;
+          updateUI();
+          document.getElementById('loadingOverlay').style.display = 'none';
+        })
+        .withFailureHandler(err => {
+          alert('Lỗi tải dữ liệu: ' + err.message);
+          document.getElementById('loadingOverlay').style.display = 'none';
+        })
+        .getDashboardMetrics(currentPeriod, year, month);
     }
 
-    function selectPeriodMode(mode) {
-      currentPeriodMode = mode;
-      document.querySelectorAll('.period-tab').forEach(function(b) {
-        b.classList.remove('active');
+    function updateUI() {
+      if (!gData || !gData.summary) return;
+      const d = gData;
+      
+      // Update Filter Status
+      let pText = '';
+      if (d.period === 'month') pText = `Tháng ${parseInt(d.selectedMonth)+1}/${d.selectedYear}`;
+      else if (d.period === 'year') pText = `Năm ${d.selectedYear}`;
+      else pText = `Kỳ: ${d.period.toUpperCase()} - Năm ${d.selectedYear}`;
+      document.getElementById('filterStatus').innerText = pText;
+      document.getElementById('trendYearLabel').innerText = `Xu hướng Năm ${d.selectedYear}`;
+      document.getElementById('trendYearLabelSub').innerText = `Xu hướng Năm ${d.selectedYear}`;
+      document.getElementById('kpiRevDate').innerText = `Cập nhật: ${d.lastUpdated}`;
+
+      // Update KPI Revenue
+      document.getElementById('kpiTotalDtpk').innerText = formatVND(d.summary.totalRevenue);
+      document.getElementById('kpiOldDtpk').innerText = formatVND(d.summary.revenueCurrent);
+      document.getElementById('kpiNewDtpk').innerText = formatVND(d.summary.revenuePtm);
+
+      // Update KPI Subscriber (3 Trạng thái Chặn cắt)
+      document.getElementById('kpiTotalSub').innerText = (d.summary.totalActiveSub).toLocaleString('vi-VN');
+      document.getElementById('kpiNeedRenew').innerText = (d.summary.subNeedRenew || 0).toLocaleString('vi-VN');
+      document.getElementById('kpiRealDebt').innerText = (d.summary.subRealDebt || 0).toLocaleString('vi-VN');
+      document.getElementById('kpiKhyc').innerText = (d.summary.subKhyc || 0).toLocaleString('vi-VN');
+
+      const sortedByDtpk = [...d.regionStats].sort((a, b) => b.totalDtpk - a.totalDtpk);
+      const labels = sortedByDtpk.map(i => i.name);
+
+      renderBarChart('chartRevOld', labels, sortedByDtpk.map(i => i.currentDtpk), '#3b82f6', formatNumCompact);
+      renderBarChart('chartRevNew', labels, sortedByDtpk.map(i => i.ptmDtpk), '#10b981', formatNumCompact);
+      
+      const sortedBySub = [...d.regionStats].sort((a, b) => b.totalSub - a.totalSub);
+      const subLabels = sortedBySub.map(i => i.name);
+      
+      renderBarChart('chartSubOld', subLabels, sortedBySub.map(i => i.currentSub), '#3b82f6', v => v + ' TB');
+      renderBarChart('chartSubNew', subLabels, sortedBySub.map(i => i.ptmSub), '#10b981', v => v + ' TB');
+
+      // Bảng Doanh Thu
+      let htmlRev = '';
+      sortedByDtpk.forEach((r, idx) => {
+        const share = d.summary.totalRevenue > 0 ? (r.totalDtpk / d.summary.totalRevenue * 100).toFixed(1) : 0;
+        htmlRev += `<tr>
+          <td>${idx+1}</td>
+          <td style="font-weight: 500;">${r.name}</td>
+          <td style="text-align: right;">${formatVND(r.currentDtpk)}</td>
+          <td style="text-align: right; color: #059669; font-weight: 500;">${formatVND(r.ptmDtpk)}</td>
+          <td style="text-align: right; color: #1e40af; font-weight: bold;">${formatVND(r.totalDtpk)}</td>
+          <td style="text-align: right;">${share}%</td>
+        </tr>`;
       });
-      var activeBtn = document.getElementById('tab-' + mode);
-      if (activeBtn) activeBtn.classList.add('active');
+      htmlRev += `<tr>
+        <td colspan="2">TỔNG CỘNG</td>
+        <td style="text-align: right;">${formatVND(d.summary.revenueCurrent)}</td>
+        <td style="text-align: right; color: #059669;">${formatVND(d.summary.revenuePtm)}</td>
+        <td style="text-align: right; color: #1e40af;">${formatVND(d.summary.totalRevenue)}</td>
+        <td style="text-align: right;">100%</td>
+      </tr>`;
+      document.getElementById('tblRevenue').innerHTML = htmlRev;
 
-      if (mode !== 'month') {
-        var selM = document.getElementById('selectMonth');
-        if (selM) selM.classList.remove('border-blue-600', 'bg-blue-50');
-      }
-
-      updatePeriodBadgeLabel();
-      reloadDashboardMetrics();
-    }
-
-    function onSelectMonthChanged() {
-      var selM = document.getElementById('selectMonth');
-      if (selM) {
-        selectedMonth = parseInt(selM.value, 10);
-        currentPeriodMode = 'month';
-
-        document.querySelectorAll('.period-tab').forEach(function(b) {
-          b.classList.remove('active');
-        });
-        selM.classList.add('border-blue-600', 'bg-blue-50');
-
-        updatePeriodBadgeLabel();
-        reloadDashboardMetrics();
-      }
-    }
-
-    // MODAL CHỌN NĂM (DẠNG CALENDAR PICKER KHẮC PHỤC TRIỆT ĐỂ)
-    function openYearPickerModal(e) {
-      if (e) e.stopPropagation();
-      renderYearGrid();
-      var modal = document.getElementById('yearPickerModal');
-      if (modal) modal.classList.remove('hidden');
-    }
-
-    function closeYearPickerModal() {
-      var modal = document.getElementById('yearPickerModal');
-      if (modal) modal.classList.add('hidden');
-    }
-
-    function selectYear(yr) {
-      selectedYear = yr;
-      document.getElementById('currentYearText').innerText = 'Năm ' + yr;
-      closeYearPickerModal();
-
-      updatePeriodBadgeLabel();
-      reloadDashboardMetrics();
-    }
-
-    function renderYearGrid() {
-      var container = document.getElementById('yearGridList');
-      if (!container) return;
-      container.innerHTML = '';
-      var years = [2023, 2024, 2025, 2026, 2027, 2028];
-      years.forEach(function(yr) {
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = (yr === selectedYear)
-          ? 'py-2 bg-blue-600 text-white rounded-xl font-bold shadow-sm'
-          : 'py-2 hover:bg-slate-100 text-slate-700 rounded-xl font-medium transition-colors border border-slate-100';
-        btn.innerText = yr;
-        btn.onclick = function() { selectYear(yr); };
-        container.appendChild(btn);
+      // Bảng Thuê Bao
+      let htmlSub = '';
+      sortedBySub.forEach((r, idx) => {
+        const share = d.summary.totalActiveSub > 0 ? (r.totalSub / d.summary.totalActiveSub * 100).toFixed(1) : 0;
+        htmlSub += `<tr>
+          <td>${idx+1}</td>
+          <td style="font-weight: 500;">${r.name}</td>
+          <td style="text-align: center;">${r.currentSub} TB</td>
+          <td style="text-align: center; color: #059669; font-weight: 500;">${r.ptmSub} TB</td>
+          <td style="text-align: center; color: #1e40af; font-weight: bold;">${r.totalSub} TB</td>
+          <td style="text-align: right;">${share}%</td>
+        </tr>`;
       });
-    }
+      htmlSub += `<tr>
+        <td colspan="2">TỔNG CỘNG</td>
+        <td style="text-align: center;">${d.summary.subCurrent} TB</td>
+        <td style="text-align: center; color: #059669;">${d.summary.subPtm} TB</td>
+        <td style="text-align: center; color: #1e40af;">${d.summary.totalActiveSub} TB</td>
+        <td style="text-align: right;">100%</td>
+      </tr>`;
+      document.getElementById('tblSubscriber').innerHTML = htmlSub;
 
-    function updatePeriodBadgeLabel() {
-      var badge = document.getElementById('periodLabelBadge');
-      if (!badge) return;
-
-      if (currentPeriodMode === 'month') {
-        badge.innerText = 'Tháng ' + (selectedMonth + 1) + '/' + selectedYear;
-      } else if (currentPeriodMode === 'year') {
-        badge.innerText = 'Cả năm ' + selectedYear;
-      } else if (currentPeriodMode === 'week') {
-        badge.innerText = 'Tuần này';
+      // Danh sách gói cước PTM
+      let htmlPkg = '';
+      if (d.packagePtmDistribution.length === 0) {
+        htmlPkg = '<div style="text-align: center; color: #94a3b8; padding: 20px;">Không có PTM trong kỳ</div>';
       } else {
-        badge.innerText = (periodNames[currentPeriodMode] || currentPeriodMode) + ' ' + selectedYear;
-      }
-
-      var lblRevY = document.getElementById('revYearTrendLabel');
-      if (lblRevY) lblRevY.innerText = selectedYear;
-      var lblSubY = document.getElementById('subYearTrendLabel');
-      if (lblSubY) lblSubY.innerText = selectedYear;
-    }
-
-    function reloadDashboardMetrics() {
-      try {
-        var refBtn = document.getElementById('refreshBtn');
-        if (refBtn) refBtn.innerText = '⏳ Đang nạp...';
-
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          google.script.run
-            .withSuccessHandler(function(data) {
-              if (refBtn) refBtn.innerText = '🔄 Làm mới';
-              cachedMetrics = data;
-              setTimeout(function() {
-                if (activeMainTab === 'revenue') renderRevenueDashboard(data);
-                if (activeMainTab === 'subscriber') renderSubscriberDashboard(data);
-              }, 50);
-            })
-            .withFailureHandler(function(err) {
-              if (refBtn) refBtn.innerText = '🔄 Làm mới';
-              alert('Lỗi nạp số liệu: ' + err.message);
-            })
-            .getDashboardMetrics(currentPeriodMode, selectedYear, selectedMonth);
-        }
-      } catch (err) {
-        console.error('Lỗi reloadDashboardMetrics:', err);
-      }
-    }
-
-    // RENDER DASHBOARD DOANH THU (BIỂU ĐỒ ĐIỂM ĐÁY TRANG)
-    function renderRevenueDashboard(data) {
-      try {
-        if (!data || !data.summary) return;
-
-        document.getElementById('revTotal').innerText = formatCurrency(data.summary.totalRevenue);
-        document.getElementById('revCurrent').innerText = formatCurrency(data.summary.revenueCurrent);
-        document.getElementById('revPtm').innerText = formatCurrency(data.summary.revenuePtm);
-        document.getElementById('revUpdateTime').innerText = 'Cập nhật: ' + (data.lastUpdated || '');
-
-        var labels = data.regionStats.map(function(r) { return r.name; });
-        var valCurrent = data.regionStats.map(function(r) { return r.currentDtpk; });
-        var valPtm = data.regionStats.map(function(r) { return r.ptmDtpk; });
-
-        if (typeof Chart !== 'undefined') {
-          // 1. Biểu đồ Cột DT Hiện Hữu (Trái)
-          if (chartRevCurrentInst) chartRevCurrentInst.destroy();
-          var cvCur = document.getElementById('chartRevCurrent');
-          if (cvCur) {
-            var maxCur = Math.max.apply(null, valCurrent) || 1000000;
-            chartRevCurrentInst = new Chart(cvCur.getContext('2d'), {
-              type: 'bar',
-              data: {
-                labels: labels,
-                datasets: [{
-                  label: 'DT Hiện hữu',
-                  data: valCurrent,
-                  backgroundColor: '#3b82f6',
-                  borderRadius: 6
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    suggestedMax: maxCur * 1.25,
-                    ticks: { callback: function(v) { return (v / 1000000).toFixed(1) + 'M'; } }
-                  }
-                }
-              },
-              plugins: [topLabelPlugin]
-            });
-          }
-
-          // 2. Biểu đồ Cột DT PTM Mới (Phải)
-          if (chartRevPtmInst) chartRevPtmInst.destroy();
-          var cvPtm = document.getElementById('chartRevPtm');
-          if (cvPtm) {
-            var maxPtm = Math.max.apply(null, valPtm) || 1000;
-            chartRevPtmInst = new Chart(cvPtm.getContext('2d'), {
-              type: 'bar',
-              data: {
-                labels: labels,
-                datasets: [{
-                  label: 'DT PTM',
-                  data: valPtm,
-                  backgroundColor: '#10b981',
-                  borderRadius: 6
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    suggestedMax: maxPtm * 1.25,
-                    ticks: { callback: function(v) { return (v / 1000).toFixed(0) + 'k'; } }
-                  }
-                }
-              },
-              plugins: [topLabelPlugin]
-            });
-          }
-
-          // 3. BIỂU ĐỒ ĐIỂM (SMOOTH SPLINE POINT / LINE CHART): Xu hướng Doanh thu 12 Tháng
-          if (chartRevMonthlyTrendInst) chartRevMonthlyTrendInst.destroy();
-          var cvTrend = document.getElementById('chartRevMonthlyTrend');
-          if (cvTrend && data.monthlyTrend) {
-            var mLabels = data.monthlyTrend.map(function(m) { return m.monthLabel; });
-            var mValues = data.monthlyTrend.map(function(m) { return m.hasData ? m.totalDtpk : null; });
-            var maxMonthlyRev = Math.max.apply(null, data.monthlyTrend.filter(m => m.hasData).map(m => m.totalDtpk)) || 1000000;
-
-            chartRevMonthlyTrendInst = new Chart(cvTrend.getContext('2d'), {
-              type: 'line',
-              data: {
-                labels: mLabels,
-                datasets: [{
-                  label: 'Tổng DTPK (VNĐ)',
-                  data: mValues,
-                  borderColor: '#6366f1',
-                  backgroundColor: 'rgba(99, 102, 241, 0.12)',
-                  borderWidth: 3,
-                  tension: 0.35, // Tạo đường cong uốn lượn mềm mại (Smooth Spline)
-                  fill: true,
-                  pointRadius: 6,
-                  pointHoverRadius: 8,
-                  pointBackgroundColor: '#6366f1',
-                  pointBorderColor: '#ffffff',
-                  pointBorderWidth: 2,
-                  spanGaps: false
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    suggestedMax: maxMonthlyRev * 1.25,
-                    ticks: { callback: function(v) { return (v / 1000000).toFixed(1) + 'M'; } }
-                  }
-                }
-              },
-              plugins: [{
-                id: 'pointRevLabelPlugin',
-                afterDatasetsDraw: function(chart) {
-                  var ctx = chart.ctx;
-                  var meta = chart.getDatasetMeta(0);
-                  meta.data.forEach(function(point, index) {
-                    var item = data.monthlyTrend[index];
-                    if (item && item.hasData && item.totalDtpk > 0) {
-                      ctx.save();
-                      ctx.fillStyle = '#4338ca';
-                      ctx.font = 'bold 11px sans-serif';
-                      ctx.textAlign = 'center';
-                      ctx.textBaseline = 'bottom';
-                      ctx.fillText(formatCompactCurrency(item.totalDtpk), point.x, point.y - 8);
-                      ctx.restore();
-                    }
-                  });
-                }
-              }]
-            });
-          }
-        }
-
-        // Render Bảng Doanh thu có dòng Tổng cộng
-        var tbody = document.getElementById('revTableBody');
-        if (tbody) {
-          tbody.innerHTML = '';
-          var sumCurrent = 0, sumPtm = 0, sumTotal = 0;
-
-          data.regionStats.forEach(function(r, idx) {
-            sumCurrent += r.currentDtpk;
-            sumPtm += r.ptmDtpk;
-            sumTotal += r.totalDtpk;
-
-            var ratio = data.summary.totalRevenue > 0 ? ((r.totalDtpk / data.summary.totalRevenue) * 100).toFixed(1) : '0.0';
-            var isZero = r.totalDtpk === 0;
-
-            var tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50 transition-colors';
-            tr.innerHTML = `
-              <td class="px-4 py-3 text-slate-400">${idx + 1}</td>
-              <td class="px-4 py-3 font-semibold ${isZero ? 'text-slate-400' : 'text-slate-900'}">${r.name}</td>
-              <td class="px-4 py-3 text-right ${isZero ? 'text-slate-400' : 'text-slate-700'}">${formatCurrency(r.currentDtpk)}</td>
-              <td class="px-4 py-3 text-right font-medium ${r.ptmDtpk > 0 ? 'text-emerald-600' : 'text-slate-400'}">${formatCurrency(r.ptmDtpk)}</td>
-              <td class="px-4 py-3 text-right font-bold ${isZero ? 'text-slate-400' : 'text-blue-700'}">${formatCurrency(r.totalDtpk)}</td>
-              <td class="px-4 py-3 text-right font-semibold ${isZero ? 'text-slate-400' : 'text-blue-600'}">${ratio}%</td>
-            `;
-            tbody.appendChild(tr);
-          });
-
-          var tfoot = document.getElementById('revTableFoot');
-          if (tfoot) {
-            tfoot.innerHTML = `
-              <tr>
-                <td colspan="2" class="px-4 py-3 uppercase tracking-wider text-center">TỔNG CỘNG</td>
-                <td class="px-4 py-3 text-right text-slate-800">${formatCurrency(sumCurrent)}</td>
-                <td class="px-4 py-3 text-right text-emerald-700">${formatCurrency(sumPtm)}</td>
-                <td class="px-4 py-3 text-right text-blue-800">${formatCurrency(sumTotal)}</td>
-                <td class="px-4 py-3 text-right text-blue-800">100%</td>
-              </tr>
-            `;
-          }
-        }
-      } catch (err) {
-        console.error('Lỗi renderRevenueDashboard:', err);
-      }
-    }
-
-    // RENDER DASHBOARD THUÊ BAO (BIỂU ĐỒ ĐIỂM ĐÁY TRANG)
-    function renderSubscriberDashboard(data) {
-      try {
-        if (!data || !data.summary) return;
-
-        document.getElementById('subActiveTotal').innerText = data.summary.totalActiveSub.toLocaleString('vi-VN');
-        document.getElementById('subCurrentVal').innerText = data.summary.subCurrent.toLocaleString('vi-VN');
-        document.getElementById('subPtmVal').innerText = data.summary.subPtm.toLocaleString('vi-VN');
-        document.getElementById('subDebtVal').innerText = data.summary.subDebt.toLocaleString('vi-VN');
-        document.getElementById('subKhycVal').innerText = data.summary.subKhyc.toLocaleString('vi-VN');
-        document.getElementById('subPtmBadge').innerText = data.summary.subPtm + ' TB PTM';
-
-        var labels = data.regionStats.map(function(r) { return r.name; });
-        var valCurrentSub = data.regionStats.map(function(r) { return r.currentSub; });
-        var valPtmSub = data.regionStats.map(function(r) { return r.ptmSub; });
-
-        if (typeof Chart !== 'undefined') {
-          // 1. Biểu đồ Cột TB Hiện Hữu (BÊN TRÁI - Đồng bộ với Doanh thu)
-          if (chartSubCurrentInst) chartSubCurrentInst.destroy();
-          var cvSubCur = document.getElementById('chartSubCurrent');
-          if (cvSubCur) {
-            var maxCurSub = Math.max.apply(null, valCurrentSub) || 10;
-            chartSubCurrentInst = new Chart(cvSubCur.getContext('2d'), {
-              type: 'bar',
-              data: {
-                labels: labels,
-                datasets: [{
-                  label: 'TB Hiện hữu',
-                  data: valCurrentSub,
-                  backgroundColor: '#3b82f6',
-                  borderRadius: 6
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    suggestedMax: maxCurSub * 1.25
-                  }
-                }
-              },
-              plugins: [topLabelPlugin]
-            });
-          }
-
-          // 2. Biểu đồ Cột TB PTM (BÊN PHẢI - Focus Lãnh Đạo)
-          if (chartSubPtmInst) chartSubPtmInst.destroy();
-          var cvSubPtm = document.getElementById('chartSubPtm');
-          if (cvSubPtm) {
-            var maxPtmSub = Math.max.apply(null, valPtmSub) || 5;
-            chartSubPtmInst = new Chart(cvSubPtm.getContext('2d'), {
-              type: 'bar',
-              data: {
-                labels: labels,
-                datasets: [{
-                  label: 'Thuê bao PTM',
-                  data: valPtmSub,
-                  backgroundColor: '#10b981',
-                  borderRadius: 6
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    suggestedMax: maxPtmSub * 1.3,
-                    ticks: { stepSize: 1 }
-                  }
-                }
-              },
-              plugins: [topLabelPlugin]
-            });
-          }
-
-          // 3. BIỂU ĐỒ ĐIỂM (SMOOTH SPLINE POINT / LINE CHART): Xu hướng Thuê bao PTM 12 Tháng
-          if (chartSubMonthlyTrendInst) chartSubMonthlyTrendInst.destroy();
-          var cvSubTrend = document.getElementById('chartSubMonthlyTrend');
-          if (cvSubTrend && data.monthlyTrend) {
-            var mLabels = data.monthlyTrend.map(function(m) { return m.monthLabel; });
-            var mPtmVals = data.monthlyTrend.map(function(m) { return m.hasData ? m.ptmSub : null; });
-            var maxMonthlyPtm = Math.max.apply(null, data.monthlyTrend.filter(m => m.hasData).map(m => m.ptmSub)) || 5;
-
-            chartSubMonthlyTrendInst = new Chart(cvSubTrend.getContext('2d'), {
-              type: 'line',
-              data: {
-                labels: mLabels,
-                datasets: [{
-                  label: 'Thuê bao PTM',
-                  data: mPtmVals,
-                  borderColor: '#10b981',
-                  backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                  borderWidth: 3,
-                  tension: 0.35, // Đường cong uốn lượn mượt mà
-                  fill: true,
-                  pointRadius: 6,
-                  pointHoverRadius: 8,
-                  pointBackgroundColor: '#10b981',
-                  pointBorderColor: '#ffffff',
-                  pointBorderWidth: 2,
-                  spanGaps: false
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    suggestedMax: maxMonthlyPtm * 1.35,
-                    ticks: { stepSize: 1 }
-                  }
-                }
-              },
-              plugins: [{
-                id: 'pointSubLabelPlugin',
-                afterDatasetsDraw: function(chart) {
-                  var ctx = chart.ctx;
-                  var meta = chart.getDatasetMeta(0);
-                  meta.data.forEach(function(point, index) {
-                    var item = data.monthlyTrend[index];
-                    if (item && item.hasData && item.ptmSub !== undefined) {
-                      ctx.save();
-                      ctx.fillStyle = '#047857';
-                      ctx.font = 'bold 11px sans-serif';
-                      ctx.textAlign = 'center';
-                      ctx.textBaseline = 'bottom';
-                      ctx.fillText(item.ptmSub + ' TB', point.x, point.y - 8);
-                      ctx.restore();
-                    }
-                  });
-                }
-              }]
-            });
-          }
-        }
-
-        // Render Gói cước PTM
-        var pkgList = document.getElementById('subPackageList');
-        if (pkgList) {
-          pkgList.innerHTML = '';
-          if (!data.packagePtmDistribution || data.packagePtmDistribution.length === 0) {
-            pkgList.innerHTML = '<div class="text-xs text-slate-400 text-center py-6 italic">Không có thuê bao PTM trong kỳ.</div>';
-          } else {
-            data.packagePtmDistribution.forEach(function(pkg) {
-              var div = document.createElement('div');
-              div.className = 'text-xs';
-              div.innerHTML = `
-                <div class="flex justify-between items-center mb-1">
-                  <span class="font-bold text-slate-800">${pkg.package}</span>
-                  <div class="text-right">
-                    <span class="font-semibold text-emerald-600">${pkg.count} TB</span>
-                    <span class="text-slate-400 mx-1">|</span>
-                    <span class="text-slate-600">${pkg.ratio}%</span>
-                  </div>
-                </div>
-                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                  <div class="bg-emerald-500 h-2 rounded-full" style="width: ${Math.min(pkg.ratio, 100)}%"></div>
-                </div>
-              `;
-              pkgList.appendChild(div);
-            });
-          }
-        }
-
-        // Render Bảng Thuê bao
-        var tbody = document.getElementById('subTableBody');
-        if (tbody) {
-          tbody.innerHTML = '';
-          var sumCurrent = 0, sumPtm = 0, sumTotal = 0;
-
-          data.regionStats.forEach(function(r, idx) {
-            sumCurrent += r.currentSub;
-            sumPtm += r.ptmSub;
-            sumTotal += r.totalSub;
-
-            var ratio = data.summary.totalActiveSub > 0 ? ((r.totalSub / data.summary.totalActiveSub) * 100).toFixed(1) : '0.0';
-            var isZero = r.totalSub === 0;
-
-            var tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50 transition-colors';
-            tr.innerHTML = `
-              <td class="px-4 py-3 text-slate-400">${idx + 1}</td>
-              <td class="px-4 py-3 font-semibold ${isZero ? 'text-slate-400' : 'text-slate-900'}">${r.name}</td>
-              <td class="px-4 py-3 text-center ${isZero ? 'text-slate-400' : 'text-slate-800'}">${r.currentSub.toLocaleString('vi-VN')} TB</td>
-              <td class="px-4 py-3 text-center font-bold ${r.ptmSub > 0 ? 'text-emerald-600' : 'text-slate-400'}">${r.ptmSub.toLocaleString('vi-VN')} TB</td>
-              <td class="px-4 py-3 text-center font-bold ${isZero ? 'text-slate-400' : 'text-blue-700'}">${r.totalSub.toLocaleString('vi-VN')} TB</td>
-              <td class="px-4 py-3 text-right font-semibold ${isZero ? 'text-slate-400' : 'text-blue-600'}">${ratio}%</td>
-            `;
-            tbody.appendChild(tr);
-          });
-
-          var tfoot = document.getElementById('subTableFoot');
-          if (tfoot) {
-            tfoot.innerHTML = `
-              <tr>
-                <td colspan="2" class="px-4 py-3 uppercase tracking-wider text-center">TỔNG CỘNG</td>
-                <td class="px-4 py-3 text-center text-slate-800">${sumCurrent.toLocaleString('vi-VN')} TB</td>
-                <td class="px-4 py-3 text-center text-emerald-700">${sumPtm.toLocaleString('vi-VN')} TB</td>
-                <td class="px-4 py-3 text-center text-blue-800">${sumTotal.toLocaleString('vi-VN')} TB</td>
-                <td class="px-4 py-3 text-right text-blue-800">100%</td>
-              </tr>
-            `;
-          }
-        }
-      } catch (err) {
-        console.error('Lỗi renderSubscriberDashboard:', err);
-      }
-    }
-
-    // --- LOGIC TRA CỨU 360° ---
-    function clearSearch() {
-      var input = document.getElementById('searchInput');
-      if (input) {
-        input.value = '';
-        input.focus();
-      }
-      var btn = document.getElementById('clearBtn');
-      if (btn) btn.classList.add('hidden');
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-      var input = document.getElementById('searchInput');
-      if (input) {
-        input.addEventListener('input', function(e) {
-          var btn = document.getElementById('clearBtn');
-          if (btn) {
-            if (e.target.value.trim()) btn.classList.remove('hidden');
-            else btn.classList.add('hidden');
-          }
+        d.packagePtmDistribution.forEach(p => {
+          htmlPkg += `
+            <div class="pkg-row">
+              <div style="width: 110px; font-weight: 600; color: #0f172a; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${p.package}">${p.package}</div>
+              <div class="pkg-bar-bg"><div class="pkg-bar-fill" style="width: ${p.ratio}%;"></div></div>
+              <div style="width: 75px; text-align: right;">
+                <span style="color: #059669; font-weight: 500;">${p.count} TB</span> <span style="color: #94a3b8; font-size: 11px;">| ${p.ratio}%</span>
+              </div>
+            </div>`;
         });
       }
+      document.getElementById('pkgList').innerHTML = htmlPkg;
 
-      var selM = document.getElementById('selectMonth');
-      if (selM) {
-        selM.value = "9"; // Mặc định Tháng 10
-        selM.classList.add('border-blue-600', 'bg-blue-50');
-      }
-    });
+      // Vẽ Trend
+      renderTrendChart(d.monthlyTrend);
+    }
 
-    function handleSearch() {
-      try {
-        var input = document.getElementById('searchInput');
-        var q = input ? input.value.trim() : '';
-        if (!q) {
-          alert('Vui lòng nhập từ khóa tra cứu (Mã KH, USER, SĐT hoặc Serial ONT)!');
+    function renderBarChart(canvasId, labels, data, color, fmtFunc) {
+      if (charts[canvasId]) charts[canvasId].destroy();
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      charts[canvasId] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: color,
+            borderRadius: 6,
+            barPercentage: 0.5
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            datalabels: { display: false }
+          },
+          animation: {
+            onComplete: function() {
+              const chartInstance = this;
+              const ctx = chartInstance.ctx;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              ctx.fillStyle = '#475569';
+              ctx.font = 'bold 11px -apple-system, sans-serif';
+              
+              chartInstance.data.datasets.forEach(function (dataset, i) {
+                const meta = chartInstance.getDatasetMeta(i);
+                meta.data.forEach(function (bar, index) {
+                  const dataVal = dataset.data[index];
+                  if (dataVal > 0) {
+                    ctx.fillText(fmtFunc(dataVal), bar.x, bar.y - 4);
+                  }
+                });
+              });
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, border: { display: false }, grid: { color: '#f1f5f9' }, ticks: { callback: function(v) { return fmtFunc(v); } } },
+            x: { border: { display: false }, grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    function renderTrendChart(trendData) {
+      if (charts['trendRev']) charts['trendRev'].destroy();
+      if (charts['trendSub']) charts['trendSub'].destroy();
+
+      const labels = trendData.map(t => t.monthLabel);
+      
+      const revData = trendData.map(t => t.hasData ? t.totalDtpk : null);
+      const ctxRev = document.getElementById('chartRevTrend').getContext('2d');
+      
+      charts['trendRev'] = new Chart(ctxRev, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Tổng DTPK (VNĐ)',
+            data: revData,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            borderWidth: 3,
+            pointBackgroundColor: '#6366f1',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            fill: true,
+            tension: 0.4,
+            spanGaps: true
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Tổng DTPK (VNĐ): ' + Math.round(c.raw).toLocaleString('vi-VN'); } } } },
+          animation: {
+            onComplete: function() {
+              const chartInstance = this;
+              const ctx = chartInstance.ctx;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              ctx.fillStyle = '#4f46e5';
+              ctx.font = 'bold 11px -apple-system, sans-serif';
+              
+              chartInstance.data.datasets.forEach(function (dataset, i) {
+                const meta = chartInstance.getDatasetMeta(i);
+                meta.data.forEach(function (point, index) {
+                  const dataVal = dataset.data[index];
+                  if (dataVal !== null) ctx.fillText(formatNumCompact(dataVal), point.x, point.y - 8);
+                });
+              });
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, border: { display: false }, grid: { color: '#f1f5f9' }, ticks: { callback: function(v) { return formatNumCompact(v); } } },
+            x: { border: { display: false }, grid: { display: false } }
+          }
+        }
+      });
+
+      const subData = trendData.map(t => t.hasData ? (t.currentSub + t.ptmSub) : null);
+      const ctxSub = document.getElementById('chartSubTrend').getContext('2d');
+      
+      charts['trendSub'] = new Chart(ctxSub, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Tổng Thuê Bao',
+            data: subData,
+            borderColor: '#0ea5e9',
+            backgroundColor: 'rgba(14, 165, 233, 0.1)',
+            borderWidth: 3,
+            pointBackgroundColor: '#0ea5e9',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            fill: true,
+            tension: 0.4,
+            spanGaps: true
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Tổng Thuê bao: ' + c.raw + ' TB'; } } } },
+          animation: {
+            onComplete: function() {
+              const chartInstance = this;
+              const ctx = chartInstance.ctx;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              ctx.fillStyle = '#0284c7';
+              ctx.font = 'bold 11px -apple-system, sans-serif';
+              
+              chartInstance.data.datasets.forEach(function (dataset, i) {
+                const meta = chartInstance.getDatasetMeta(i);
+                meta.data.forEach(function (point, index) {
+                  const dataVal = dataset.data[index];
+                  if (dataVal !== null) ctx.fillText(dataVal + ' TB', point.x, point.y - 8);
+                });
+              });
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, border: { display: false }, grid: { color: '#f1f5f9' } },
+            x: { border: { display: false }, grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    function handleSearch(e) {
+      if (e.key === 'Enter') {
+        const val = document.getElementById('searchInput').value.trim();
+        if (val.length < 3) {
+          alert('Vui lòng nhập ít nhất 3 ký tự (Mã KH, Số ĐT, User hoặc Serial).');
           return;
         }
-
-        var btn = document.getElementById('btnSearch');
-        var loading = document.getElementById('loadingBox');
-        var resultList = document.getElementById('resultList');
-        var resultCount = document.getElementById('resultCount');
-        var emptyGuide = document.getElementById('emptyGuide');
-
-        if (btn) {
-          btn.disabled = true;
-          btn.innerText = 'Đang tìm...';
-        }
-        if (loading) loading.classList.remove('hidden');
-        if (resultList) resultList.innerHTML = '';
-        if (resultCount) resultCount.classList.add('hidden');
-        if (emptyGuide) emptyGuide.classList.add('hidden');
-
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          google.script.run
-            .withSuccessHandler(function(results) {
-              if (btn) {
-                btn.disabled = false;
-                btn.innerText = 'Tìm kiếm';
-              }
-              if (loading) loading.classList.add('hidden');
-              renderResults(results);
-            })
-            .withFailureHandler(function(err) {
-              if (btn) {
-                btn.disabled = false;
-                btn.innerText = 'Tìm kiếm';
-              }
-              if (loading) loading.classList.add('hidden');
-              alert('Lỗi tra cứu: ' + err.message);
-            })
-            .apiSearchSubscriber(q);
-        }
-      } catch (err) {
-        console.error('Lỗi handleSearch:', err);
+        
+        document.getElementById('searchCount').innerText = 'Đang tìm kiếm...';
+        document.getElementById('searchResults').innerHTML = '<div style="text-align: center; padding: 40px;"><div class="spinner-border"></div></div>';
+        document.getElementById('searchModal').style.display = 'flex';
+        
+        google.script.run
+          .withSuccessHandler(res => {
+            document.getElementById('searchCount').innerText = `Tìm thấy ${res.length} kết quả khớp với "${val}"`;
+            let html = '';
+            if (res.length === 0) {
+              html = '<div style="text-align: center; color: #64748b; padding: 40px;">Không tìm thấy khách hàng nào.</div>';
+            } else {
+              res.forEach(item => {
+                let badgeChan = item.tinhTrangChan === 'Bình thường' ? 'badge-green' : 'badge-red';
+                let badgeHD = item.tinhTrangHD.includes('Đang hoạt động') ? 'badge-blue' : 'badge-red';
+                
+                html += `
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                  <div style="background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <div style="font-weight: bold; color: #0f172a; font-size: 15px;">${item.tenTB}</div>
+                      <div style="font-family: monospace; color: #2563eb; font-size: 13px; font-weight: 600;">KH: ${item.maKH} ${item.user ? ' | User: ' + item.user : ''}</div>
+                    </div>
+                    <div style="text-align: right; display: flex; gap: 8px;">
+                      <span class="badge ${badgeHD}">${item.tinhTrangHD}</span>
+                      <span class="badge ${badgeChan}">${item.tinhTrangChan}</span>
+                    </div>
+                  </div>
+                  <div class="detail-grid">
+                    <div class="info-group">
+                      <div class="info-item"><span class="info-label">Khu vực & Địa chỉ</span><span class="info-value">📍 ${item.khuVuc} - ${item.diaChi}</span></div>
+                      <div class="info-item"><span class="info-label">Liên hệ</span><span class="info-value">📞 ${item.sdt}</span></div>
+                      <div class="info-item"><span class="info-label">Gói cước</span><span class="info-value">📦 ${item.goiCuoc} (${item.chuKy}T) - ${formatVND(item.giaCuoc)}</span></div>
+                      <div class="info-item"><span class="info-label">Chu kỳ cước</span><span class="info-value">🗓️ ${item.ngayBatDau} ➔ ${item.ngayKetThuc}</span></div>
+                    </div>
+                    <div class="info-group">
+                      <div class="info-item"><span class="info-label">Doanh thu phân kỳ</span><span class="info-value" style="color: #059669; font-size: 16px; font-weight: bold;">💰 ${formatVND(item.dtpk)} / tháng</span></div>
+                      <div class="info-item"><span class="info-label">Thiết bị ONT</span><span class="info-value">⚙️ ${item.loaiONT} (SN: ${item.serial})</span></div>
+                      <div class="info-item"><span class="info-label">Phát triển bởi</span><span class="info-value">🧑‍💼 ${item.tenNV}</span></div>
+                      <div class="info-item"><span class="info-label">Điểm bán</span><span class="info-value">🏪 ${item.tenCH}</span></div>
+                    </div>
+                  </div>
+                </div>`;
+              });
+            }
+            document.getElementById('searchResults').innerHTML = html;
+          })
+          .withFailureHandler(err => {
+            document.getElementById('searchResults').innerHTML = `<div style="color: #dc2626; padding: 20px;">Lỗi tra cứu: ${err.message}</div>`;
+          })
+          .apiSearchSubscriber(val);
       }
     }
 
-    function renderResults(list) {
-      try {
-        var resultList = document.getElementById('resultList');
-        var resultCount = document.getElementById('resultCount');
-
-        if (!list || list.length === 0) {
-          if (resultList) {
-            resultList.innerHTML = `
-              <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center card-shadow">
-                <div class="text-3xl mb-2">❌</div>
-                <div class="text-sm font-bold text-slate-800">Không tìm thấy thuê bao phù hợp</div>
-                <div class="text-xs text-slate-500 mt-1">Vui lòng kiểm tra lại tính chính xác của Mã KH, USER, SĐT hoặc Serial ONT.</div>
-              </div>
-            `;
-          }
-          return;
-        }
-
-        if (resultCount) {
-          resultCount.innerText = 'Tìm thấy ' + list.length + ' kết quả phù hợp:';
-          resultCount.classList.remove('hidden');
-        }
-
-        if (resultList) {
-          resultList.innerHTML = '';
-          list.forEach(function(item) {
-            var isCancelled = item.tinhTrangHD && (item.tinhTrangHD.toLowerCase().indexOf('hủy') !== -1 || item.tinhTrangHD.toLowerCase().indexOf('huy') !== -1);
-            var isBlocked = item.tinhTrangChan && (item.tinhTrangChan.toLowerCase().indexOf('nợ') !== -1 || item.tinhTrangChan.toLowerCase().indexOf('khóa') !== -1 || item.tinhTrangChan.toLowerCase().indexOf('chặn') !== -1);
-
-            var badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-            var badgeText = item.tinhTrangHD || 'Đang hoạt động';
-
-            if (isCancelled) {
-              badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
-              badgeText = 'Hợp đồng hủy';
-            } else if (isBlocked) {
-              badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
-              badgeText = item.tinhTrangChan;
-            }
-
-            var card = document.createElement('div');
-            card.className = 'bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 card-shadow transition-all';
-            card.innerHTML = `
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2 mb-3">
-                <div>
-                  <div class="flex items-center space-x-2">
-                    <span class="text-base font-bold text-blue-700">${item.tenTB}</span>
-                    <span class="text-xs px-2 py-0.5 rounded-full border font-semibold ${badgeClass}">
-                      ${badgeText}
-                    </span>
-                  </div>
-                  <div class="flex items-center space-x-3 text-xs text-slate-500 mt-1">
-                    <span>Mã KH: <b class="text-slate-800">${item.maKH}</b></span>
-                    ${item.user ? `<span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-mono font-semibold">USER: ${item.user}</span>` : ''}
-                  </div>
-                </div>
-                <div class="text-left sm:text-right">
-                  <div class="text-xs font-semibold text-slate-400">GÓI CƯỚC SỬ DỤNG</div>
-                  <div class="text-base font-extrabold text-slate-900">${item.goiCuoc} <span class="text-xs font-normal text-slate-500">(${item.chuKy}T)</span></div>
-                </div>
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs mb-3">
-                <div class="space-y-1.5">
-                  <div class="flex"><span class="w-24 text-slate-400">Số điện thoại:</span> <span class="font-semibold text-slate-800">${item.sdt || '---'}</span></div>
-                  <div class="flex"><span class="w-24 text-slate-400">Giá gói:</span> <span class="font-semibold text-slate-800">${formatCurrency(item.giaCuoc)}</span></div>
-                  <div class="flex"><span class="w-24 text-slate-400">DTPK:</span> <span class="font-bold text-emerald-600">${formatCurrency(item.dtpk)}</span></div>
-                  <div class="flex"><span class="w-24 text-slate-400">Hạn gói cước:</span> <span class="font-semibold text-blue-600">${item.ngayKetThuc}</span></div>
-                </div>
-                <div class="space-y-1.5">
-                  <div class="flex"><span class="w-24 text-slate-400">Khu vực:</span> <span class="font-semibold text-slate-800">${item.khuVuc}</span></div>
-                  <div class="flex"><span class="w-24 text-slate-400">Cửa hàng:</span> <span class="font-semibold text-slate-800">${item.tenCH}</span></div>
-                  <div class="flex"><span class="w-24 text-slate-400">Nhân viên:</span> <span class="font-semibold text-slate-800">${item.tenNV}</span></div>
-                  <div class="flex"><span class="w-24 text-slate-400">Serial ONT:</span> <span class="font-mono font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">${item.serial}</span></div>
-                </div>
-              </div>
-              <div class="pt-2.5 border-t border-slate-100 flex items-start text-xs text-slate-500">
-                <span class="mr-1.5">📍</span>
-                <span class="flex-1">${item.diaChi}</span>
-              </div>
-            `;
-            resultList.appendChild(card);
-          });
-        }
-      } catch (err) {
-        console.error('Lỗi renderResults:', err);
-      }
+    function closeModal() {
+      document.getElementById('searchModal').style.display = 'none';
+      document.getElementById('searchInput').value = '';
     }
   </script>
 </body>
