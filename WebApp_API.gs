@@ -2,7 +2,7 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * FILE        : WebApp_API.gs
- * PHIÊN BẢN   : 12.0 (Hỗ trợ 3 Tab Độc lập & Tách Khối Chặn cắt chi tiết)
+ * PHIÊN BẢN   : 13.0 (Executive Dashboard - Tích hợp Tăng trưởng, ARPU, Thu hồi ONT & Cơ cấu KH)
  * NGÀY CẬP NHẬT: 28/10/2026
  * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
@@ -27,7 +27,7 @@ function safeParseCurrency(val) {
 function doGet(e) {
   return HtmlService.createTemplateFromFile('Dashboard')
     .evaluate()
-    .setTitle('MobiFiber Management Portal - MobiFone Lâm Đồng')
+    .setTitle('MobiFiber Executive Dashboard - MobiFone Lâm Đồng')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -47,9 +47,7 @@ function getDateRangeByPeriod(periodType, selectedYear, selectedMonth) {
       break;
     }
     case 'month':
-      start = new Date(y, m, 1, 0, 0, 0);
-      end = new Date(y, m + 1, 0, 23, 59, 59);
-      break;
+      start = new Date(y, m, 1, 0, 0, 0); end = new Date(y, m + 1, 0, 23, 59, 59); break;
     case 'q1': start = new Date(y, 0, 1, 0, 0, 0); end = new Date(y, 2, 31, 23, 59, 59); break;
     case 'q2': start = new Date(y, 3, 1, 0, 0, 0); end = new Date(y, 5, 30, 23, 59, 59); break;
     case 'q3': start = new Date(y, 6, 1, 0, 0, 0); end = new Date(y, 8, 30, 23, 59, 59); break;
@@ -62,10 +60,25 @@ function getDateRangeByPeriod(periodType, selectedYear, selectedMonth) {
   return { start, end };
 }
 
+// Hàm lấy kỳ trước để tính Tăng trưởng MoM/YoY
+function getPrevDateRange(periodType, y, m) {
+  if (periodType === 'month') {
+    let pM = m - 1, pY = y;
+    if (pM < 0) { pM = 11; pY = y - 1; }
+    return { start: new Date(pY, pM, 1, 0, 0, 0), end: new Date(pY, pM + 1, 0, 23, 59, 59) };
+  } else if (periodType === 'year') {
+    return { start: new Date(y - 1, 0, 1, 0, 0, 0), end: new Date(y - 1, 11, 31, 23, 59, 59) };
+  }
+  return null; // Các kỳ khác bỏ qua MoM cho nhẹ hệ thống
+}
+
 function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, endDate) {
   let grandTotalOldTB = 0, grandTotalOldDtpk = 0;
   let grandTotalNewTB = 0, grandTotalNewRevenue = 0;
+  
   let subKhyc = 0, subNeedRenew = 0, subRealDebt = 0, subCancelled = 0;
+  let unrecoveredOnt = 0; // Đếm ONT chưa thu hồi
+  let segGov = 0, segBiz = 0, segInd = 0; // Cơ cấu Khách hàng
 
   const regionMap = new Map();
   STANDARD_REGIONS.forEach(reg => {
@@ -85,8 +98,15 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, 
     const isCancelled = tinhTrangHD.includes('hủy') || tinhTrangHD.includes('huy') ||
                         tinhTrangHD.includes('thanh lý') || tinhTrangHD.includes('thanh ly') ||
                         tinhTrangHD.includes('chấm dứt') || tinhTrangHD.includes('cham dut');
+                        
+    // Cảnh báo ONT: Nếu Hủy HĐ mà vẫn còn Serial
     if (isCancelled) {
-      subCancelled++; continue;
+      subCancelled++;
+      const serial = String(row[indices.idxSerial] || '').trim();
+      if (serial && serial.toLowerCase() !== 'khong' && serial !== '-' && serial !== '---') {
+        unrecoveredOnt++;
+      }
+      continue;
     }
 
     const chuKy = parseInt(row[indices.idxChuKy], 10) || 0;
@@ -106,8 +126,7 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, 
     if (isKhyc) {
       subKhyc++;
     } else if (isDebt && (!dKetThuc || dKetThuc.getTime() < startTime)) {
-      if (chuKy > 1) subNeedRenew++; 
-      else subRealDebt++;
+      if (chuKy > 1) subNeedRenew++; else subRealDebt++;
     }
 
     if (isDebt && dKetThuc && dKetThuc.getTime() < startTime) continue;
@@ -121,9 +140,7 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, 
       } else {
         ptmDate = dBatDau;
       }
-      if (ptmDate && ptmDate.getTime() >= startTime && ptmDate.getTime() <= endTime) {
-        isPtmInPeriod = true;
-      }
+      if (ptmDate && ptmDate.getTime() >= startTime && ptmDate.getTime() <= endTime) isPtmInPeriod = true;
     }
 
     let isRetainedInPeriod = false;
@@ -137,6 +154,15 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, 
     }
 
     if (!isPtmInPeriod && !isRetainedInPeriod) continue;
+
+    // Phân loại Cơ cấu KH
+    if (loaiKH.includes('hành chính') || loaiKH.includes('cơ quan') || loaiKH.includes('ủy ban') || loaiKH.includes('công an') || loaiKH.includes('bca') || loaiKH.includes('vũ trang') || loaiKH.includes('trường') || loaiKH.includes('y tế') || loaiKH.includes('bệnh viện')) {
+      segGov++;
+    } else if (loaiKH.includes('doanh nghiệp') || loaiKH.includes('công ty') || loaiKH.includes('tnhh') || loaiKH.includes('cp') || loaiKH.includes('dntn') || loaiKH.includes('hợp tác xã')) {
+      segBiz++;
+    } else {
+      segInd++;
+    }
 
     const rawMaNV = normalizeHeader(String(row[indices.idxMaNV] || ''));
     let khuVuc = 'TT.KDVT';
@@ -158,7 +184,9 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, 
   return {
     revenueCurrent: grandTotalOldDtpk, revenuePtm: grandTotalNewRevenue, totalRevenue: grandTotalOldDtpk + grandTotalNewRevenue,
     subCurrent: grandTotalOldTB, subPtm: grandTotalNewTB, totalActiveSub: grandTotalOldTB + grandTotalNewTB,
-    subNeedRenew, subRealDebt, subKhyc, subCancelled, regionMap, ptmPackageMap
+    subNeedRenew, subRealDebt, subKhyc, subCancelled, unrecoveredOnt, 
+    segGov, segBiz, segInd,
+    regionMap, ptmPackageMap
   };
 }
 
@@ -172,14 +200,7 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
   const yTarget = parseInt(selectedYear, 10) || new Date().getFullYear();
   const mTarget = selectedMonth !== undefined ? parseInt(selectedMonth, 10) : new Date().getMonth();
 
-  if (lastRow < CONFIG.DATA_START_ROW_TARGET) {
-    return {
-      period: periodType, selectedYear: yTarget, selectedMonth: mTarget,
-      summary: { totalRevenue: 0, revenueCurrent: 0, revenuePtm: 0, totalActiveSub: 0, subCurrent: 0, subPtm: 0, subNeedRenew: 0, subRealDebt: 0, subKhyc: 0, subCancelled: 0 },
-      regionStats: STANDARD_REGIONS.map(name => ({ name, currentSub: 0, ptmSub: 0, totalSub: 0, currentDtpk: 0, ptmDtpk: 0, totalDtpk: 0 })),
-      monthlyTrend: [], packagePtmDistribution: [], lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
-    };
-  }
+  if (lastRow < CONFIG.DATA_START_ROW_TARGET) return { success: false };
 
   const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
   const indices = {
@@ -196,7 +217,8 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     idxNgayDauNoi: headers.findIndex(h => h === 'ngày đấu nối'),
     idxNgayThiCong: headers.findIndex(h => h === 'ngày hoàn tất thi công'),
     idxNgayBatDau: headers.findIndex(h => h === 'ngày băt đầu gói cước' || h === 'ngày bắt đầu gói cước'),
-    idxNgayKetThuc: headers.findIndex(h => h === 'ngày kết thúc gói cước')
+    idxNgayKetThuc: headers.findIndex(h => h === 'ngày kết thúc gói cước'),
+    idxSerial: headers.findIndex(h => h === 'serial ont')
   };
 
   const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
@@ -211,9 +233,21 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     });
   }
 
+  // 1. TÍNH DỮ LIỆU HIỆN TẠI
   const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType, yTarget, mTarget);
   const currentResult = calculateDtpkForDateRange(rawData, indices, staffRegionMap, dateStart, dateEnd);
 
+  // 1.5. TÍNH DỮ LIỆU KỲ TRƯỚC (ĐỂ SO SÁNH TĂNG TRƯỞNG)
+  let prevTotalRev = 0, prevTotalSub = 0, prevPtmSub = 0;
+  const prevDateRange = getPrevDateRange(periodType, yTarget, mTarget);
+  if (prevDateRange) {
+    const prevResult = calculateDtpkForDateRange(rawData, indices, staffRegionMap, prevDateRange.start, prevDateRange.end);
+    prevTotalRev = prevResult.totalRevenue;
+    prevTotalSub = prevResult.totalActiveSub;
+    prevPtmSub = prevResult.subPtm;
+  }
+
+  // 2. TÍNH 12 THÁNG XU HƯỚNG
   const monthlyTrend = [];
   for (let m = 0; m < 12; m++) {
     const mStart = new Date(yTarget, m, 1, 0, 0, 0);
@@ -241,11 +275,14 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     .sort((a, b) => b.count - a.count);
 
   return {
-    period: periodType, selectedYear: yTarget, selectedMonth: mTarget,
+    success: true, period: periodType, selectedYear: yTarget, selectedMonth: mTarget,
     summary: {
       totalRevenue: currentResult.totalRevenue, revenueCurrent: currentResult.revenueCurrent, revenuePtm: currentResult.revenuePtm,
       totalActiveSub: currentResult.totalActiveSub, subCurrent: currentResult.subCurrent, subPtm: currentResult.subPtm,
-      subNeedRenew: currentResult.subNeedRenew, subRealDebt: currentResult.subRealDebt, subKhyc: currentResult.subKhyc, subCancelled: currentResult.subCancelled
+      subNeedRenew: currentResult.subNeedRenew, subRealDebt: currentResult.subRealDebt, subKhyc: currentResult.subKhyc, 
+      unrecoveredOnt: currentResult.unrecoveredOnt, 
+      segGov: currentResult.segGov, segBiz: currentResult.segBiz, segInd: currentResult.segInd,
+      prevTotalRev, prevTotalSub, prevPtmSub
     },
     regionStats: regionStats, monthlyTrend: monthlyTrend, packagePtmDistribution: packagePtmDistribution,
     lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
