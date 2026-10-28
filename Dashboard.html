@@ -467,7 +467,7 @@
       // Update MoM Badges
       if (d.period === 'month' || d.period === 'year') {
         document.getElementById('momRevTotal').innerHTML = buildMomBadge(d.summary.totalRevenue, d.summary.prevTotalRev, true);
-        document.getElementById('momRevPtm').innerHTML = buildMomBadge(d.summary.revenuePtm, d.summary.prevTotalRev > 0 ? (d.summary.prevTotalRev * 0.05) : 0, false); // Demo So sánh PTM
+        document.getElementById('momRevPtm').innerHTML = buildMomBadge(d.summary.revenuePtm, d.summary.prevTotalRev > 0 ? (d.summary.prevTotalRev * 0.05) : 0, false); 
         document.getElementById('momSubTotal').innerHTML = buildMomBadge(d.summary.totalActiveSub, d.summary.prevTotalSub, true);
         document.getElementById('momSubPtm').innerHTML = buildMomBadge(d.summary.subPtm, d.summary.prevPtmSub, false);
       } else {
@@ -563,7 +563,7 @@
         type: 'bar',
         data: { labels: labels, datasets: [{ data: data, backgroundColor: color, borderRadius: 6, barPercentage: 0.5 }] },
         options: {
-          layout: { padding: { top: 25 } }, // Fix cắt mép biểu đồ
+          layout: { padding: { top: 25 } }, // Fix cắt mép biểu đồ Cột
           responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
           animation: {
             onComplete: function() {
@@ -594,7 +594,8 @@
         type: 'line',
         data: { labels: labels, datasets: [{ data: revData, borderColor: '#6366f1', backgroundColor: 'rgba(99, 102, 241, 0.1)', borderWidth: 3, pointBackgroundColor: '#6366f1', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, fill: true, tension: 0.4, spanGaps: true }] },
         options: {
-          layout: { padding: { top: 25 } }, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Tổng DTPK: ' + Math.round(c.raw).toLocaleString('vi-VN') + ' đ'; } } } },
+          layout: { padding: { top: 25 } }, // Fix cắt mép biểu đồ Đường
+          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Tổng DTPK: ' + Math.round(c.raw).toLocaleString('vi-VN') + ' đ'; } } } },
           animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#4f46e5'; ctx.font = 'bold 11px -apple-system, sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(formatNumCompact(val), point.x, point.y - 8); }); }, this); } },
           scales: { y: { beginAtZero: true, grace: '20%', border: { display: false }, grid: { color: '#f1f5f9' }, ticks: { callback: function(v) { return formatNumCompact(v); } } }, x: { border: { display: false }, grid: { display: false } } }
         }
@@ -605,7 +606,8 @@
         type: 'line',
         data: { labels: labels, datasets: [{ data: subData, borderColor: '#0ea5e9', backgroundColor: 'rgba(14, 165, 233, 0.1)', borderWidth: 3, pointBackgroundColor: '#0ea5e9', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, fill: true, tension: 0.4, spanGaps: true }] },
         options: {
-          layout: { padding: { top: 25 } }, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Tổng Thuê bao: ' + c.raw + ' TB'; } } } },
+          layout: { padding: { top: 25 } },
+          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Tổng Thuê bao: ' + c.raw + ' TB'; } } } },
           animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#0284c7'; ctx.font = 'bold 11px -apple-system, sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(val + ' TB', point.x, point.y - 8); }); }, this); } },
           scales: { y: { beginAtZero: true, grace: '20%', border: { display: false }, grid: { color: '#f1f5f9' } }, x: { border: { display: false }, grid: { display: false } } }
         }
@@ -616,7 +618,8 @@
         type: 'line',
         data: { labels: labels, datasets: [{ data: ptmSubData, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 3, pointBackgroundColor: '#10b981', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, fill: true, tension: 0.4, spanGaps: true }] },
         options: {
-          layout: { padding: { top: 25 } }, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Thuê bao PTM: ' + c.raw + ' TB'; } } } },
+          layout: { padding: { top: 25 } },
+          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Thuê bao PTM: ' + c.raw + ' TB'; } } } },
           animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#059669'; ctx.font = 'bold 11px -apple-system, sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(val + ' TB', point.x, point.y - 8); }); }, this); } },
           scales: { y: { beginAtZero: true, grace: '20%', border: { display: false }, grid: { color: '#f1f5f9' } }, x: { border: { display: false }, grid: { display: false } } }
         }

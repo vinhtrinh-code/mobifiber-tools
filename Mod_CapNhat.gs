@@ -1,16 +1,17 @@
 /**
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
- * MODULE       : Mod_CapNhat.gs
- * PHIÊN BẢN    : 4.0 (Chuẩn hóa Vibe Coding - Quét toàn diện, Độc lập & Chống xung đột)
+ * MODULE       : CẬP NHẬT DỮ LIỆU & GHI NHẬT KÝ ĐỐI SOÁT
+ * PHIÊN BẢN    : 2.5 (Fix lỗi ghi đè lệch Cột G ở Bảng Tên Cửa Hàng)
+ * NGÀY CẬP NHẬT: 28/10/2026
  * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
 
 function showUploadDialog() {
   const html = HtmlService.createHtmlOutputFromFile('UploadDialog')
-    .setWidth(600)
-    .setHeight(560)
+    .setWidth(590)
+    .setHeight(520)
     .setTitle('Cập nhật dữ liệu MobiFiber');
   SpreadsheetApp.getUi().showModalDialog(html, 'Cập nhật dữ liệu MobiFiber');
 }
@@ -19,21 +20,26 @@ function isValidSubscriberRow(rawCode, rowArray) {
   if (rawCode === undefined || rawCode === null) return false;
   let cleanCode = String(rawCode).replace(/[\s\uFEFF\xA0]+/g, '').replace(/^'+/, '').trim();
   if (!cleanCode) return false;
+  
   const lower = cleanCode.toLowerCase();
   if (lower.includes('tổng') || lower.includes('cong') || lower.includes('stt') || lower.includes('mã')) {
     return false;
   }
+  
   const digitsOnly = cleanCode.replace(/[^0-9]/g, '');
   if (digitsOnly.length < 8) return false;
-
+  
   if (rowArray && Array.isArray(rowArray)) {
     let sequentialCount = 0;
     for (let c = 0; c < Math.min(rowArray.length, 10); c++) {
       const val = parseInt(String(rowArray[c] || '').trim(), 10);
-      if (!isNaN(val) && val >= 1 && val <= 15) sequentialCount++;
+      if (!isNaN(val) && val >= 1 && val <= 15) {
+        sequentialCount++;
+      }
     }
     if (sequentialCount >= 5) return false;
   }
+  
   return true;
 }
 
@@ -41,40 +47,47 @@ function formatValueByFieldType(fieldName, rawVal) {
   if (rawVal === undefined || rawVal === null || rawVal === '') return '';
   const normField = normalizeHeader(fieldName);
   let str = String(rawVal).replace(/[\s\uFEFF\xA0]+/g, ' ').trim();
-
+  
   if (normField === normalizeHeader(CONFIG.KEY_COLUMN_NAME)) {
     str = str.replace(/[^0-9]/g, '');
     if (str.length === 8) str = '00' + str;
     else if (str.length < 10) str = str.padStart(10, '0');
     return "'" + str;
   }
+  
   if (normField === 'số cmnd/cccd') {
     str = str.replace(/[^0-9]/g, '');
     if (str.length === 11) str = '0' + str;
     return "'" + str;
   }
+  
   if (normField === 'sđt liên hệ') {
     str = str.replace(/[^0-9]/g, '');
     if (str.length === 9) str = '0' + str;
     return "'" + str;
   }
+  
   if (CONFIG.CURRENCY_INTEGER_FIELDS.some(f => normalizeHeader(f) === normField)) {
     return parseCurrencyToInteger(rawVal);
   }
+  
   if (normField === 'chu kỳ sử dụng') {
     const num = parseInt(str, 10);
     return isNaN(num) ? str : num;
   }
+  
   if (CONFIG.DATE_ONLY_FIELDS.some(f => normalizeHeader(f) === normField)) {
     const d = parseToDate(rawVal);
     if (d) return Utilities.formatDate(d, 'Asia/Saigon', 'dd/MM/yyyy');
     return str;
   }
+  
   if (CONFIG.DATETIME_FIELDS.some(f => normalizeHeader(f) === normField)) {
     const d = parseToDate(rawVal);
     if (d) return Utilities.formatDate(d, 'Asia/Saigon', 'dd/MM/yyyy HH:mm:ss');
     return str;
   }
+  
   return rawVal;
 }
 
@@ -95,45 +108,45 @@ function isValueChanged(fieldName, val1, val2) {
   return String(val1 ?? '').replace(/^'+/, '').trim() !== String(val2 ?? '').replace(/^'+/, '').trim();
 }
 
-/**
- * XỬ LÝ TRUNG TÂM CẬP NHẬT DỮ LIỆU
- */
 function processDataUpdate(sourceRawData, headerRowIndex) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const targetSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
   if (!targetSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
-
+  
   const sourceHeaders = sourceRawData[headerRowIndex].map(h => String(h || '').trim());
   const rawDataRows = sourceRawData.slice(headerRowIndex + 1);
-
-  // Lấy chính xác vị trí cột từ nguồn
-  const srcKeyIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
-  if (srcKeyIdx === -1) throw new Error(`File nguồn không chứa cột "${CONFIG.KEY_COLUMN_NAME}"!`);
-
-  const srcNameIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.NAME_COLUMN_NAME));
-  const srcGiaCuocIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'giá cước');
-  const srcChuKyIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'chu kỳ sử dụng');
-  const srcDtpkIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'dtpk');
-  const srcMaNVIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'mã nhân viên');
-  const srcTenNVIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'tên nhân viên');
-  const srcMaCHIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'mã cửa hàng');
-  const srcTenCHIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'tên cửa hàng');
-
+  
+  const sourceKeyColIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
+  if (sourceKeyColIdx === -1) throw new Error(`File nguồn không chứa cột "${CONFIG.KEY_COLUMN_NAME}"!`);
+  
+  const sourceNameColIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.NAME_COLUMN_NAME));
+  const sourceGiaCuocIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'giá cước');
+  const sourceChuKyIdx   = sourceHeaders.findIndex(h => normalizeHeader(h) === 'chu kỳ sử dụng');
+  
   const sourceDataRows = rawDataRows.filter(r => {
     if (!r || r.length === 0) return false;
-    const rawCode = r[srcKeyIdx];
-    return isValidSubscriberRow(rawCode, r);
+    return isValidSubscriberRow(r[sourceKeyColIdx], r);
   });
-
+  
   const lastTargetCol = targetSheet.getLastColumn();
   const lastTargetRow = targetSheet.getLastRow();
   const targetHeaders = targetSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastTargetCol).getValues()[0].map(h => String(h || '').trim());
+  
   const targetKeyColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
   const targetNameColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.NAME_COLUMN_NAME));
   const giaCuocTargetColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === 'giá cước');
   const dtpkTargetColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === 'dtpk');
   const ngaySinhTargetColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === 'ngày sinh');
-
+  
+  const colIndicesForSync = {
+    idxLoaiKH: targetHeaders.findIndex(h => normalizeHeader(h) === 'loại khách hàng'),
+    idxMoHinh: targetHeaders.findIndex(h => normalizeHeader(h) === 'loại mô hình triển khai'),
+    idxTenCH: targetHeaders.findIndex(h => normalizeHeader(h) === 'tên cửa hàng'),
+    idxMaCH: targetHeaders.findIndex(h => normalizeHeader(h) === 'mã cửa hàng'),
+    idxMaNV: targetHeaders.findIndex(h => normalizeHeader(h) === 'mã nhân viên'),
+    idxTenNV: targetHeaders.findIndex(h => normalizeHeader(h) === 'tên nhân viên')
+  };
+  
   const colMapping = {};
   targetHeaders.forEach((tHead, tIdx) => {
     if (tHead) {
@@ -141,13 +154,11 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
       if (sIdx !== -1) colMapping[tIdx] = sIdx;
     }
   });
-
+  
   const criticalFieldsNormalized = new Set(CONFIG.CRITICAL_LOG_FIELDS.map(f => normalizeHeader(f)));
-  criticalFieldsNormalized.add('mã nhân viên');
-
   let targetData = [];
   const customerRowMap = new Map();
-
+  
   if (lastTargetRow >= CONFIG.DATA_START_ROW_TARGET) {
     targetData = targetSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastTargetRow - CONFIG.DATA_START_ROW_TARGET + 1, lastTargetCol).getValues();
     targetData.forEach((row, idx) => {
@@ -155,82 +166,64 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
       if (normCode) customerRowMap.set(normCode, { rowIndex: CONFIG.DATA_START_ROW_TARGET + idx, dataIndex: idx });
     });
   }
-
+  
   const nowStr = Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm');
   const logs = [];
   const newRowsToAppend = [];
-  const itemsForParamSync = [];
-
+  const newRawRowsToScan = []; 
   let updatedCustCount = 0, updatedFieldsCount = 0;
-
+  
   sourceDataRows.forEach(srcRow => {
-    const rawSrcCustId = srcRow[srcKeyIdx];
+    const rawSrcCustId = srcRow[sourceKeyColIdx];
     const normSrcCustId = normalizeCustomerId(rawSrcCustId);
     if (!normSrcCustId) return;
-
-    const custName = (srcNameIdx !== -1 && srcRow[srcNameIdx]) ? String(srcRow[srcNameIdx]).trim() : '';
+  
+    const custName = (sourceNameColIdx !== -1 && srcRow[sourceNameColIdx]) ? String(srcRow[sourceNameColIdx]).trim() : '';
     let cleanDisplayCustId = String(rawSrcCustId).replace(/[^0-9]/g, '').trim();
     if (cleanDisplayCustId.length === 8) cleanDisplayCustId = '00' + cleanDisplayCustId;
     else if (cleanDisplayCustId.length < 10) cleanDisplayCustId = cleanDisplayCustId.padStart(10, '0');
-
+  
     let derivedDtpk = '';
-    const rawGiaCuoc = (srcGiaCuocIdx !== -1) ? parseCurrencyToInteger(srcRow[srcGiaCuocIdx]) : '';
-    const rawChuKy = (srcChuKyIdx !== -1) ? parseInt(srcRow[srcChuKyIdx], 10) : '';
+    const rawGiaCuoc = (sourceGiaCuocIdx !== -1) ? parseCurrencyToInteger(srcRow[sourceGiaCuocIdx]) : '';
+    const rawChuKy = (sourceChuKyIdx !== -1) ? parseInt(srcRow[sourceChuKyIdx], 10) : '';
     if (typeof rawGiaCuoc === 'number' && typeof rawChuKy === 'number' && rawChuKy > 0) {
       derivedDtpk = Math.round(rawGiaCuoc / rawChuKy);
     }
-
-    // Thu thập tham số nhân sự trực tiếp từ dòng nguồn
-    const itemMaNV = srcMaNVIdx !== -1 ? String(srcRow[srcMaNVIdx] || '').replace(/^'+/, '').trim() : '';
-    const itemTenNV = srcTenNVIdx !== -1 ? String(srcRow[srcTenNVIdx] || '').trim() : '';
-    const itemMaCH = srcMaCHIdx !== -1 ? String(srcRow[srcMaCHIdx] || '').replace(/^'+/, '').trim() : '';
-    const itemTenCH = srcTenCHIdx !== -1 ? String(srcRow[srcTenCHIdx] || '').trim() : '';
-
-    if (itemMaNV || itemTenCH) {
-      itemsForParamSync.push({
-        maNV: itemMaNV,
-        tenNV: itemTenNV,
-        maCH: itemMaCH,
-        tenCH: itemTenCH,
-        maKH: cleanDisplayCustId,
-        tenTB: custName
-      });
-    }
-
+  
     if (customerRowMap.has(normSrcCustId)) {
-      // 1. CẬP NHẬT THUÊ BAO ĐÃ TỒN TẠI
       const { rowIndex, dataIndex } = customerRowMap.get(normSrcCustId);
       const existingRow = targetData[dataIndex];
       let custHasChange = false;
       const displayName = custName || (targetNameColIdx !== -1 ? String(existingRow[targetNameColIdx] || '') : '');
-
+  
       for (const [tColIdxStr, sColIdx] of Object.entries(colMapping)) {
         const tColIdx = parseInt(tColIdxStr, 10);
         const fieldName = targetHeaders[tColIdx];
         const normField = normalizeHeader(fieldName);
+  
         if (tColIdx === targetKeyColIdx) continue;
-
+  
         const oldVal = existingRow[tColIdx];
         let formattedNewVal = formatValueByFieldType(fieldName, srcRow[sColIdx]);
-
+  
         if (normField === 'dtpk' && (formattedNewVal === '' || formattedNewVal === null || formattedNewVal === undefined)) {
           formattedNewVal = derivedDtpk;
         }
-
+  
         if (isValueChanged(fieldName, oldVal, formattedNewVal)) {
           existingRow[tColIdx] = formattedNewVal;
           const cellRange = targetSheet.getRange(rowIndex, tColIdx + 1);
-
+  
           if (CONFIG.CURRENCY_INTEGER_FIELDS.some(f => normalizeHeader(f) === normField)) {
             cellRange.setValue(formattedNewVal).setNumberFormat('#,##0');
-          } else if (normField === 'số cmnd/cccd' || normField === 'sđt liên hệ' || normField === 'mã nhân viên' || normField === 'mã cửa hàng') {
+          } else if (normField === 'số cmnd/cccd' || normField === 'sđt liên hệ') {
             cellRange.setNumberFormat('@').setValue(formattedNewVal);
           } else if (normField === 'ngày sinh') {
             cellRange.setValue(formattedNewVal).setNumberFormat('dd/MM/yyyy');
           } else {
             cellRange.setValue(formattedNewVal);
           }
-
+  
           if (criticalFieldsNormalized.has(normField)) {
             const colLetter = columnToLetter(tColIdx + 1);
             logs.push([
@@ -243,8 +236,8 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
         }
       }
       if (custHasChange) updatedCustCount++;
+  
     } else {
-      // 2. THÊM MỚI THUÊ BAO
       const newRow = new Array(lastTargetCol).fill('');
       for (const [tColIdxStr, sColIdx] of Object.entries(colMapping)) {
         const tColIdx = parseInt(tColIdxStr, 10);
@@ -254,54 +247,60 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
         newRow[dtpkTargetColIdx] = derivedDtpk;
       }
       newRowsToAppend.push({ custId: cleanDisplayCustId, custName: custName, rowData: newRow });
+      newRawRowsToScan.push(newRow);
     }
   });
-
+  
   let insertedCount = 0;
   if (newRowsToAppend.length > 0) {
     const startAppendRow = targetSheet.getLastRow() + 1;
     const appendValues = newRowsToAppend.map(item => item.rowData);
+  
     targetSheet.getRange(startAppendRow, 1, appendValues.length, lastTargetCol).setValues(appendValues);
     insertedCount = appendValues.length;
-
+  
     [targetKeyColIdx, targetHeaders.findIndex(h => normalizeHeader(h) === 'số cmnd/cccd'), targetHeaders.findIndex(h => normalizeHeader(h) === 'sđt liên hệ')].forEach(cIdx => {
       if (cIdx !== -1) targetSheet.getRange(startAppendRow, cIdx + 1, appendValues.length, 1).setNumberFormat('@');
     });
-
+  
     if (giaCuocTargetColIdx !== -1) targetSheet.getRange(startAppendRow, giaCuocTargetColIdx + 1, appendValues.length, 1).setNumberFormat('#,##0');
     if (dtpkTargetColIdx !== -1) targetSheet.getRange(startAppendRow, dtpkTargetColIdx + 1, appendValues.length, 1).setNumberFormat('#,##0');
     if (ngaySinhTargetColIdx !== -1) targetSheet.getRange(startAppendRow, ngaySinhTargetColIdx + 1, appendValues.length, 1).setNumberFormat('dd/MM/yyyy');
-
+  
     newRowsToAppend.forEach((item, idx) => {
       const curRow = startAppendRow + idx;
       logs.push([nowStr, item.custId, item.custName, 'Thêm mới', 'Toàn bộ bản ghi', `A${curRow}:AR${curRow}`, '', 'Cập nhật dữ liệu']);
     });
   }
-
-  // ĐỒNG BỘ THAM SỐ TỪNG CỘT AN TOÀN
-  const syncResult = executeSyncStaffAndStores(itemsForParamSync);
-
-  // Ghi nhật ký vào log_capnhat
+  
+  let syncResult = { newParamsCount: 0, details: '' };
+  if (newRawRowsToScan.length > 0) {
+    syncResult = autoDetectAndSyncNewParameters(newRawRowsToScan, colIndicesForSync);
+  }
+  
   const logSheet = initLogSheet(ss);
   if (logs.length > 0) {
     const startLogRow = logSheet.getLastRow() + 1;
     logSheet.getRange(startLogRow, 2, logs.length, 1).setNumberFormat('@');
+  
     const safeLogs = logs.map(row => {
       const copy = [...row];
       copy[1] = "'" + copy[1].replace(/^'+/, '');
       return copy;
     });
+  
     logSheet.getRange(startLogRow, 1, safeLogs.length, safeLogs[0].length).setValues(safeLogs);
     logSheet.getRange(startLogRow, 1, safeLogs.length, 1).setHorizontalAlignment('center');
     logSheet.getRange(startLogRow, 2, safeLogs.length, 1).setHorizontalAlignment('center');
     logSheet.getRange(startLogRow, 4, safeLogs.length, 1).setHorizontalAlignment('center');
     logSheet.getRange(startLogRow, 6, safeLogs.length, 1).setHorizontalAlignment('center');
+  
     logSheet.autoResizeColumns(1, 8);
     for (let c = 1; c <= 8; c++) {
       if (logSheet.getColumnWidth(c) > 300) logSheet.setColumnWidth(c, 300);
     }
   }
-
+  
   return {
     success: true,
     updatedCustCount: updatedCustCount,
@@ -309,117 +308,7 @@ function processDataUpdate(sourceRawData, headerRowIndex) {
     insertedCount: insertedCount,
     totalValidSourceRows: sourceDataRows.length,
     newParamsCount: syncResult.newParamsCount,
-    syncDetails: syncResult.details,
-    newStaffList: syncResult.newStaffList || []
-  };
-}
-
-/**
- * HÀM NỘI BỘ: ĐỒNG BỘ CHÍNH XÁC VÀO THAM SỐ CÀI ĐẶT
- */
-function executeSyncStaffAndStores(paramItems) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const tsSheet = ss.getSheetByName('thamso_caidat');
-  if (!tsSheet || !Array.isArray(paramItems) || paramItems.length === 0) {
-    return { newParamsCount: 0, details: '', newStaffList: [] };
-  }
-
-  const maxRows = tsSheet.getMaxRows();
-
-  // 1. Quét Cột L (Cột 12: Mã NV) từ dòng 4
-  const staffColVals = tsSheet.getRange(4, 12, Math.max(maxRows - 3, 1), 1).getValues();
-  const existingStaffCodes = new Set();
-  let maxStaffRow = 3;
-  for (let i = 0; i < staffColVals.length; i++) {
-    const val = String(staffColVals[i][0] || '').replace(/^'+/, '').trim();
-    if (val) {
-      existingStaffCodes.add(normalizeHeader(val));
-      maxStaffRow = 4 + i;
-    }
-  }
-
-  // 2. Quét Cột F (Cột 6: Tên CH) từ dòng 4
-  const storeColVals = tsSheet.getRange(4, 6, Math.max(maxRows - 3, 1), 1).getValues();
-  const existingStoreNames = new Set();
-  let maxStoreRow = 3;
-  for (let i = 0; i < storeColVals.length; i++) {
-    const val = String(storeColVals[i][0] || '').trim();
-    if (val) {
-      existingStoreNames.add(normalizeHeader(val));
-      maxStoreRow = 4 + i;
-    }
-  }
-
-  const newStaffToAppend = [];
-  const newStoresToAppend = [];
-  const addedStaffKeys = new Set();
-  const addedStoreKeys = new Set();
-  const newStaffDetails = [];
-
-  paramItems.forEach(item => {
-    const maNV = item.maNV;
-    const tenNV = item.tenNV;
-    const maCH = item.maCH;
-    const tenCH = item.tenCH;
-
-    // Kiểm tra Mã NV mới
-    if (maNV) {
-      const normMaNV = normalizeHeader(maNV);
-      if (!existingStaffCodes.has(normMaNV) && !addedStaffKeys.has(normMaNV)) {
-        addedStaffKeys.add(normMaNV);
-        // Cột J: Khu vực, Cột K: Mã Cửa hàng, Cột L: Mã NV, Cột M: Tên NV
-        newStaffToAppend.push(['[Chưa phân bổ KV]', "'" + (maCH || ''), "'" + maNV, tenNV || 'Chưa rõ']);
-        newStaffDetails.push({ maNV: maNV, tenNV: tenNV, tenCH: tenCH, maKH: item.maKH, tenTB: item.tenTB });
-      }
-    }
-
-    // Kiểm tra Cửa hàng mới
-    if (tenCH) {
-      const normTenCH = normalizeHeader(tenCH);
-      if (!existingStoreNames.has(normTenCH) && !addedStoreKeys.has(normTenCH)) {
-        addedStoreKeys.add(normTenCH);
-        newStoresToAppend.push([tenCH, tenCH]);
-      }
-    }
-  });
-
-  let totalNew = 0;
-  const alertDetails = [];
-
-  // Ghi thêm Nhân viên mới vào Bảng 4 (Cột J:M)
-  if (newStaffToAppend.length > 0) {
-    const insertRow = maxStaffRow + 1;
-    if (insertRow + newStaffToAppend.length > tsSheet.getMaxRows()) {
-      tsSheet.insertRowsAfter(tsSheet.getMaxRows(), newStaffToAppend.length + 10);
-    }
-
-    const targetStaffRange = tsSheet.getRange(insertRow, 10, newStaffToAppend.length, 4);
-    targetStaffRange.setValues(newStaffToAppend);
-    tsSheet.getRange(insertRow, 11, newStaffToAppend.length, 2).setNumberFormat('@');
-    tsSheet.getRange(insertRow, 10, newStaffToAppend.length, 1)
-      .setBackground('#FCE8E6')
-      .setFontColor('#C5221F')
-      .setFontWeight('bold');
-
-    totalNew += newStaffToAppend.length;
-    alertDetails.push(`${newStaffToAppend.length} Nhân viên mới`);
-  }
-
-  // Ghi thêm Cửa hàng mới vào Bảng 3 (Cột F:G)
-  if (newStoresToAppend.length > 0) {
-    const insertStoreRow = maxStoreRow + 1;
-    if (insertStoreRow + newStoresToAppend.length > tsSheet.getMaxRows()) {
-      tsSheet.insertRowsAfter(tsSheet.getMaxRows(), newStoresToAppend.length + 5);
-    }
-    tsSheet.getRange(insertStoreRow, 6, newStoresToAppend.length, 2).setValues(newStoresToAppend);
-    totalNew += newStoresToAppend.length;
-    alertDetails.push(`${newStoresToAppend.length} Cửa hàng mới`);
-  }
-
-  return {
-    newParamsCount: totalNew,
-    details: alertDetails.join(', '),
-    newStaffList: newStaffDetails
+    syncDetails: syncResult.details
   };
 }
 
@@ -429,6 +318,7 @@ function initLogSheet(ss) {
     'Thời gian xử lý', 'MÃ KHÁCH HÀNG', 'TÊN THUÊ BAO', 'Thao tác',
     'Trường dữ liệu (Cột)', 'Tọa độ ô (Row, Column)', 'Before (Giá trị cũ)', 'After (Giá trị mới)'
   ];
+  
   if (!logSheet) {
     logSheet = ss.insertSheet(CONFIG.LOG_SHEET_NAME);
     logSheet.getRange(1, 1, 1, expectedHeaders.length).setValues([expectedHeaders])
@@ -436,4 +326,129 @@ function initLogSheet(ss) {
     logSheet.setFrozenRows(1);
   }
   return logSheet;
+}
+
+/**
+ * HÀM TỰ ĐỘNG BẮT PHÁT SINH THAM SỐ MỚI (Đã sửa lỗi ghi đè cột G)
+ */
+function autoDetectAndSyncNewParameters(newRowsToScan, colIndices) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tsSheet = ss.getSheetByName('thamso_caidat');
+  if (!tsSheet || !newRowsToScan || newRowsToScan.length === 0) return { newParamsCount: 0, details: '' };
+  
+  const lastRow = Math.max(tsSheet.getLastRow(), 4);
+  const tsData = tsSheet.getRange(4, 1, lastRow - 3, 13).getValues();
+  
+  const existingCustTypes = new Set();
+  const existingModels    = new Set();
+  const existingStores    = new Set();
+  const existingStaff     = new Set();
+  
+  for (let i = 0; i < tsData.length; i++) {
+    const r = tsData[i];
+    if (r[0]) existingCustTypes.add(normalizeHeader(r[0])); 
+    if (r[3]) existingModels.add(normalizeHeader(r[3]));    
+    if (r[6]) existingStores.add(normalizeHeader(r[6]));    // Cột G - Cửa hàng
+    if (r[11]) existingStaff.add(normalizeHeader(r[11]));   
+  }
+  
+  const toAddCust = new Map();
+  const toAddModel = new Map();
+  const toAddStore = new Map();
+  const toAddStaff = new Map();
+  
+  for (let i = 0; i < newRowsToScan.length; i++) {
+    const row = newRowsToScan[i];
+  
+    if (colIndices.idxLoaiKH !== -1 && row[colIndices.idxLoaiKH]) {
+      const val = String(row[colIndices.idxLoaiKH]).trim();
+      const norm = normalizeHeader(val);
+      if (val && !existingCustTypes.has(norm) && !toAddCust.has(norm)) {
+        toAddCust.set(norm, [val, suggestShortCustType(val)]);
+      }
+    }
+  
+    if (colIndices.idxMoHinh !== -1 && row[colIndices.idxMoHinh]) {
+      const val = String(row[colIndices.idxMoHinh]).trim();
+      const norm = normalizeHeader(val);
+      if (val && !existingModels.has(norm) && !toAddModel.has(norm)) {
+        toAddModel.set(norm, [val, suggestShortModel(val)]);
+      }
+    }
+  
+    if (colIndices.idxTenCH !== -1 && row[colIndices.idxTenCH]) {
+      const val = String(row[colIndices.idxTenCH]).trim();
+      const norm = normalizeHeader(val);
+      if (val && !existingStores.has(norm) && !toAddStore.has(norm)) {
+        toAddStore.set(norm, [val, suggestShortStore(val)]);
+      }
+    }
+  
+    if (colIndices.idxMaNV !== -1 && row[colIndices.idxMaNV]) {
+      const maNV = String(row[colIndices.idxMaNV]).trim();
+      const norm = normalizeHeader(maNV);
+      if (maNV && !existingStaff.has(norm) && !toAddStaff.has(norm)) {
+        const maCH = colIndices.idxMaCH !== -1 ? String(row[colIndices.idxMaCH] || '').trim() : '';
+        const tenNV = colIndices.idxTenNV !== -1 ? String(row[colIndices.idxTenNV] || '').trim() : '';
+        toAddStaff.set(norm, {
+          khuVuc: '[Chưa phân bổ KV]',
+          maCH: maCH,
+          maNV: maNV,
+          tenNV: tenNV
+        });
+      }
+    }
+  }
+  
+  let totalNew = 0;
+  const detailList = [];
+  
+  if (toAddCust.size > 0) {
+    const rows = Array.from(toAddCust.values());
+    const nextRow = getNextEmptyRowInCol(tsSheet, 1);
+    tsSheet.getRange(nextRow, 1, rows.length, 2).setValues(rows);
+    totalNew += toAddCust.size;
+    detailList.push(`${toAddCust.size} Loại KH mới`);
+  }
+  
+  if (toAddModel.size > 0) {
+    const rows = Array.from(toAddModel.values());
+    const nextRow = getNextEmptyRowInCol(tsSheet, 4);
+    tsSheet.getRange(nextRow, 4, rows.length, 2).setValues(rows);
+    totalNew += toAddModel.size;
+    detailList.push(`${toAddModel.size} Mô hình mới`);
+  }
+  
+  // FIX: Ghi Cửa hàng mới vào chính xác Cột G (Cột số 7)
+  if (toAddStore.size > 0) {
+    const rows = Array.from(toAddStore.values());
+    const nextRow = getNextEmptyRowInCol(tsSheet, 7); 
+    tsSheet.getRange(nextRow, 7, rows.length, 2).setValues(rows);
+    totalNew += toAddStore.size;
+    detailList.push(`${toAddStore.size} Cửa hàng mới`);
+  }
+  
+  if (toAddStaff.size > 0) {
+    const staffArr = Array.from(toAddStaff.values());
+    const rows = staffArr.map(s => [s.khuVuc, "'" + s.maCH, "'" + s.maNV, '  ' + s.tenNV]);
+    const nextRow = getNextEmptyRowInCol(tsSheet, 10);
+    const range = tsSheet.getRange(nextRow, 10, rows.length, 4);
+    range.setValues(rows);
+  
+    tsSheet.getRange(nextRow, 10, rows.length, 1)
+      .setBackground('#FEF7E0')
+      .setFontColor('#B06000')
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center');
+    tsSheet.getRange(nextRow, 11, rows.length, 2).setNumberFormat('@').setHorizontalAlignment('center');
+    tsSheet.getRange(nextRow, 13, rows.length, 1).setHorizontalAlignment('left');
+  
+    totalNew += toAddStaff.size;
+    detailList.push(`${toAddStaff.size} Nhân sự mới [Chưa phân bổ]`);
+  }
+  
+  return {
+    newParamsCount: totalNew,
+    details: detailList.join(', ')
+  };
 }
