@@ -1,10 +1,9 @@
 /**
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
- * FILE        : WebApp_API.gs
- * PHIÊN BẢN   : 10.0 (Chuẩn hóa Date Precision - Khớp chính xác 100% với Sheet DTPB)
- * NGÀY CẬP NHẬT: 27/10/2026
- * TÁC GIẢ     : Trịnh Vũ Thế Vinh & AI Assistant
+ * FILE         : WebApp_API.gs
+ * PHIÊN BẢN    : 10.0 (Đồng bộ tuyệt đối 100% Logic Core với Mod_DoanhThuPhanBo)
+ * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
 
@@ -16,13 +15,6 @@ const STANDARD_REGIONS = [
   'KV Phan Thiết',
   'KV Hàm Tân'
 ];
-
-function safeParseCurrency(val) {
-  if (typeof val === 'number') return Math.round(val);
-  if (!val) return 0;
-  const clean = String(val).replace(/[^0-9]/g, '');
-  return parseInt(clean, 10) || 0;
-}
 
 function doGet(e) {
   return HtmlService.createTemplateFromFile('Dashboard')
@@ -89,9 +81,9 @@ function getDateRangeByPeriod(periodType, selectedYear, selectedMonth) {
 }
 
 /**
- * HÀM TÍNH TOÁN DTPK LÕI - KHỚP 100% TỪNG XU VỚI MOD_DOANHTHUPHANBO
+ * HÀM TÍNH TOÁN DTPK LÕI - SỬ DỤNG CHUNG HÀM PARSE VỚI MOD_DOANHTHUPHANBO
  */
-function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, endDate) {
+function calculateDtpkForDateRange(rawData, indices, mapping, startDate, endDate) {
   let grandTotalOldTB = 0;
   let grandTotalOldDtpk = 0;
   let grandTotalNewTB = 0;
@@ -110,19 +102,15 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, 
   });
 
   const ptmPackageMap = new Map();
-
-  // Chuẩn hóa mốc thời gian về đầu ngày và cuối ngày chính xác
   const startTime = startDate.getTime();
   const endTime = endDate.getTime();
 
   for (let i = 0; i < rawData.length; i++) {
     const row = rawData[i];
 
-    // 1. Loại trừ thuê bao nghiệp vụ
     const loaiKH = normalizeHeader(String(row[indices.idxLoaiKH] || ''));
     if (loaiKH === 'thuê bao nghiệp vụ' || loaiKH === 'thue bao nghiep vu') continue;
 
-    // 2. Kiểm tra tình trạng hợp đồng hủy/chấm dứt
     const tinhTrangHD = normalizeHeader(String(row[indices.idxTinhTrangHD] || ''));
     const isCancelled = tinhTrangHD.includes('hủy') || tinhTrangHD.includes('huy') ||
                         tinhTrangHD.includes('thanh lý') || tinhTrangHD.includes('thanh ly') ||
@@ -134,8 +122,9 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, 
 
     const chuKyRaw = row[indices.idxChuKy];
     const chuKy = chuKyRaw ? parseInt(chuKyRaw, 10) : 0;
-    const giaCuoc = safeParseCurrency(row[indices.idxGiaCuoc]);
-    const dtpk = safeParseCurrency(row[indices.idxDtpk]) || (chuKy > 0 ? Math.round(giaCuoc / chuKy) : 0);
+    // Dùng chuẩn hàm parseCurrencyToInteger thay vì safeParseCurrency
+    const giaCuoc = parseCurrencyToInteger(row[indices.idxGiaCuoc]) || 0;
+    const dtpk = parseCurrencyToInteger(row[indices.idxDtpk]) || (chuKy > 0 ? Math.round(giaCuoc / chuKy) : 0);
 
     const dDauNoi = parseToDate(row[indices.idxNgayDauNoi]);
     const dThiCong = parseToDate(row[indices.idxNgayThiCong]);
@@ -144,18 +133,17 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, 
     const nhuCau = normalizeHeader(String(row[indices.idxNhuCau] || ''));
     const chanCat = normalizeHeader(String(row[indices.idxChanCat] || ''));
 
-    const isDebt = chanCat.includes('1c') || chanCat.includes('nợ cước') || chanCat.includes('no cuoc') || chanCat.includes('khóa cước');
+    // Đồng bộ định nghĩa Nợ Cước 100%
+    const isDebt = chanCat.includes('1c') || chanCat.includes('nợ cước') || chanCat.includes('no cuoc');
     const isKhyc = chanCat.includes('khyc') || chanCat.includes('yêu cầu') || chanCat.includes('yeu cau');
 
     if (isDebt && (!dKetThuc || dKetThuc.getTime() < startTime)) subDebt++;
     if (isKhyc) subKhyc++;
 
-    // 3. Logic chặn cắt theo thời điểm
     if (isDebt && dKetThuc && dKetThuc.getTime() < startTime) {
       continue;
     }
 
-    // 4. Kiểm tra thuê bao PTM mới trong kỳ (Chuẩn xác theo Mod_DoanhThuPhanBo)
     let isPtmInPeriod = false;
     if (nhuCau === 'đăng ký mới' || nhuCau === 'dang ky moi') {
       let ptmDate = null;
@@ -174,7 +162,6 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, 
       }
     }
 
-    // 5. Kiểm tra thuê bao hiện hữu trong kỳ
     let isRetainedInPeriod = false;
     if (!isPtmInPeriod) {
       if (chuKy === 1) {
@@ -183,7 +170,6 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, 
           isRetainedInPeriod = true;
         }
       } else {
-        // Gói dài kỳ: Phải có ngày kết thúc và kết thúc từ mốc bắt đầu kỳ trở đi
         if (dKetThuc && dKetThuc.getTime() >= startTime) {
           isRetainedInPeriod = true;
         }
@@ -192,12 +178,16 @@ function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, 
 
     if (!isPtmInPeriod && !isRetainedInPeriod) continue;
 
-    // 6. Ánh xạ Khu vực
-    const rawMaNV = normalizeHeader(String(row[indices.idxMaNV] || ''));
-    let khuVuc = 'TT.KDVT';
-    if (rawMaNV && staffRegionMap.has(rawMaNV)) {
-      khuVuc = staffRegionMap.get(rawMaNV);
+    // Sử dụng chuẩn mapping thay vì tự quét
+    const rawMaNV = String(row[indices.idxMaNV] || '').trim();
+    let khuVuc = 'Chưa phân bổ KV';
+    if (rawMaNV && mapping.staffRegion && mapping.staffRegion.has(normalizeHeader(rawMaNV))) {
+      const staffInfo = mapping.staffRegion.get(normalizeHeader(rawMaNV));
+      if (staffInfo.khuVuc && !staffInfo.khuVuc.includes('Chưa phân bổ')) {
+        khuVuc = staffInfo.khuVuc;
+      }
     }
+    
     let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc)) || 'TT.KDVT';
     const regStat = regionMap.get(matchedRegion);
 
@@ -289,31 +279,20 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
   };
 
   const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
-
-  // Nạp danh mục tham số Khu vực
-  const staffRegionMap = new Map();
-  const thamSoSheet = ss.getSheetByName('thamso_caidat');
-  if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
-    const tsData = thamSoSheet.getRange(4, 10, thamSoSheet.getLastRow() - 3, 4).getValues();
-    tsData.forEach(r => {
-      const kv = String(r[0] || '').trim();
-      const maNV = normalizeHeader(String(r[2] || ''));
-      if (maNV && kv) staffRegionMap.set(maNV, kv);
-    });
-  }
+  const mapping = loadThamSoMapping();
 
   // 1. TÍNH DỮ LIỆU CHO KỲ ĐANG ĐƯỢC CHỌN TRÊN GIAO DIỆN
   const { start: dateStart, end: dateEnd } = getDateRangeByPeriod(periodType, yTarget, mTarget);
-  const currentResult = calculateDtpkForDateRange(rawData, indices, staffRegionMap, dateStart, dateEnd);
+  const currentResult = calculateDtpkForDateRange(rawData, indices, mapping, dateStart, dateEnd);
 
-  // 2. TÍNH TOÀN BỘ 12 THÁNG CHO BIỂU ĐỒ XU HƯỚNG (ĐỒNG NHẤT VỚI KỲ THÁNG)
+  // 2. TÍNH TOÀN BỘ 12 THÁNG CHO BIỂU ĐỒ XU HƯỚNG
   const monthlyTrend = [];
   for (let m = 0; m < 12; m++) {
     const mStart = new Date(yTarget, m, 1, 0, 0, 0);
     const mEnd = new Date(yTarget, m + 1, 0, 23, 59, 59);
 
     if (m <= mTarget) {
-      const mRes = calculateDtpkForDateRange(rawData, indices, staffRegionMap, mStart, mEnd);
+      const mRes = calculateDtpkForDateRange(rawData, indices, mapping, mStart, mEnd);
       monthlyTrend.push({
         monthLabel: 'T' + (m + 1),
         monthIndex: m,
@@ -338,7 +317,6 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     }
   }
 
-  // 3. ĐÓNG GÓI SỐ LIỆU ĐỊA BÀN
   const regionStats = STANDARD_REGIONS.map(regName => {
     const s = currentResult.regionMap.get(regName);
     return {
@@ -352,7 +330,6 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
     };
   });
 
-  // 4. CƠ CẤU GÓI CƯỚC PTM
   const packagePtmDistribution = Array.from(currentResult.ptmPackageMap.entries())
     .map(([pkg, count]) => ({
       package: pkg,
@@ -384,7 +361,7 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
 }
 
 /**
- * 2. API TRA CỨU HỒ SƠ 360° (QUÉT CẢ CỘT USER)
+ * 2. API TRA CỨU HỒ SƠ 360°
  */
 function apiSearchSubscriber(keyword) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -420,18 +397,7 @@ function apiSearchSubscriber(keyword) {
   const idxMaNV = headers.findIndex(h => h === 'mã nhân viên');
 
   const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
-
-  const staffRegionMap = new Map();
-  const thamSoSheet = ss.getSheetByName('thamso_caidat');
-  if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
-    const tsData = thamSoSheet.getRange(4, 10, thamSoSheet.getLastRow() - 3, 4).getValues();
-    tsData.forEach(r => {
-      const kv = String(r[0] || '').trim();
-      const maNV = normalizeHeader(String(r[2] || ''));
-      if (maNV && kv) staffRegionMap.set(maNV, kv);
-    });
-  }
-
+  const mapping = loadThamSoMapping();
   const matched = [];
 
   for (let i = 0; i < rawData.length; i++) {
@@ -450,18 +416,20 @@ function apiSearchSubscriber(keyword) {
     const matchSerial = qClean && serial.includes(qClean);
 
     if (matchMaKH || matchUser || matchSDT || matchSerial) {
-      const giaCuoc = safeParseCurrency(row[idxGiaCuoc]);
+      const giaCuoc = parseCurrencyToInteger(row[idxGiaCuoc]) || 0;
       const chuKy = parseInt(row[idxChuKy], 10) || 1;
-      let dtpk = safeParseCurrency(row[idxDtpk]);
-      if (!dtpk && giaCuoc > 0) dtpk = Math.round(giaCuoc / chuKy);
+      let dtpk = parseCurrencyToInteger(row[idxDtpk]) || (chuKy > 0 ? Math.round(giaCuoc / chuKy) : 0);
 
       const dBatDau = parseToDate(row[idxNgayBatDau]);
       const dKetThuc = parseToDate(row[idxNgayKetThuc]);
 
-      const maNV = normalizeHeader(String(row[idxMaNV] || ''));
+      const rawMaNV = String(row[idxMaNV] || '').trim();
       let khuVuc = 'TT.KDVT';
-      if (maNV && staffRegionMap.has(maNV)) {
-        khuVuc = staffRegionMap.get(maNV);
+      if (rawMaNV && mapping.staffRegion && mapping.staffRegion.has(normalizeHeader(rawMaNV))) {
+        const staffInfo = mapping.staffRegion.get(normalizeHeader(rawMaNV));
+        if (staffInfo.khuVuc && !staffInfo.khuVuc.includes('Chưa phân bổ')) {
+          khuVuc = staffInfo.khuVuc;
+        }
       }
 
       matched.push({
