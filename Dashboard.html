@@ -5,397 +5,500 @@
   <title>MobiFiber Executive Dashboard</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Bổ sung thư viện chụp ảnh màn hình xuất báo cáo -->
+  <!-- Thư viện chụp ảnh full content -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   
   <style>
-    :root { --mf-blue: #1b365d; --mf-light-blue: #e8f0fe; --mf-accent: #2563eb; --mf-green: #059669; --mf-red: #dc2626; --mf-orange: #d97706; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; color: #1e293b; padding-bottom: 30px; }
-    .header-bar { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 12px 24px; position: sticky; top: 0; z-index: 50; display: flex; justify-content: space-between; align-items: center; }
-    .brand-logo { background: #2563eb; color: #fff; font-weight: bold; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; margin-right: 12px; }
-    .filter-bar { background: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
-    .filter-group { display: flex; align-items: center; gap: 4px; }
-    .filter-item { padding: 6px 12px; cursor: pointer; color: #64748b; border-radius: 20px; transition: 0.2s; white-space: nowrap; }
-    .filter-item:hover { background: #f1f5f9; color: #0f172a; }
-    .filter-item.active { background: #e0e7ff; color: #4338ca; font-weight: 600; }
-    .custom-select { border: 1px solid #cbd5e1; padding: 4px 8px; border-radius: 6px; outline: none; font-size: 13px; color: #334155; }
-    .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    /* BỘ NHẬN DIỆN THƯƠNG HIỆU MOBIFONE */
+    :root { 
+      --mf-blue: #005AAB; 
+      --mf-red: #ED1C24; 
+      --mf-bg: #F4F6F9;
+      --mf-text: #202124;
+      --sidebar-width: 260px;
+    }
     
-    .nav-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; border: none; outline: none; }
-    .nav-btn.active { background: #2563eb; color: #fff; }
-    .nav-btn.inactive { background: #f1f5f9; color: #475569; }
-    .nav-btn.inactive:hover { background: #e2e8f0; }
-    .nav-btn.action-btn { background: #059669; color: #fff; }
-    .nav-btn.action-btn:hover { background: #047857; }
+    body { 
+      font-family: 'UTM Mobifone KT', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+      background-color: var(--mf-bg); 
+      color: var(--mf-text); 
+      margin: 0; 
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
     
-    /* Layout Thẻ KPI Dashboard Thuê bao - 4 Thẻ */
-    .sub-kpi-grid { display: grid; grid-template-columns: 2.5fr 2.5fr 1fr 1fr 1fr 1.5fr; gap: 12px; margin-bottom: 16px; }
-    .sub-kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; position: relative; display: flex; flex-direction: column; justify-content: space-between; }
+    /* LEFT SIDEBAR NAVIGATION */
+    .sidebar {
+      width: var(--sidebar-width);
+      background-color: #ffffff;
+      border-right: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.04);
+      z-index: 100;
+    }
     
-    .kpi-tong { background: #1e3a8a; color: white; border: none; }
-    .kpi-hienhuu { background: #2563eb; color: white; border: none; }
-    .kpi-ptm { background: #059669; color: white; border: none; }
+    .brand-logo-container {
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      border-bottom: 1px solid #f1f5f9;
+    }
     
-    .sub-kpi-value { font-size: 30px; font-weight: bold; margin: 4px 0; letter-spacing: -0.5px; }
-    .sub-kpi-label { font-size: 12px; text-transform: uppercase; font-weight: bold; opacity: 0.9; }
+    .brand-logo-container img {
+      width: 180px;
+      height: auto;
+      margin-bottom: 12px;
+    }
     
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--mf-blue);
+      text-align: center;
+      line-height: 1.3;
+    }
+    
+    .nav-menu {
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .nav-item {
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.2s ease;
+    }
+    
+    .nav-item:hover {
+      background-color: #f8fafc;
+      color: var(--mf-blue);
+    }
+    
+    .nav-item.active {
+      background-color: rgba(0, 90, 171, 0.1);
+      color: var(--mf-blue);
+      border-left: 4px solid var(--mf-blue);
+    }
+    
+    /* MAIN CONTENT AREA */
+    .main-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* STICKY FILTER BAR */
+    .filter-bar { 
+      background: #fff; 
+      padding: 16px 32px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between;
+      border-bottom: 1px solid #e2e8f0; 
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      position: sticky; 
+      top: 0; 
+      z-index: 50; 
+    }
+    
+    .filter-group { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+    .filter-label { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 12px; }
+    
+    .custom-select { 
+      border: 1px solid #cbd5e1; 
+      padding: 8px 12px; 
+      border-radius: 8px; 
+      outline: none; 
+      font-size: 13px; 
+      color: var(--mf-blue);
+      font-weight: 600;
+      background-color: #f8fafc;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .custom-select:hover { border-color: var(--mf-blue); }
+    
+    .action-btn { 
+      background: var(--mf-red); 
+      color: #fff; 
+      padding: 10px 20px; 
+      border-radius: 8px; 
+      font-size: 13px; 
+      font-weight: bold; 
+      cursor: pointer; 
+      border: none;
+      box-shadow: 0 4px 6px -1px rgba(237, 28, 36, 0.2);
+      transition: 0.2s;
+    }
+    .action-btn:hover { background: #d91620; transform: translateY(-1px); }
+    
+    /* SCROLLABLE DASHBOARD CONTENT */
+    .dashboard-scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px;
+    }
+    
+    /* DASHBOARD CARD & GRID */
+    .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; }
+    
+    .sub-kpi-grid { display: grid; grid-template-columns: 2.5fr 2.5fr 1fr 1fr 1fr 1.5fr; gap: 16px; margin-bottom: 24px; }
+    .sub-kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; position: relative; display: flex; flex-direction: column; justify-content: space-between; }
+    
+    .kpi-tong { background: var(--mf-blue); color: white; border: none; }
+    .kpi-hienhuu { background: #0284c7; color: white; border: none; }
+    .kpi-ptm { background: #10b981; color: white; border: none; }
+    
+    .sub-kpi-value { font-size: 32px; font-weight: bold; margin: 4px 0; letter-spacing: -0.5px; }
+    .sub-kpi-label { font-size: 13px; text-transform: uppercase; font-weight: bold; opacity: 0.9; }
     .sub-kpi-value-small { font-size: 26px; font-weight: bold; margin: 4px 0; }
-    .sub-kpi-label-small { font-size: 11px; text-transform: uppercase; font-weight: 700; }
-    .sub-kpi-subtext-small { font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.3; }
+    .sub-kpi-label-small { font-size: 11px; text-transform: uppercase; font-weight: 800; }
+    .sub-kpi-subtext-small { font-size: 12px; color: #64748b; margin-top: 4px; line-height: 1.3; }
     
-    /* Layout Thẻ KPI Dashboard Doanh thu */
     .rev-kpi-grid { display: grid; grid-template-columns: 2fr 1.5fr 1.5fr; gap: 16px; margin-bottom: 24px; }
-    .rev-kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; position: relative; }
-    .rev-kpi-card.main { background: #2563eb; color: white; border: none; }
-    .rev-kpi-value { font-size: 32px; font-weight: bold; margin: 8px 0; letter-spacing: -0.5px; }
-    .rev-kpi-label { font-size: 12px; text-transform: uppercase; font-weight: 600; }
+    .rev-kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; position: relative; }
+    .rev-kpi-card.main { background: var(--mf-blue); color: white; border: none; }
+    .rev-kpi-value { font-size: 36px; font-weight: bold; margin: 8px 0; letter-spacing: -0.5px; }
+    .rev-kpi-label { font-size: 13px; text-transform: uppercase; font-weight: 700; }
     
-    /* Huy hiệu Tăng trưởng MoM */
-    .mom-badge { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-top: 8px; }
-    .mom-up { background: rgba(255,255,255,0.2); color: #fff; }
-    .mom-down { background: rgba(255,255,255,0.2); color: #fee2e2; }
-    .mom-up-light { background: #dcfce7; color: #166534; }
-    .mom-down-light { background: #fee2e2; color: #991b1b; }
-    .mom-flat { background: #f1f5f9; color: #475569; }
+    .chart-container { position: relative; height: 340px; width: 100%; margin-top: 20px; }
+    .chart-container-large { position: relative; height: 320px; width: 100%; margin-top: 20px; }
     
-    .chart-container { position: relative; height: 320px; width: 100%; margin-top: 16px; }
-    .chart-container-large { position: relative; height: 300px; width: 100%; margin-top: 16px; }
-    
-    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
-    .data-table th { text-align: left; padding: 12px 12px; background: #f8fafc; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 11px; border-bottom: 2px solid #e2e8f0; }
-    .data-table td { padding: 12px 12px; border-bottom: 1px solid #e2e8f0; color: #1e293b; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 20px; }
+    .data-table th { text-align: left; padding: 14px 16px; background: #f8fafc; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 11px; border-bottom: 2px solid #e2e8f0; }
+    .data-table td { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #1e293b; }
     .data-table tr:hover { background: #f8fafc; }
     .data-table tr:last-child { font-weight: bold; background: #f8fafc; }
     
-    /* Search Layout */
-    .search-big-input { width: 100%; padding: 16px 24px; font-size: 16px; border: 2px solid #cbd5e1; border-radius: 12px; outline: none; transition: 0.2s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-    .search-big-input:focus { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37,99,235,0.1); }
-    
-    .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; padding: 24px; }
-    .info-group { background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; }
-    .info-item { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
-    .info-label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; }
-    .info-value { font-size: 14px; color: #0f172a; font-weight: 500; }
+    .search-big-input { width: 100%; padding: 18px 24px; font-size: 16px; border: 2px solid #cbd5e1; border-radius: 12px; outline: none; transition: 0.2s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .search-big-input:focus { border-color: var(--mf-blue); box-shadow: 0 0 0 4px rgba(0,90,171,0.1); }
     
     .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
     .badge-green { background: #dcfce7; color: #166534; }
     .badge-red { background: #fee2e2; color: #991b1b; }
     .badge-blue { background: #dbeafe; color: #1e40af; }
-    
-    .pkg-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; }
-    .pkg-bar-bg { height: 6px; background: #e2e8f0; border-radius: 3px; flex-grow: 1; margin: 0 12px; overflow: hidden; }
-    .pkg-bar-fill { height: 100%; background: #059669; border-radius: 3px; }
 
-    #loadingOverlay { position: fixed; inset: 0; background: rgba(255,255,255,0.85); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
-    .spinner-border { width: 40px; height: 40px; border: 3px solid #cbd5e1; border-top-color: #2563eb; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+    #loadingOverlay { position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+    .spinner-border { width: 48px; height: 48px; border: 4px solid #cbd5e1; border-top-color: var(--mf-red); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
-<body id="dashboardBody">
+<body>
 
-  <!-- Header -->
-  <div class="header-bar" data-html2canvas-ignore>
-    <div style="display: flex; align-items: center;">
-      <div class="brand-logo">MF</div>
-      <div>
-        <div style="font-size: 16px; font-weight: bold; color: #0f172a;">MobiFiber Executive Dashboard</div>
-        <div style="font-size: 12px; color: #64748b;">TTKD Viễn thông MobiFone Lâm Đồng</div>
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar" data-html2canvas-ignore>
+    <div class="brand-logo-container">
+      <!-- Logo MobiFiber vừa được tải lên -->
+      <img src="https://drive.google.com/uc?export=view&id=1iROsN5GeodNsRo_KqeSQyDJ4W9v7u8xi" alt="MobiFiber Logo">
+      <div class="brand-title">Executive Dashboard</div>
+    </div>
+    
+    <div class="nav-menu">
+      <div id="btnNavRevenue" class="nav-item active" onclick="switchDashboard('revenue')">
+        <span style="font-size: 18px;">📈</span> Báo cáo Doanh thu
+      </div>
+      <div id="btnNavSub" class="nav-item" onclick="switchDashboard('subscriber')">
+        <span style="font-size: 18px;">👥</span> Báo cáo Thuê bao
+      </div>
+      <div id="btnNavSearch" class="nav-item" onclick="switchDashboard('search')">
+        <span style="font-size: 18px;">🔍</span> Tra cứu 360°
       </div>
     </div>
     
-    <div style="display: flex; gap: 8px; background: #f1f5f9; padding: 6px; border-radius: 12px;">
-      <button id="btnNavSearch" class="nav-btn inactive" onclick="switchDashboard('search')">🔍 Tra cứu 360°</button>
-      <button id="btnNavRevenue" class="nav-btn active" onclick="switchDashboard('revenue')">💰 Dashboard Doanh thu</button>
-      <button id="btnNavSub" class="nav-btn inactive" onclick="switchDashboard('subscriber')">👥 Dashboard Thuê bao</button>
+    <div style="margin-top: auto; padding: 20px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9;">
+      TTKD Viễn thông Lâm Đồng<br>Version 14.0 Enterprise
     </div>
   </div>
 
-  <!-- Filter Bar -->
-  <div class="filter-bar" id="filterBarContainer" data-html2canvas-ignore>
-    <div class="filter-group">
-      <span style="color: #64748b; margin-right: 8px;">Thời gian</span>
-      <div class="filter-item" data-period="month" onclick="selectPeriod('month', this)">Tháng
-        <select id="monthSelect" class="custom-select ml-1" onchange="triggerLoad()" onclick="event.stopPropagation()">
-          <option value="0">1</option><option value="1">2</option><option value="2">3</option>
-          <option value="3">4</option><option value="4">5</option><option value="5">6</option>
-          <option value="6">7</option><option value="7">8</option><option value="8">9</option>
-          <option value="9">10</option><option value="10">11</option><option value="11">12</option>
+  <!-- MAIN CONTENT WRAPPER -->
+  <div class="main-wrapper">
+    
+    <!-- TOP STICKY FILTER BAR -->
+    <div class="filter-bar" id="filterBarContainer" data-html2canvas-ignore>
+      <div class="filter-group">
+        <span class="filter-label">Kỳ báo cáo:</span>
+        <select id="periodTypeSelect" class="custom-select" onchange="handlePeriodTypeChange()">
+          <option value="month">Theo Tháng</option>
+          <option value="quarter">Theo Quý</option>
+          <option value="ytd">Lũy kế Đầu năm</option>
+          <option value="year">Cả năm</option>
+        </select>
+        
+        <select id="periodDetailSelect" class="custom-select" onchange="triggerLoad()"></select>
+        
+        <select id="yearSelect" class="custom-select" onchange="triggerLoad()">
+          <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
         </select>
       </div>
-      <span style="color: #cbd5e1; margin: 0 4px;">|</span>
-      <div class="filter-item" data-period="q1" onclick="selectPeriod('q1', this)">Quý 1</div>
-      <div class="filter-item" data-period="q2" onclick="selectPeriod('q2', this)">Quý 2</div>
-      <div class="filter-item" data-period="q3" onclick="selectPeriod('q3', this)">Quý 3</div>
-      <div class="filter-item" data-period="q4" onclick="selectPeriod('q4', this)">Quý 4</div>
-      <span style="color: #cbd5e1; margin: 0 4px;">|</span>
-      <div class="filter-item" data-period="6tdn" onclick="selectPeriod('6tdn', this)">6T Đầu năm</div>
-      <div class="filter-item" data-period="9tdn" onclick="selectPeriod('9tdn', this)">9T Đầu năm</div>
-      <div class="filter-item active" data-period="year" onclick="selectPeriod('year', this)">Năm
-        <select id="yearSelect" class="custom-select ml-1" onchange="triggerLoad()" onclick="event.stopPropagation()">
-          <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
-        </select>
-      </div>
-    </div>
-    
-    <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
-      <div id="filterStatus" style="font-weight: 600; color: #2563eb; background: #e0e7ff; padding: 6px 12px; border-radius: 20px;"></div>
-      <button onclick="loadData()" class="nav-btn inactive">🔄 Làm mới</button>
-      <button onclick="takeSnapshot()" class="nav-btn action-btn">📸 Xuất Ảnh Báo Cáo</button>
-    </div>
-  </div>
-
-  <div class="max-w-7xl mx-auto px-6 py-6" id="dashboardContent">
-    
-    <!-- TAB: TRA CỨU 360 -->
-    <div id="viewSearch" style="display: none;">
-      <div class="card" style="max-width: 900px; margin: 0 auto; text-align: center;">
-        <h2 style="font-size: 24px; font-weight: bold; color: #0f172a; margin-bottom: 8px;">Tra cứu Hồ sơ Khách hàng (360°)</h2>
-        <p style="color: #64748b; margin-bottom: 24px;">Hỗ trợ tìm kiếm theo Mã KH, Số điện thoại, User PPPoE, hoặc Serial Thiết bị.</p>
-        <input type="text" id="searchInputMain" class="search-big-input" placeholder="Nhập từ khóa tìm kiếm (nhấn Enter để tìm)..." onkeypress="handleSearchMain(event)" data-html2canvas-ignore>
-        <div id="searchCountMain" style="margin-top: 16px; font-weight: 600; color: #2563eb;"></div>
-        <div id="searchResultsMain" style="margin-top: 24px; text-align: left;"></div>
-      </div>
-    </div>
-
-    <!-- TAB: DASHBOARD DOANH THU -->
-    <div id="viewRevenue">
-      <!-- KPI Doanh thu -->
-      <div class="rev-kpi-grid">
-        <div class="rev-kpi-card main">
-          <div class="rev-kpi-label">TỔNG DOANH THU DTPK TOÀN TỈNH</div>
-          <div class="rev-kpi-value" id="kpiTotalDtpk">0 đ</div>
-          <div id="momRevTotal"></div>
-        </div>
-        <div class="rev-kpi-card">
-          <div class="rev-kpi-label" style="color: #64748b;">DOANH THU HIỆN HỮU (DTPK)</div>
-          <div class="rev-kpi-value" id="kpiOldDtpk">0 đ</div>
-          <div class="rev-kpi-subtext" style="color: #64748b;">Duy trì từ các hợp đồng đang hoạt động</div>
-        </div>
-        <div class="rev-kpi-card">
-          <div class="rev-kpi-label" style="color: #059669;">DOANH THU PTM MỚI (DTPK)</div>
-          <div class="rev-kpi-value" style="color: #059669;" id="kpiNewDtpk">0 đ</div>
-          <div id="momRevPtm"></div>
-        </div>
-      </div>
-
-      <!-- Biểu đồ Doanh thu Cơ cấu -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-        <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <h3 style="font-size: 16px; font-weight: bold;">Doanh thu Hiện hữu (DTPK) theo 6 Địa bàn</h3>
-              <p style="font-size: 12px; color: #64748b;">Dòng tiền nền tảng từ khách hàng đang duy trì</p>
-            </div>
-          </div>
-          <div class="chart-container"><canvas id="chartRevOld"></canvas></div>
-        </div>
-        <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <h3 style="font-size: 16px; font-weight: bold;">Doanh thu PTM (DTPK) theo 6 Địa bàn</h3>
-              <p style="font-size: 12px; color: #64748b;">Doanh thu phát sinh mới từ thuê bao PTM kỳ này</p>
-            </div>
-          </div>
-          <div class="chart-container"><canvas id="chartRevNew"></canvas></div>
-        </div>
-      </div>
       
-      <!-- Biểu đồ Trend 12 Tháng -->
-      <div class="card" style="margin-bottom: 24px;">
-        <h3 style="font-size: 16px; font-weight: bold;">Xu hướng Doanh thu Phân kỳ (DTPK) qua 12 Tháng</h3>
-        <p style="font-size: 12px; color: #64748b;">Quỹ đạo tăng trưởng tổng doanh thu</p>
-        <div class="chart-container-large"><canvas id="chartRevTrend"></canvas></div>
-      </div>
-
-      <!-- Bảng Tổng hợp Doanh thu & ARPU -->
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <h3 style="font-size: 15px; font-weight: bold;">Bảng Tổng Hợp Doanh Thu Phân Kỳ & Chỉ số ARPU</h3>
-          <span style="font-size: 12px; color: #64748b; font-style: italic;">*ARPU: Doanh thu bình quân/1 khách hàng</span>
-        </div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 50px;">STT</th>
-              <th>KHU VỰC / CỤM</th>
-              <th style="text-align: right;">DT HIỆN HỮU</th>
-              <th style="text-align: right; color: #059669;">DT PTM MỚI</th>
-              <th style="text-align: right; color: #1e40af;">TỔNG DTPK</th>
-              <th style="text-align: right; color: #d97706;" title="Average Revenue Per User">ARPU (VNĐ/TB)</th>
-              <th style="text-align: right;">TỶ TRỌNG (%)</th>
-            </tr>
-          </thead>
-          <tbody id="tblRevenue"></tbody>
-        </table>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div id="filterStatus" style="font-weight: 700; color: var(--mf-blue); background: #e0e7ff; padding: 8px 16px; border-radius: 20px; font-size: 13px;"></div>
+        <button onclick="takeSnapshot()" class="action-btn">📸 Xuất Ảnh Báo Cáo</button>
       </div>
     </div>
 
-    <!-- TAB: DASHBOARD THUÊ BAO -->
-    <div id="viewSubscriber" style="display: none;">
+    <!-- SCROLLABLE DASHBOARD AREA -->
+    <div class="dashboard-scroll-area" id="dashboardContent">
       
-      <!-- HÀNG 1: HOẠT ĐỘNG & CHẶN CẮT LIÊN HOÀN (6 Thẻ) -->
-      <div class="sub-kpi-grid">
-        <div class="sub-kpi-card kpi-tong">
-          <div><div class="sub-kpi-label">TỔNG TB ĐANG HĐ</div><div class="sub-kpi-value" id="kpiTotalSub">0</div></div>
-          <div id="momSubTotal"></div>
-        </div>
-        <div class="sub-kpi-card kpi-hienhuu">
-          <div><div class="sub-kpi-label">TB HIỆN HỮU</div><div class="sub-kpi-value" id="kpiOldSub">0</div></div>
-          <div class="sub-kpi-subtext" style="border: none; padding: 0;">Khách hàng duy trì ổn định</div>
-        </div>
-        <div class="sub-kpi-card kpi-ptm">
-          <div><div class="sub-kpi-label">TB PTM MỚI</div><div class="sub-kpi-value" id="kpiNewSub">0</div></div>
-          <div id="momSubPtm"></div>
-        </div>
-        <div class="sub-kpi-card" style="border-top: 4px solid #d97706;">
-          <div><div class="sub-kpi-label-small" style="color: #d97706;">TƯ VẤN GIA HẠN</div><div class="sub-kpi-value-small" style="color: #d97706;" id="kpiNeedRenew">0</div></div>
-          <div class="sub-kpi-subtext-small">Hết hạn gói Dài kỳ</div>
-        </div>
-        <div class="sub-kpi-card" style="border-top: 4px solid #dc2626;">
-          <div><div class="sub-kpi-label-small" style="color: #dc2626;">THU HỒI NỢ CƯỚC</div><div class="sub-kpi-value-small" style="color: #dc2626;" id="kpiRealDebt">0</div></div>
-          <div class="sub-kpi-subtext-small">Nợ gói Đơn kỳ</div>
-        </div>
-        <!-- Thẻ Cảnh báo ONT (Thay cho KHYC - Gộp KHYC xuống góc dưới) -->
-        <div class="sub-kpi-card" style="border-top: 4px solid #475569; background: #f8fafc;">
-          <div><div class="sub-kpi-label-small" style="color: #475569;">CẢNH BÁO THU HỒI</div><div class="sub-kpi-value-small" style="color: #334155;" id="kpiUnt">0</div></div>
-          <div class="sub-kpi-subtext-small">TB đã Hủy chưa thu ONT</div>
+      <!-- TAB: TRA CỨU 360 -->
+      <div id="viewSearch" style="display: none;">
+        <div class="card" style="max-width: 900px; margin: 0 auto; text-align: center;">
+          <h2 style="font-size: 26px; font-weight: bold; color: var(--mf-blue); margin-bottom: 8px;">Tra cứu Hồ sơ Khách hàng (360°)</h2>
+          <p style="color: #64748b; margin-bottom: 32px;">Hỗ trợ tìm kiếm theo Mã KH, Số điện thoại, User PPPoE, hoặc Serial Thiết bị.</p>
+          <input type="text" id="searchInputMain" class="search-big-input" placeholder="Nhập từ khóa tìm kiếm (nhấn Enter để tìm)..." onkeypress="handleSearchMain(event)" data-html2canvas-ignore>
+          <div id="searchCountMain" style="margin-top: 16px; font-weight: 600; color: var(--mf-red);"></div>
+          <div id="searchResultsMain" style="margin-top: 32px; text-align: left;"></div>
         </div>
       </div>
 
-      <!-- Biểu đồ Quy mô & Chiến dịch PTM -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-        <div class="card">
-          <h3 style="font-size: 16px; font-weight: bold;">Quy mô Thuê bao Hiện hữu theo 6 Địa bàn</h3>
-          <p style="font-size: 12px; color: #64748b;">Số lượng khách hàng đang duy trì hợp đồng</p>
-          <div class="chart-container"><canvas id="chartSubOld"></canvas></div>
-        </div>
-        <div class="card">
-          <h3 style="font-size: 16px; font-weight: bold;">Chiến dịch Thuê bao PTM theo 6 Địa bàn</h3>
-          <p style="font-size: 12px; color: #64748b;">Đánh giá năng lực phát triển mới độc lập</p>
-          <div class="chart-container"><canvas id="chartSubNew"></canvas></div>
-        </div>
-      </div>
-
-      <!-- Biểu đồ Trend KÉP (Tổng TB & PTM) -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-        <div class="card">
-          <h3 style="font-size: 16px; font-weight: bold;">Tăng trưởng Tổng Thuê bao qua 12 Tháng</h3>
-          <p style="font-size: 12px; color: #64748b;">Quy mô tổng hợp mạng lưới (Hiện hữu + PTM)</p>
-          <div class="chart-container-large"><canvas id="chartSubTrend"></canvas></div>
-        </div>
-        <div class="card">
-          <h3 style="font-size: 16px; font-weight: bold;">Xu hướng Thuê bao PTM Mới qua 12 Tháng</h3>
-          <p style="font-size: 12px; color: #64748b;">Năng lực phát triển mới theo từng tháng</p>
-          <div class="chart-container-large"><canvas id="chartPtmSubTrend"></canvas></div>
-        </div>
-      </div>
-
-      <!-- Cấu trúc Phân khúc KH & Bảng biểu -->
-      <div style="display: grid; grid-template-columns: 3fr 3.5fr 3.5fr; gap: 24px;">
-        <!-- Cơ cấu Gói cước PTM -->
-        <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <div>
-              <h3 style="font-size: 15px; font-weight: bold;">Cơ cấu Gói PTM</h3>
-              <p style="font-size: 11px; color: #64748b;">Tỷ trọng gói cước bán ra</p>
-            </div>
-            <span class="badge badge-green" id="lblTotalPkgPtm">0 PTM</span>
+      <!-- TAB: DASHBOARD DOANH THU -->
+      <div id="viewRevenue">
+        <!-- KPI Doanh thu -->
+        <div class="rev-kpi-grid">
+          <div class="rev-kpi-card main">
+            <div class="rev-kpi-label">TỔNG DOANH THU DTPK TOÀN TỈNH</div>
+            <div class="rev-kpi-value" id="kpiTotalDtpk">0 đ</div>
+            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 12px; font-weight: 500;">Dòng tiền Thực tế Ghi nhận trong kỳ</div>
           </div>
-          <div id="pkgList" style="max-height: 250px; overflow-y: auto; padding-right: 8px;"></div>
+          <div class="rev-kpi-card">
+            <div class="rev-kpi-label" style="color: #64748b;">DOANH THU HIỆN HỮU (DTPK)</div>
+            <div class="rev-kpi-value" id="kpiOldDtpk" style="color: var(--mf-blue);">0 đ</div>
+            <div class="rev-kpi-subtext">Duy trì từ các hợp đồng đang hoạt động</div>
+          </div>
+          <div class="rev-kpi-card">
+            <div class="rev-kpi-label" style="color: #059669;">DOANH THU PTM MỚI (DTPK)</div>
+            <div class="rev-kpi-value" style="color: #059669;" id="kpiNewDtpk">0 đ</div>
+            <div class="rev-kpi-subtext">Đóng góp phát sinh mới trong kỳ</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+          <div class="card">
+            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue);">Doanh thu Hiện hữu (DTPK) theo 6 Địa bàn</h3>
+            <p style="font-size: 12px; color: #64748b;">Dòng tiền nền tảng từ khách hàng đang duy trì</p>
+            <div class="chart-container"><canvas id="chartRevOld"></canvas></div>
+          </div>
+          <div class="card">
+            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-red);">Doanh thu PTM (DTPK) theo 6 Địa bàn</h3>
+            <p style="font-size: 12px; color: #64748b;">Doanh thu phát sinh mới từ thuê bao PTM kỳ này</p>
+            <div class="chart-container"><canvas id="chartRevNew"></canvas></div>
+          </div>
         </div>
         
-        <!-- Cơ cấu Phân khúc Khách hàng -->
-        <div class="card" style="text-align: center;">
-          <h3 style="font-size: 15px; font-weight: bold;">Cơ cấu Phân khúc Khách hàng</h3>
-          <p style="font-size: 11px; color: #64748b; margin-bottom: 12px;">(Tính trên Tổng TB Hoạt động)</p>
-          <div style="position: relative; height: 230px; width: 100%;"><canvas id="chartSegments"></canvas></div>
-          <div style="display: flex; justify-content: space-around; margin-top: 12px; font-size: 11px; font-weight: bold;">
-            <div style="color: #3b82f6;">Cá nhân/Hộ GĐ</div>
-            <div style="color: #f59e0b;">Doanh nghiệp</div>
-            <div style="color: #10b981;">Cơ quan/HCSN</div>
+        <div class="card" style="margin-bottom: 24px;">
+          <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue);">Xu hướng Tổng Doanh thu qua 12 Tháng</h3>
+          <p style="font-size: 12px; color: #64748b;">Quỹ đạo tăng trưởng dòng tiền</p>
+          <div class="chart-container-large"><canvas id="chartRevTrend"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue);">Bảng Tổng Hợp Doanh Thu Phân Kỳ & Chỉ số ARPU</h3>
+            <span style="font-size: 12px; color: #64748b; font-style: italic;">*ARPU: Doanh thu bình quân / 1 Khách hàng</span>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">STT</th>
+                <th>KHU VỰC / CỤM</th>
+                <th style="text-align: right;">DT HIỆN HỮU</th>
+                <th style="text-align: right; color: #059669;">DT PTM MỚI</th>
+                <th style="text-align: right; color: var(--mf-blue);">TỔNG DTPK</th>
+                <th style="text-align: right; color: var(--mf-red);">ARPU (VNĐ/TB)</th>
+                <th style="text-align: right;">TỶ TRỌNG (%)</th>
+              </tr>
+            </thead>
+            <tbody id="tblRevenue"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB: DASHBOARD THUÊ BAO -->
+      <div id="viewSubscriber" style="display: none;">
+        
+        <div class="sub-kpi-grid">
+          <div class="sub-kpi-card kpi-tong">
+            <div><div class="sub-kpi-label">TỔNG TB ĐANG HĐ</div><div class="sub-kpi-value" id="kpiTotalSub">0</div></div>
+            <div class="sub-kpi-subtext" style="border: none;">Lát cắt quy mô tổng hợp mạng lưới</div>
+          </div>
+          <div class="sub-kpi-card kpi-hienhuu">
+            <div><div class="sub-kpi-label">TB HIỆN HỮU</div><div class="sub-kpi-value" id="kpiOldSub">0</div></div>
+            <div class="sub-kpi-subtext" style="border: none;">Duy trì ổn định</div>
+          </div>
+          <div class="sub-kpi-card kpi-ptm">
+            <div><div class="sub-kpi-label">TB PTM MỚI</div><div class="sub-kpi-value" id="kpiNewSub">0</div></div>
+            <div class="sub-kpi-subtext" style="border: none;">Phát triển mới</div>
+          </div>
+          <div class="sub-kpi-card" style="border-top: 5px solid #d97706;">
+            <div><div class="sub-kpi-label-small" style="color: #d97706;">TƯ VẤN GIA HẠN</div><div class="sub-kpi-value-small" style="color: #d97706;" id="kpiNeedRenew">0</div></div>
+            <div class="sub-kpi-subtext-small">Hết hạn gói Dài kỳ</div>
+          </div>
+          <div class="sub-kpi-card" style="border-top: 5px solid var(--mf-red);">
+            <div><div class="sub-kpi-label-small" style="color: var(--mf-red);">THU HỒI NỢ CƯỚC</div><div class="sub-kpi-value-small" style="color: var(--mf-red);" id="kpiRealDebt">0</div></div>
+            <div class="sub-kpi-subtext-small">Nợ gói Đơn kỳ</div>
+          </div>
+          <div class="sub-kpi-card" style="border-top: 5px solid #475569; background: #f8fafc;">
+            <div><div class="sub-kpi-label-small" style="color: #475569;">CẢNH BÁO ONT</div><div class="sub-kpi-value-small" style="color: #334155;" id="kpiUnt">0</div></div>
+            <div class="sub-kpi-subtext-small">TB đã Hủy chưa thu ONT</div>
           </div>
         </div>
 
-        <!-- Các chỉ số phụ khác -->
-        <div class="card">
-          <h3 style="font-size: 15px; font-weight: bold; margin-bottom: 16px;">Theo dõi Trạng thái Khác</h3>
-          
-          <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div style="font-weight: bold; font-size: 14px; color: #475569;">Tạm ngưng KHYC</div>
-              <div style="font-size: 11px; color: #64748b;">Khách hàng chủ động ngưng dịch vụ</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+          <div class="card">
+            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue);">Quy mô Thuê bao Hiện hữu theo 6 Địa bàn</h3>
+            <p style="font-size: 12px; color: #64748b;">Số lượng khách hàng đang duy trì hợp đồng</p>
+            <div class="chart-container"><canvas id="chartSubOld"></canvas></div>
+          </div>
+          <div class="card">
+            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-red);">Chiến dịch Thuê bao PTM theo 6 Địa bàn</h3>
+            <p style="font-size: 12px; color: #64748b;">Đánh giá năng lực phát triển mới độc lập</p>
+            <div class="chart-container"><canvas id="chartSubNew"></canvas></div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+          <div class="card">
+            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue);">Tăng trưởng Tổng Thuê bao qua 12 Tháng</h3>
+            <p style="font-size: 12px; color: #64748b;">Quy mô tổng hợp mạng lưới (Hiện hữu + PTM)</p>
+            <div class="chart-container-large"><canvas id="chartSubTrend"></canvas></div>
+          </div>
+          <div class="card">
+            <h3 style="font-size: 16px; font-weight: bold; color: #10b981;">Xu hướng Thuê bao PTM Mới qua 12 Tháng</h3>
+            <p style="font-size: 12px; color: #64748b;">Năng lực phát triển mới theo từng tháng</p>
+            <div class="chart-container-large"><canvas id="chartPtmSubTrend"></canvas></div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 3fr 3.5fr 3.5fr; gap: 24px;">
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <h3 style="font-size: 15px; font-weight: bold; color: var(--mf-blue);">Cơ cấu Gói PTM</h3>
+                <p style="font-size: 11px; color: #64748b;">Tỷ trọng gói cước bán ra</p>
+              </div>
+              <span class="badge badge-green" id="lblTotalPkgPtm">0 PTM</span>
             </div>
-            <div style="font-size: 24px; font-weight: bold; color: #475569;" id="kpiKhyc">0</div>
+            <div id="pkgList" style="max-height: 250px; overflow-y: auto; padding-right: 8px;"></div>
           </div>
           
-          <div style="background: #fee2e2; padding: 16px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div style="font-weight: bold; font-size: 14px; color: #991b1b;">Thuê bao Hủy / Chấm dứt</div>
-              <div style="font-size: 11px; color: #b91c1c;">Đã thanh lý hợp đồng trong kỳ</div>
+          <div class="card" style="text-align: center;">
+            <h3 style="font-size: 15px; font-weight: bold; color: var(--mf-blue);">Cơ cấu Phân khúc Khách hàng</h3>
+            <p style="font-size: 11px; color: #64748b; margin-bottom: 16px;">(Tính trên Tổng TB Hoạt động)</p>
+            <div style="position: relative; height: 210px; width: 100%;"><canvas id="chartSegments"></canvas></div>
+            <div style="display: flex; justify-content: space-around; margin-top: 16px; font-size: 12px; font-weight: bold;">
+              <div style="color: #3b82f6;">Cá nhân/Hộ GĐ</div>
+              <div style="color: #f59e0b;">Doanh nghiệp</div>
+              <div style="color: var(--mf-red);">Cơ quan/HCSN</div>
             </div>
-            <div style="font-size: 24px; font-weight: bold; color: #991b1b;" id="kpiCancelled">0</div>
           </div>
+
+          <div class="card">
+            <h3 style="font-size: 15px; font-weight: bold; color: var(--mf-blue); margin-bottom: 20px;">Theo dõi Trạng thái Khác</h3>
+            
+            <div style="background: #f1f5f9; padding: 20px; border-radius: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight: bold; font-size: 15px; color: #475569;">Tạm ngưng KHYC</div>
+                <div style="font-size: 12px; color: #64748b; margin-top:4px;">Chủ động ngưng dịch vụ</div>
+              </div>
+              <div style="font-size: 28px; font-weight: bold; color: #475569;" id="kpiKhyc">0</div>
+            </div>
+            
+            <div style="background: #fee2e2; padding: 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight: bold; font-size: 15px; color: #991b1b;">Thuê bao Đã Hủy</div>
+                <div style="font-size: 12px; color: #b91c1c; margin-top:4px;">Thanh lý hợp đồng</div>
+              </div>
+              <div style="font-size: 28px; font-weight: bold; color: #991b1b;" id="kpiCancelled">0</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card" style="margin-top: 24px;">
+          <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue); margin-bottom: 16px;">Bảng Tổng Hợp Số Lượng Thuê Bao theo Địa Bàn</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">STT</th>
+                <th>KHU VỰC / CỤM</th>
+                <th style="text-align: center;">TB HIỆN HỮU</th>
+                <th style="text-align: center; color: #059669;">TB PTM MỚI</th>
+                <th style="text-align: center; color: var(--mf-blue);">TỔNG TB HOẠT ĐỘNG</th>
+                <th style="text-align: right;">TỶ TRỌNG TB (%)</th>
+              </tr>
+            </thead>
+            <tbody id="tblSubscriber"></tbody>
+          </table>
         </div>
       </div>
       
-      <!-- Bảng Tổng hợp -->
-      <div class="card" style="margin-top: 24px;">
-        <h3 style="font-size: 15px; font-weight: bold; margin-bottom: 12px;">Bảng Tổng Hợp Số Lượng Thuê Bao theo Địa Bàn</h3>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 50px;">STT</th>
-              <th>KHU VỰC / CỤM</th>
-              <th style="text-align: center;">TB HIỆN HỮU</th>
-              <th style="text-align: center; color: #059669;">TB PTM</th>
-              <th style="text-align: center; color: #1e40af;">TỔNG TB HOẠT ĐỘNG</th>
-              <th style="text-align: right;">TỶ TRỌNG TB (%)</th>
-            </tr>
-          </thead>
-          <tbody id="tblSubscriber"></tbody>
-        </table>
-      </div>
     </div>
-    
   </div>
 
   <!-- Loading Overlay -->
   <div id="loadingOverlay">
     <div class="spinner-border"></div>
-    <div style="font-weight: 600; color: #1e40af; font-size: 15px;">Đang xử lý dữ liệu...</div>
-    <div style="font-size: 12px; color: #64748b; margin-top: 6px;">Vui lòng đợi trong giây lát</div>
+    <div style="font-weight: bold; color: var(--mf-blue); font-size: 16px;">Đang tính toán dữ liệu Đa kỳ...</div>
+    <div style="font-size: 13px; color: #64748b; margin-top: 8px;">Vui lòng đợi trong giây lát</div>
   </div>
 
   <script>
-    let currentPeriod = 'month';
     let currentView = 'revenue';
     let charts = {};
     let gData = null;
 
-    Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    Chart.defaults.font.family = "'UTM Mobifone KT', 'Segoe UI', Roboto, sans-serif";
     Chart.defaults.color = '#64748b';
 
     window.onload = () => {
+      handlePeriodTypeChange();
       const now = new Date();
-      document.getElementById('monthSelect').value = now.getMonth();
+      document.getElementById('periodDetailSelect').value = now.getMonth();
       document.getElementById('yearSelect').value = now.getFullYear();
       loadData();
     };
 
-    function selectPeriod(period, el) {
-      document.querySelectorAll('.filter-item').forEach(e => e.classList.remove('active'));
-      el.classList.add('active');
-      currentPeriod = period;
-      loadData();
+    function handlePeriodTypeChange() {
+      const pType = document.getElementById('periodTypeSelect').value;
+      const detailSelect = document.getElementById('periodDetailSelect');
+      detailSelect.innerHTML = '';
+      
+      if (pType === 'month') {
+        for (let i = 0; i < 12; i++) detailSelect.innerHTML += `<option value="${i}">Tháng ${i+1}</option>`;
+        detailSelect.style.display = 'inline-block';
+      } else if (pType === 'quarter') {
+        for (let i = 1; i <= 4; i++) detailSelect.innerHTML += `<option value="${i}">Quý ${i}</option>`;
+        detailSelect.style.display = 'inline-block';
+      } else if (pType === 'ytd') {
+        for (let i = 1; i <= 12; i++) detailSelect.innerHTML += `<option value="${i}">${i} Tháng đầu năm</option>`;
+        detailSelect.style.display = 'inline-block';
+      } else if (pType === 'year') {
+        detailSelect.style.display = 'none';
+        detailSelect.innerHTML = `<option value="12">Cả năm</option>`;
+      }
+      triggerLoad();
     }
 
     function triggerLoad() { loadData(); }
 
     function switchDashboard(view) {
       currentView = view;
-      document.getElementById('btnNavSearch').className = (view === 'search') ? 'nav-btn active' : 'nav-btn inactive';
-      document.getElementById('btnNavRevenue').className = (view === 'revenue') ? 'nav-btn active' : 'nav-btn inactive';
-      document.getElementById('btnNavSub').className = (view === 'subscriber') ? 'nav-btn active' : 'nav-btn inactive';
+      document.getElementById('btnNavSearch').className = (view === 'search') ? 'nav-item active' : 'nav-item';
+      document.getElementById('btnNavRevenue').className = (view === 'revenue') ? 'nav-item active' : 'nav-item';
+      document.getElementById('btnNavSub').className = (view === 'subscriber') ? 'nav-item active' : 'nav-item';
       
       document.getElementById('viewSearch').style.display = (view === 'search') ? 'block' : 'none';
       document.getElementById('viewRevenue').style.display = (view === 'revenue') ? 'block' : 'none';
@@ -411,23 +514,20 @@
       return val.toString();
     }
 
-    // Hàm tạo Huy hiệu Tăng trưởng
-    function buildMomBadge(current, previous, isDarkBg = false) {
-      if (!previous) return '';
-      const pct = ((current - previous) / previous) * 100;
-      if (pct === 0) return `<span class="mom-badge ${isDarkBg ? 'mom-flat' : 'mom-flat'}"> ➖ Bằng kỳ trước</span>`;
-      const valStr = Math.abs(pct).toFixed(1) + '%';
-      if (pct > 0) return `<span class="mom-badge ${isDarkBg ? 'mom-up' : 'mom-up-light'}"> ▲ Tăng ${valStr}</span>`;
-      return `<span class="mom-badge ${isDarkBg ? 'mom-down' : 'mom-down-light'}"> ▼ Giảm ${valStr}</span>`;
-    }
-
+    // Chụp FULL nội dung dashboard cuộn
     function takeSnapshot() {
       document.getElementById('loadingOverlay').style.display = 'flex';
-      document.querySelector('#loadingOverlay div:nth-child(2)').innerText = 'Đang trích xuất ảnh báo cáo...';
-      html2canvas(document.getElementById('dashboardBody'), { scale: 2 }).then(canvas => {
+      document.querySelector('#loadingOverlay div:nth-child(2)').innerText = 'Đang trích xuất ảnh báo cáo toàn trang...';
+      
+      const targetElement = document.getElementById('dashboardContent');
+      html2canvas(targetElement, { 
+        scale: 2,
+        scrollY: -window.scrollY,
+        useCORS: true 
+      }).then(canvas => {
         let a = document.createElement('a');
         a.href = canvas.toDataURL('image/jpeg', 0.9);
-        a.download = `MobiFiber_Report_${currentPeriod}.jpg`;
+        a.download = `MobiFiber_Executive_Report.jpg`;
         a.click();
         document.getElementById('loadingOverlay').style.display = 'none';
       });
@@ -435,9 +535,11 @@
 
     function loadData() {
       document.getElementById('loadingOverlay').style.display = 'flex';
-      document.querySelector('#loadingOverlay div:nth-child(2)').innerText = 'Đang xử lý dữ liệu phân bổ...';
+      document.querySelector('#loadingOverlay div:nth-child(2)').innerText = 'Đang tính toán dữ liệu Đa kỳ...';
+      
+      const pType = document.getElementById('periodTypeSelect').value;
+      const detail = document.getElementById('periodDetailSelect').value;
       const year = document.getElementById('yearSelect').value;
-      const month = document.getElementById('monthSelect').value;
 
       google.script.run
         .withSuccessHandler(res => {
@@ -446,7 +548,7 @@
         .withFailureHandler(err => {
           alert('Lỗi tải dữ liệu: ' + err.message); document.getElementById('loadingOverlay').style.display = 'none';
         })
-        .getDashboardMetrics(currentPeriod, year, month);
+        .getDashboardMetrics(pType, year, detail);
     }
 
     function updateUI() {
@@ -455,26 +557,16 @@
       
       let pText = '';
       if (d.period === 'month') pText = `Tháng ${parseInt(d.selectedMonth)+1}/${d.selectedYear}`;
-      else if (d.period === 'year') pText = `Năm ${d.selectedYear}`;
-      else pText = `Kỳ: ${d.period.toUpperCase()} - Năm ${d.selectedYear}`;
-      document.getElementById('filterStatus').innerText = pText;
+      else if (d.period === 'quarter') pText = `Quý ${d.selectedMonth}/${d.selectedYear}`;
+      else if (d.period === 'ytd') pText = `Lũy kế ${d.selectedMonth} Tháng Đầu năm ${d.selectedYear}`;
+      else pText = `Cả năm ${d.selectedYear}`;
       
-      // Update KPIs
+      document.getElementById('filterStatus').innerText = `BÁO CÁO: ${pText.toUpperCase()}`;
+      
       document.getElementById('kpiTotalDtpk').innerText = formatVND(d.summary.totalRevenue);
       document.getElementById('kpiOldDtpk').innerText = formatVND(d.summary.revenueCurrent);
       document.getElementById('kpiNewDtpk').innerText = formatVND(d.summary.revenuePtm);
       
-      // Update MoM Badges
-      if (d.period === 'month' || d.period === 'year') {
-        document.getElementById('momRevTotal').innerHTML = buildMomBadge(d.summary.totalRevenue, d.summary.prevTotalRev, true);
-        document.getElementById('momRevPtm').innerHTML = buildMomBadge(d.summary.revenuePtm, d.summary.prevTotalRev > 0 ? (d.summary.prevTotalRev * 0.05) : 0, false); 
-        document.getElementById('momSubTotal').innerHTML = buildMomBadge(d.summary.totalActiveSub, d.summary.prevTotalSub, true);
-        document.getElementById('momSubPtm').innerHTML = buildMomBadge(d.summary.subPtm, d.summary.prevPtmSub, false);
-      } else {
-        document.getElementById('momRevTotal').innerHTML = ''; document.getElementById('momRevPtm').innerHTML = '';
-        document.getElementById('momSubTotal').innerHTML = ''; document.getElementById('momSubPtm').innerHTML = '';
-      }
-
       document.getElementById('kpiTotalSub').innerText = (d.summary.totalActiveSub || 0).toLocaleString('vi-VN');
       document.getElementById('kpiOldSub').innerText = (d.summary.subCurrent || 0).toLocaleString('vi-VN');
       document.getElementById('kpiNewSub').innerText = (d.summary.subPtm || 0).toLocaleString('vi-VN');
@@ -487,36 +579,36 @@
 
       const sortedByDtpk = [...d.regionStats].sort((a, b) => b.totalDtpk - a.totalDtpk);
       const labels = sortedByDtpk.map(i => i.name);
-      renderBarChart('chartRevOld', labels, sortedByDtpk.map(i => i.currentDtpk), '#3b82f6', formatNumCompact);
-      renderBarChart('chartRevNew', labels, sortedByDtpk.map(i => i.ptmDtpk), '#10b981', formatNumCompact);
+      renderBarChart('chartRevOld', labels, sortedByDtpk.map(i => i.currentDtpk), '#005AAB', formatNumCompact);
+      renderBarChart('chartRevNew', labels, sortedByDtpk.map(i => i.ptmDtpk), '#ED1C24', formatNumCompact);
       
       const sortedBySub = [...d.regionStats].sort((a, b) => b.totalSub - a.totalSub);
       const subLabels = sortedBySub.map(i => i.name);
-      renderBarChart('chartSubOld', subLabels, sortedBySub.map(i => i.currentSub), '#3b82f6', v => v + ' TB');
-      renderBarChart('chartSubNew', subLabels, sortedBySub.map(i => i.ptmSub), '#10b981', v => v + ' TB');
+      renderBarChart('chartSubOld', subLabels, sortedBySub.map(i => i.currentSub), '#005AAB', v => v + ' TB');
+      renderBarChart('chartSubNew', subLabels, sortedBySub.map(i => i.ptmSub), '#ED1C24', v => v + ' TB');
 
-      // Bảng Doanh Thu + ARPU
+      // Bảng Doanh Thu
       let htmlRev = '';
       sortedByDtpk.forEach((r, idx) => {
         const share = d.summary.totalRevenue > 0 ? (r.totalDtpk / d.summary.totalRevenue * 100).toFixed(1) : 0;
         const arpu = r.totalSub > 0 ? Math.round(r.totalDtpk / r.totalSub) : 0;
         htmlRev += `<tr>
           <td>${idx+1}</td>
-          <td style="font-weight: 500;">${r.name}</td>
+          <td style="font-weight: 600;">${r.name}</td>
           <td style="text-align: right;">${formatVND(r.currentDtpk)}</td>
           <td style="text-align: right; color: #059669; font-weight: 500;">${formatVND(r.ptmDtpk)}</td>
-          <td style="text-align: right; color: #1e40af; font-weight: bold;">${formatVND(r.totalDtpk)}</td>
-          <td style="text-align: right; color: #d97706; font-weight: 600;">${arpu.toLocaleString('vi-VN')} đ</td>
+          <td style="text-align: right; color: #005AAB; font-weight: bold;">${formatVND(r.totalDtpk)}</td>
+          <td style="text-align: right; color: #ED1C24; font-weight: bold;">${arpu.toLocaleString('vi-VN')} đ</td>
           <td style="text-align: right;">${share}%</td>
         </tr>`;
       });
       const sumArpu = d.summary.totalActiveSub > 0 ? Math.round(d.summary.totalRevenue / d.summary.totalActiveSub) : 0;
       htmlRev += `<tr>
-        <td colspan="2">TỔNG CỘNG</td>
+        <td colspan="2">TỔNG CỘNG LŨY KẾ KỲ</td>
         <td style="text-align: right;">${formatVND(d.summary.revenueCurrent)}</td>
         <td style="text-align: right; color: #059669;">${formatVND(d.summary.revenuePtm)}</td>
-        <td style="text-align: right; color: #1e40af;">${formatVND(d.summary.totalRevenue)}</td>
-        <td style="text-align: right; color: #d97706;">${sumArpu.toLocaleString('vi-VN')} đ</td>
+        <td style="text-align: right; color: #005AAB;">${formatVND(d.summary.totalRevenue)}</td>
+        <td style="text-align: right; color: #ED1C24;">${sumArpu.toLocaleString('vi-VN')} đ</td>
         <td style="text-align: right;">100%</td>
       </tr>`;
       document.getElementById('tblRevenue').innerHTML = htmlRev;
@@ -527,16 +619,15 @@
         const share = d.summary.totalActiveSub > 0 ? (r.totalSub / d.summary.totalActiveSub * 100).toFixed(1) : 0;
         htmlSub += `<tr>
           <td>${idx+1}</td>
-          <td style="font-weight: 500;">${r.name}</td>
+          <td style="font-weight: 600;">${r.name}</td>
           <td style="text-align: center;">${r.currentSub} TB</td>
           <td style="text-align: center; color: #059669; font-weight: 500;">${r.ptmSub} TB</td>
-          <td style="text-align: center; color: #1e40af; font-weight: bold;">${r.totalSub} TB</td>
+          <td style="text-align: center; color: #005AAB; font-weight: bold;">${r.totalSub} TB</td>
           <td style="text-align: right;">${share}%</td>
         </tr>`;
       });
       document.getElementById('tblSubscriber').innerHTML = htmlSub;
 
-      // Danh sách gói cước PTM
       let htmlPkg = '';
       if (d.packagePtmDistribution.length === 0) {
         htmlPkg = '<div style="text-align: center; color: #94a3b8; padding: 20px;">Không có PTM trong kỳ</div>';
@@ -544,7 +635,7 @@
         d.packagePtmDistribution.forEach(p => {
           htmlPkg += `
             <div class="pkg-row">
-              <div style="width: 110px; font-weight: 600; color: #0f172a; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${p.package}">${p.package}</div>
+              <div style="width: 120px; font-weight: 600; color: #0f172a; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${p.package}">${p.package}</div>
               <div class="pkg-bar-bg"><div class="pkg-bar-fill" style="width: ${p.ratio}%;"></div></div>
               <div style="width: 75px; text-align: right;"><span style="color: #059669; font-weight: 500;">${p.count} TB</span> <span style="color: #94a3b8; font-size: 11px;">| ${p.ratio}%</span></div>
             </div>`;
@@ -561,18 +652,18 @@
       const ctx = document.getElementById(canvasId).getContext('2d');
       charts[canvasId] = new Chart(ctx, {
         type: 'bar',
-        data: { labels: labels, datasets: [{ data: data, backgroundColor: color, borderRadius: 6, barPercentage: 0.5 }] },
+        data: { labels: labels, datasets: [{ data: data, backgroundColor: color, borderRadius: 4, barPercentage: 0.5 }] },
         options: {
-          layout: { padding: { top: 25 } }, // Fix cắt mép biểu đồ Cột
+          layout: { padding: { top: 30 } },
           responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
           animation: {
             onComplete: function() {
-              const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#475569'; ctx.font = 'bold 11px -apple-system, sans-serif';
+              const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#475569'; ctx.font = 'bold 12px "UTM Mobifone KT", sans-serif';
               this.data.datasets.forEach(function (dataset, i) {
                 const meta = this.getDatasetMeta(i);
                 meta.data.forEach(function (bar, index) {
                   const dataVal = dataset.data[index];
-                  if (dataVal > 0) ctx.fillText(fmtFunc(dataVal), bar.x, bar.y - 4);
+                  if (dataVal > 0) ctx.fillText(fmtFunc(dataVal), bar.x, bar.y - 6);
                 });
               }, this);
             }
@@ -592,11 +683,11 @@
       const revData = trendData.map(t => t.hasData ? t.totalDtpk : null);
       charts['trendRev'] = new Chart(document.getElementById('chartRevTrend').getContext('2d'), {
         type: 'line',
-        data: { labels: labels, datasets: [{ data: revData, borderColor: '#6366f1', backgroundColor: 'rgba(99, 102, 241, 0.1)', borderWidth: 3, pointBackgroundColor: '#6366f1', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, fill: true, tension: 0.4, spanGaps: true }] },
+        data: { labels: labels, datasets: [{ data: revData, borderColor: '#005AAB', backgroundColor: 'rgba(0, 90, 171, 0.1)', borderWidth: 3, pointBackgroundColor: '#005AAB', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, fill: true, tension: 0.4, spanGaps: true }] },
         options: {
-          layout: { padding: { top: 25 } }, // Fix cắt mép biểu đồ Đường
+          layout: { padding: { top: 30 } },
           responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Tổng DTPK: ' + Math.round(c.raw).toLocaleString('vi-VN') + ' đ'; } } } },
-          animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#4f46e5'; ctx.font = 'bold 11px -apple-system, sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(formatNumCompact(val), point.x, point.y - 8); }); }, this); } },
+          animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#005AAB'; ctx.font = 'bold 11px "UTM Mobifone KT", sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(formatNumCompact(val), point.x, point.y - 8); }); }, this); } },
           scales: { y: { beginAtZero: true, grace: '20%', border: { display: false }, grid: { color: '#f1f5f9' }, ticks: { callback: function(v) { return formatNumCompact(v); } } }, x: { border: { display: false }, grid: { display: false } } }
         }
       });
@@ -604,11 +695,11 @@
       const subData = trendData.map(t => t.hasData ? (t.currentSub + t.ptmSub) : null);
       charts['trendSub'] = new Chart(document.getElementById('chartSubTrend').getContext('2d'), {
         type: 'line',
-        data: { labels: labels, datasets: [{ data: subData, borderColor: '#0ea5e9', backgroundColor: 'rgba(14, 165, 233, 0.1)', borderWidth: 3, pointBackgroundColor: '#0ea5e9', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, fill: true, tension: 0.4, spanGaps: true }] },
+        data: { labels: labels, datasets: [{ data: subData, borderColor: '#005AAB', backgroundColor: 'rgba(0, 90, 171, 0.1)', borderWidth: 3, pointBackgroundColor: '#005AAB', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, fill: true, tension: 0.4, spanGaps: true }] },
         options: {
-          layout: { padding: { top: 25 } },
-          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Tổng Thuê bao: ' + c.raw + ' TB'; } } } },
-          animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#0284c7'; ctx.font = 'bold 11px -apple-system, sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(val + ' TB', point.x, point.y - 8); }); }, this); } },
+          layout: { padding: { top: 30 } },
+          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+          animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#005AAB'; ctx.font = 'bold 11px "UTM Mobifone KT", sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(val + ' TB', point.x, point.y - 8); }); }, this); } },
           scales: { y: { beginAtZero: true, grace: '20%', border: { display: false }, grid: { color: '#f1f5f9' } }, x: { border: { display: false }, grid: { display: false } } }
         }
       });
@@ -618,9 +709,9 @@
         type: 'line',
         data: { labels: labels, datasets: [{ data: ptmSubData, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 3, pointBackgroundColor: '#10b981', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, fill: true, tension: 0.4, spanGaps: true }] },
         options: {
-          layout: { padding: { top: 25 } },
-          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Thuê bao PTM: ' + c.raw + ' TB'; } } } },
-          animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#059669'; ctx.font = 'bold 11px -apple-system, sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(val + ' TB', point.x, point.y - 8); }); }, this); } },
+          layout: { padding: { top: 30 } },
+          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+          animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#059669'; ctx.font = 'bold 11px "UTM Mobifone KT", sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(val + ' TB', point.x, point.y - 8); }); }, this); } },
           scales: { y: { beginAtZero: true, grace: '20%', border: { display: false }, grid: { color: '#f1f5f9' } }, x: { border: { display: false }, grid: { display: false } } }
         }
       });
@@ -633,7 +724,7 @@
         type: 'doughnut',
         data: {
           labels: ['Cá nhân/Hộ GĐ', 'Doanh nghiệp', 'Cơ quan/HCSN'],
-          datasets: [{ data: [ind, biz, gov], backgroundColor: ['#3b82f6', '#f59e0b', '#10b981'], borderWidth: 0, hoverOffset: 4 }]
+          datasets: [{ data: [ind, biz, gov], backgroundColor: ['#3b82f6', '#f59e0b', '#ED1C24'], borderWidth: 0, hoverOffset: 4 }]
         },
         options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } }
       });
@@ -659,7 +750,7 @@
                 html += `
                 <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
                   <div style="background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-                    <div><div style="font-weight: bold; color: #0f172a; font-size: 16px;">${item.tenTB}</div><div style="font-family: monospace; color: #2563eb; font-size: 13px; font-weight: 600; margin-top: 4px;">KH: ${item.maKH} ${item.user ? ' | User: ' + item.user : ''}</div></div>
+                    <div><div style="font-weight: bold; color: var(--mf-blue); font-size: 16px;">${item.tenTB}</div><div style="font-family: monospace; color: #64748b; font-size: 13px; font-weight: 600; margin-top: 4px;">KH: ${item.maKH} ${item.user ? ' | User: ' + item.user : ''}</div></div>
                     <div style="text-align: right; display: flex; gap: 8px;"><span class="badge ${badgeHD}">${item.tinhTrangHD}</span><span class="badge ${badgeChan}">${item.tinhTrangChan}</span></div>
                   </div>
                   <div class="detail-grid">
@@ -670,7 +761,7 @@
                       <div class="info-item"><span class="info-label">Chu kỳ cước</span><span class="info-value">🗓️ ${item.ngayBatDau} ➔ ${item.ngayKetThuc}</span></div>
                     </div>
                     <div class="info-group">
-                      <div class="info-item"><span class="info-label">Doanh thu phân kỳ</span><span class="info-value" style="color: #059669; font-size: 16px; font-weight: bold;">💰 ${formatVND(item.dtpk)} / tháng</span></div>
+                      <div class="info-item"><span class="info-label">Doanh thu phân kỳ</span><span class="info-value" style="color: var(--mf-blue); font-size: 16px; font-weight: bold;">💰 ${formatVND(item.dtpk)} / tháng</span></div>
                       <div class="info-item"><span class="info-label">Thiết bị ONT</span><span class="info-value">⚙️ ${item.loaiONT} (SN: ${item.serial})</span></div>
                       <div class="info-item"><span class="info-label">Phát triển bởi</span><span class="info-value">🧑‍💼 ${item.tenNV}</span></div>
                       <div class="info-item"><span class="info-label">Điểm bán</span><span class="info-value">🏪 ${item.tenCH}</span></div>
@@ -680,7 +771,7 @@
               });
             }
             document.getElementById('searchResultsMain').innerHTML = html;
-          }).withFailureHandler(err => { document.getElementById('searchResultsMain').innerHTML = `<div style="color: #dc2626; padding: 20px;">Lỗi: ${err.message}</div>`; }).apiSearchSubscriber(val);
+          }).withFailureHandler(err => { document.getElementById('searchResultsMain').innerHTML = `<div style="color: var(--mf-red); padding: 20px;">Lỗi: ${err.message}</div>`; }).apiSearchSubscriber(val);
       }
     }
   </script>

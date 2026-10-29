@@ -1,454 +1,372 @@
 /**
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
- * MODULE       : CẬP NHẬT DỮ LIỆU & GHI NHẬT KÝ ĐỐI SOÁT
- * PHIÊN BẢN    : 2.5 (Fix lỗi ghi đè lệch Cột G ở Bảng Tên Cửa Hàng)
- * NGÀY CẬP NHẬT: 28/10/2026
- * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
+ * FILE        : WebApp_API.gs
+ * PHIÊN BẢN   : 14.0 (Thuật toán Lũy Kế Đa Kỳ, Tổng hợp Doanh thu chính xác)
+ * NGÀY CẬP NHẬT: 29/10/2026
  * ============================================================================
  */
 
-function showUploadDialog() {
-  const html = HtmlService.createHtmlOutputFromFile('UploadDialog')
-    .setWidth(590)
-    .setHeight(520)
-    .setTitle('Cập nhật dữ liệu MobiFiber');
-  SpreadsheetApp.getUi().showModalDialog(html, 'Cập nhật dữ liệu MobiFiber');
+const STANDARD_REGIONS = [
+  'TT.KDVT', 'KV Đà Lạt', 'KV Bảo Lộc', 'KV Gia Nghĩa', 'KV Phan Thiết', 'KV Hàm Tân'
+];
+
+function safeParseCurrency(val) {
+  if (typeof val === 'number') return Math.round(val);
+  if (!val) return 0;
+  return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0;
 }
 
-function isValidSubscriberRow(rawCode, rowArray) {
-  if (rawCode === undefined || rawCode === null) return false;
-  let cleanCode = String(rawCode).replace(/[\s\uFEFF\xA0]+/g, '').replace(/^'+/, '').trim();
-  if (!cleanCode) return false;
-  
-  const lower = cleanCode.toLowerCase();
-  if (lower.includes('tổng') || lower.includes('cong') || lower.includes('stt') || lower.includes('mã')) {
-    return false;
-  }
-  
-  const digitsOnly = cleanCode.replace(/[^0-9]/g, '');
-  if (digitsOnly.length < 8) return false;
-  
-  if (rowArray && Array.isArray(rowArray)) {
-    let sequentialCount = 0;
-    for (let c = 0; c < Math.min(rowArray.length, 10); c++) {
-      const val = parseInt(String(rowArray[c] || '').trim(), 10);
-      if (!isNaN(val) && val >= 1 && val <= 15) {
-        sequentialCount++;
+function doGet(e) {
+  return HtmlService.createTemplateFromFile('Dashboard')
+    .evaluate()
+    .setTitle('MobiFiber Executive Dashboard')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// Tính toán lát cắt dữ liệu cho 1 khoảng thời gian cố định
+function calculateDtpkForDateRange(rawData, indices, staffRegionMap, startDate, endDate) {
+  let grandTotalOldTB = 0, grandTotalOldDtpk = 0;
+  let grandTotalNewTB = 0, grandTotalNewRevenue = 0;
+  let subKhyc = 0, subNeedRenew = 0, subRealDebt = 0, subCancelled = 0;
+  let unrecoveredOnt = 0, segGov = 0, segBiz = 0, segInd = 0;
+
+  const regionMap = new Map();
+  STANDARD_REGIONS.forEach(reg => {
+    regionMap.set(reg, { currentSub: 0, currentDtpk: 0, ptmSub: 0, ptmDtpk: 0, totalSub: 0, totalDtpk: 0 });
+  });
+
+  const ptmPackageMap = new Map();
+  const startTime = startDate.getTime();
+  const endTime = endDate.getTime();
+
+  for (let i = 0; i < rawData.length; i++) {
+    const row = rawData[i];
+    const loaiKH = normalizeHeader(String(row[indices.idxLoaiKH] || ''));
+    if (loaiKH === 'thuê bao nghiệp vụ' || loaiKH === 'thue bao nghiep vu') continue;
+
+    const tinhTrangHD = normalizeHeader(String(row[indices.idxTinhTrangHD] || ''));
+    const isCancelled = tinhTrangHD.includes('hủy') || tinhTrangHD.includes('thanh lý') || tinhTrangHD.includes('chấm dứt');
+                        
+    if (isCancelled) {
+      subCancelled++;
+      const serial = String(row[indices.idxSerial] || '').trim();
+      if (serial && serial.toLowerCase() !== 'khong' && serial !== '-' && serial !== '---') unrecoveredOnt++;
+      continue;
+    }
+
+    const chuKy = parseInt(row[indices.idxChuKy], 10) || 0;
+    const giaCuoc = parseCurrencyToInteger(row[indices.idxGiaCuoc]) || 0;
+    const dtpk = parseCurrencyToInteger(row[indices.idxDtpk]) || (chuKy > 0 ? Math.round(giaCuoc / chuKy) : 0);
+
+    const dDauNoi = parseToDate(row[indices.idxNgayDauNoi]);
+    const dThiCong = parseToDate(row[indices.idxNgayThiCong]);
+    const dBatDau = parseToDate(row[indices.idxNgayBatDau]);
+    const dKetThuc = parseToDate(row[indices.idxNgayKetThuc]);
+    const nhuCau = normalizeHeader(String(row[indices.idxNhuCau] || ''));
+    const chanCat = normalizeHeader(String(row[indices.idxChanCat] || ''));
+
+    const isDebt = chanCat.includes('1c') || chanCat.includes('nợ cước');
+    const isKhyc = chanCat.includes('khyc') || chanCat.includes('yêu cầu');
+
+    if (isKhyc) subKhyc++;
+    else if (isDebt && (!dKetThuc || dKetThuc.getTime() < startTime)) {
+      if (chuKy > 1) subNeedRenew++; else subRealDebt++;
+    }
+
+    if (isDebt && dKetThuc && dKetThuc.getTime() < startTime) continue;
+
+    let isPtmInPeriod = false;
+    if (nhuCau.includes('mới')) {
+      let ptmDate = null;
+      if (chuKy === 1) {
+        if (dDauNoi && dThiCong) ptmDate = (dThiCong.getTime() > dDauNoi.getTime()) ? dThiCong : dDauNoi;
+        else ptmDate = dThiCong || dDauNoi || dBatDau;
+      } else {
+        ptmDate = dBatDau;
+      }
+      if (ptmDate && ptmDate.getTime() >= startTime && ptmDate.getTime() <= endTime) isPtmInPeriod = true;
+    }
+
+    let isRetainedInPeriod = false;
+    if (!isPtmInPeriod) {
+      if (chuKy === 1) {
+        const activeDate = dBatDau || dDauNoi;
+        if (activeDate && activeDate.getTime() <= endTime) isRetainedInPeriod = true;
+      } else {
+        if (dKetThuc && dKetThuc.getTime() >= startTime) isRetainedInPeriod = true;
       }
     }
-    if (sequentialCount >= 5) return false;
-  }
-  
-  return true;
-}
 
-function formatValueByFieldType(fieldName, rawVal) {
-  if (rawVal === undefined || rawVal === null || rawVal === '') return '';
-  const normField = normalizeHeader(fieldName);
-  let str = String(rawVal).replace(/[\s\uFEFF\xA0]+/g, ' ').trim();
-  
-  if (normField === normalizeHeader(CONFIG.KEY_COLUMN_NAME)) {
-    str = str.replace(/[^0-9]/g, '');
-    if (str.length === 8) str = '00' + str;
-    else if (str.length < 10) str = str.padStart(10, '0');
-    return "'" + str;
-  }
-  
-  if (normField === 'số cmnd/cccd') {
-    str = str.replace(/[^0-9]/g, '');
-    if (str.length === 11) str = '0' + str;
-    return "'" + str;
-  }
-  
-  if (normField === 'sđt liên hệ') {
-    str = str.replace(/[^0-9]/g, '');
-    if (str.length === 9) str = '0' + str;
-    return "'" + str;
-  }
-  
-  if (CONFIG.CURRENCY_INTEGER_FIELDS.some(f => normalizeHeader(f) === normField)) {
-    return parseCurrencyToInteger(rawVal);
-  }
-  
-  if (normField === 'chu kỳ sử dụng') {
-    const num = parseInt(str, 10);
-    return isNaN(num) ? str : num;
-  }
-  
-  if (CONFIG.DATE_ONLY_FIELDS.some(f => normalizeHeader(f) === normField)) {
-    const d = parseToDate(rawVal);
-    if (d) return Utilities.formatDate(d, 'Asia/Saigon', 'dd/MM/yyyy');
-    return str;
-  }
-  
-  if (CONFIG.DATETIME_FIELDS.some(f => normalizeHeader(f) === normField)) {
-    const d = parseToDate(rawVal);
-    if (d) return Utilities.formatDate(d, 'Asia/Saigon', 'dd/MM/yyyy HH:mm:ss');
-    return str;
-  }
-  
-  return rawVal;
-}
+    if (!isPtmInPeriod && !isRetainedInPeriod) continue;
 
-function isValueChanged(fieldName, val1, val2) {
-  const normField = normalizeHeader(fieldName);
-  const isDateCol = CONFIG.DATE_ONLY_FIELDS.some(f => normalizeHeader(f) === normField) ||
-                    CONFIG.DATETIME_FIELDS.some(f => normalizeHeader(f) === normField);
-  if (isDateCol) {
-    const d1 = parseToDate(val1);
-    const d2 = parseToDate(val2);
-    if (!d1 && !d2) return false;
-    if (!d1 || !d2) return true;
-    return Math.abs(d1.getTime() - d2.getTime()) >= 1000;
-  }
-  if (typeof val1 === 'number' && typeof val2 === 'number') {
-    return Math.abs(val1 - val2) > 0.0001;
-  }
-  return String(val1 ?? '').replace(/^'+/, '').trim() !== String(val2 ?? '').replace(/^'+/, '').trim();
-}
-
-function processDataUpdate(sourceRawData, headerRowIndex) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const targetSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
-  if (!targetSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
-  
-  const sourceHeaders = sourceRawData[headerRowIndex].map(h => String(h || '').trim());
-  const rawDataRows = sourceRawData.slice(headerRowIndex + 1);
-  
-  const sourceKeyColIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
-  if (sourceKeyColIdx === -1) throw new Error(`File nguồn không chứa cột "${CONFIG.KEY_COLUMN_NAME}"!`);
-  
-  const sourceNameColIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.NAME_COLUMN_NAME));
-  const sourceGiaCuocIdx = sourceHeaders.findIndex(h => normalizeHeader(h) === 'giá cước');
-  const sourceChuKyIdx   = sourceHeaders.findIndex(h => normalizeHeader(h) === 'chu kỳ sử dụng');
-  
-  const sourceDataRows = rawDataRows.filter(r => {
-    if (!r || r.length === 0) return false;
-    return isValidSubscriberRow(r[sourceKeyColIdx], r);
-  });
-  
-  const lastTargetCol = targetSheet.getLastColumn();
-  const lastTargetRow = targetSheet.getLastRow();
-  const targetHeaders = targetSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastTargetCol).getValues()[0].map(h => String(h || '').trim());
-  
-  const targetKeyColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
-  const targetNameColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === normalizeHeader(CONFIG.NAME_COLUMN_NAME));
-  const giaCuocTargetColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === 'giá cước');
-  const dtpkTargetColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === 'dtpk');
-  const ngaySinhTargetColIdx = targetHeaders.findIndex(h => normalizeHeader(h) === 'ngày sinh');
-  
-  const colIndicesForSync = {
-    idxLoaiKH: targetHeaders.findIndex(h => normalizeHeader(h) === 'loại khách hàng'),
-    idxMoHinh: targetHeaders.findIndex(h => normalizeHeader(h) === 'loại mô hình triển khai'),
-    idxTenCH: targetHeaders.findIndex(h => normalizeHeader(h) === 'tên cửa hàng'),
-    idxMaCH: targetHeaders.findIndex(h => normalizeHeader(h) === 'mã cửa hàng'),
-    idxMaNV: targetHeaders.findIndex(h => normalizeHeader(h) === 'mã nhân viên'),
-    idxTenNV: targetHeaders.findIndex(h => normalizeHeader(h) === 'tên nhân viên')
-  };
-  
-  const colMapping = {};
-  targetHeaders.forEach((tHead, tIdx) => {
-    if (tHead) {
-      const sIdx = sourceHeaders.findIndex(sHead => normalizeHeader(sHead) === normalizeHeader(tHead));
-      if (sIdx !== -1) colMapping[tIdx] = sIdx;
-    }
-  });
-  
-  const criticalFieldsNormalized = new Set(CONFIG.CRITICAL_LOG_FIELDS.map(f => normalizeHeader(f)));
-  let targetData = [];
-  const customerRowMap = new Map();
-  
-  if (lastTargetRow >= CONFIG.DATA_START_ROW_TARGET) {
-    targetData = targetSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastTargetRow - CONFIG.DATA_START_ROW_TARGET + 1, lastTargetCol).getValues();
-    targetData.forEach((row, idx) => {
-      const normCode = normalizeCustomerId(row[targetKeyColIdx]);
-      if (normCode) customerRowMap.set(normCode, { rowIndex: CONFIG.DATA_START_ROW_TARGET + idx, dataIndex: idx });
-    });
-  }
-  
-  const nowStr = Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm');
-  const logs = [];
-  const newRowsToAppend = [];
-  const newRawRowsToScan = []; 
-  let updatedCustCount = 0, updatedFieldsCount = 0;
-  
-  sourceDataRows.forEach(srcRow => {
-    const rawSrcCustId = srcRow[sourceKeyColIdx];
-    const normSrcCustId = normalizeCustomerId(rawSrcCustId);
-    if (!normSrcCustId) return;
-  
-    const custName = (sourceNameColIdx !== -1 && srcRow[sourceNameColIdx]) ? String(srcRow[sourceNameColIdx]).trim() : '';
-    let cleanDisplayCustId = String(rawSrcCustId).replace(/[^0-9]/g, '').trim();
-    if (cleanDisplayCustId.length === 8) cleanDisplayCustId = '00' + cleanDisplayCustId;
-    else if (cleanDisplayCustId.length < 10) cleanDisplayCustId = cleanDisplayCustId.padStart(10, '0');
-  
-    let derivedDtpk = '';
-    const rawGiaCuoc = (sourceGiaCuocIdx !== -1) ? parseCurrencyToInteger(srcRow[sourceGiaCuocIdx]) : '';
-    const rawChuKy = (sourceChuKyIdx !== -1) ? parseInt(srcRow[sourceChuKyIdx], 10) : '';
-    if (typeof rawGiaCuoc === 'number' && typeof rawChuKy === 'number' && rawChuKy > 0) {
-      derivedDtpk = Math.round(rawGiaCuoc / rawChuKy);
-    }
-  
-    if (customerRowMap.has(normSrcCustId)) {
-      const { rowIndex, dataIndex } = customerRowMap.get(normSrcCustId);
-      const existingRow = targetData[dataIndex];
-      let custHasChange = false;
-      const displayName = custName || (targetNameColIdx !== -1 ? String(existingRow[targetNameColIdx] || '') : '');
-  
-      for (const [tColIdxStr, sColIdx] of Object.entries(colMapping)) {
-        const tColIdx = parseInt(tColIdxStr, 10);
-        const fieldName = targetHeaders[tColIdx];
-        const normField = normalizeHeader(fieldName);
-  
-        if (tColIdx === targetKeyColIdx) continue;
-  
-        const oldVal = existingRow[tColIdx];
-        let formattedNewVal = formatValueByFieldType(fieldName, srcRow[sColIdx]);
-  
-        if (normField === 'dtpk' && (formattedNewVal === '' || formattedNewVal === null || formattedNewVal === undefined)) {
-          formattedNewVal = derivedDtpk;
-        }
-  
-        if (isValueChanged(fieldName, oldVal, formattedNewVal)) {
-          existingRow[tColIdx] = formattedNewVal;
-          const cellRange = targetSheet.getRange(rowIndex, tColIdx + 1);
-  
-          if (CONFIG.CURRENCY_INTEGER_FIELDS.some(f => normalizeHeader(f) === normField)) {
-            cellRange.setValue(formattedNewVal).setNumberFormat('#,##0');
-          } else if (normField === 'số cmnd/cccd' || normField === 'sđt liên hệ') {
-            cellRange.setNumberFormat('@').setValue(formattedNewVal);
-          } else if (normField === 'ngày sinh') {
-            cellRange.setValue(formattedNewVal).setNumberFormat('dd/MM/yyyy');
-          } else {
-            cellRange.setValue(formattedNewVal);
-          }
-  
-          if (criticalFieldsNormalized.has(normField)) {
-            const colLetter = columnToLetter(tColIdx + 1);
-            logs.push([
-              nowStr, cleanDisplayCustId, displayName, 'Cập nhật', fieldName,
-              `${colLetter}${rowIndex}`, formatValForLog(oldVal), formatValForLog(formattedNewVal)
-            ]);
-            updatedFieldsCount++;
-          }
-          custHasChange = true;
-        }
-      }
-      if (custHasChange) updatedCustCount++;
-  
+    if (loaiKH.includes('hành chính') || loaiKH.includes('cơ quan') || loaiKH.includes('ủy ban') || loaiKH.includes('công an') || loaiKH.includes('bca') || loaiKH.includes('vũ trang') || loaiKH.includes('trường') || loaiKH.includes('y tế') || loaiKH.includes('bệnh viện')) {
+      segGov++;
+    } else if (loaiKH.includes('doanh nghiệp') || loaiKH.includes('công ty') || loaiKH.includes('tnhh') || loaiKH.includes('cp') || loaiKH.includes('dntn') || loaiKH.includes('hợp tác xã')) {
+      segBiz++;
     } else {
-      const newRow = new Array(lastTargetCol).fill('');
-      for (const [tColIdxStr, sColIdx] of Object.entries(colMapping)) {
-        const tColIdx = parseInt(tColIdxStr, 10);
-        newRow[tColIdx] = formatValueByFieldType(targetHeaders[tColIdx], srcRow[sColIdx]);
-      }
-      if (dtpkTargetColIdx !== -1 && (newRow[dtpkTargetColIdx] === '' || newRow[dtpkTargetColIdx] === null)) {
-        newRow[dtpkTargetColIdx] = derivedDtpk;
-      }
-      newRowsToAppend.push({ custId: cleanDisplayCustId, custName: custName, rowData: newRow });
-      newRawRowsToScan.push(newRow);
+      segInd++;
     }
-  });
-  
-  let insertedCount = 0;
-  if (newRowsToAppend.length > 0) {
-    const startAppendRow = targetSheet.getLastRow() + 1;
-    const appendValues = newRowsToAppend.map(item => item.rowData);
-  
-    targetSheet.getRange(startAppendRow, 1, appendValues.length, lastTargetCol).setValues(appendValues);
-    insertedCount = appendValues.length;
-  
-    [targetKeyColIdx, targetHeaders.findIndex(h => normalizeHeader(h) === 'số cmnd/cccd'), targetHeaders.findIndex(h => normalizeHeader(h) === 'sđt liên hệ')].forEach(cIdx => {
-      if (cIdx !== -1) targetSheet.getRange(startAppendRow, cIdx + 1, appendValues.length, 1).setNumberFormat('@');
-    });
-  
-    if (giaCuocTargetColIdx !== -1) targetSheet.getRange(startAppendRow, giaCuocTargetColIdx + 1, appendValues.length, 1).setNumberFormat('#,##0');
-    if (dtpkTargetColIdx !== -1) targetSheet.getRange(startAppendRow, dtpkTargetColIdx + 1, appendValues.length, 1).setNumberFormat('#,##0');
-    if (ngaySinhTargetColIdx !== -1) targetSheet.getRange(startAppendRow, ngaySinhTargetColIdx + 1, appendValues.length, 1).setNumberFormat('dd/MM/yyyy');
-  
-    newRowsToAppend.forEach((item, idx) => {
-      const curRow = startAppendRow + idx;
-      logs.push([nowStr, item.custId, item.custName, 'Thêm mới', 'Toàn bộ bản ghi', `A${curRow}:AR${curRow}`, '', 'Cập nhật dữ liệu']);
-    });
-  }
-  
-  let syncResult = { newParamsCount: 0, details: '' };
-  if (newRawRowsToScan.length > 0) {
-    syncResult = autoDetectAndSyncNewParameters(newRawRowsToScan, colIndicesForSync);
-  }
-  
-  const logSheet = initLogSheet(ss);
-  if (logs.length > 0) {
-    const startLogRow = logSheet.getLastRow() + 1;
-    logSheet.getRange(startLogRow, 2, logs.length, 1).setNumberFormat('@');
-  
-    const safeLogs = logs.map(row => {
-      const copy = [...row];
-      copy[1] = "'" + copy[1].replace(/^'+/, '');
-      return copy;
-    });
-  
-    logSheet.getRange(startLogRow, 1, safeLogs.length, safeLogs[0].length).setValues(safeLogs);
-    logSheet.getRange(startLogRow, 1, safeLogs.length, 1).setHorizontalAlignment('center');
-    logSheet.getRange(startLogRow, 2, safeLogs.length, 1).setHorizontalAlignment('center');
-    logSheet.getRange(startLogRow, 4, safeLogs.length, 1).setHorizontalAlignment('center');
-    logSheet.getRange(startLogRow, 6, safeLogs.length, 1).setHorizontalAlignment('center');
-  
-    logSheet.autoResizeColumns(1, 8);
-    for (let c = 1; c <= 8; c++) {
-      if (logSheet.getColumnWidth(c) > 300) logSheet.setColumnWidth(c, 300);
+
+    const rawMaNV = normalizeHeader(String(row[indices.idxMaNV] || ''));
+    let khuVuc = 'TT.KDVT';
+    if (rawMaNV && staffRegionMap.has(rawMaNV)) khuVuc = staffRegionMap.get(rawMaNV);
+    let matchedRegion = STANDARD_REGIONS.find(reg => normalizeHeader(reg) === normalizeHeader(khuVuc)) || 'TT.KDVT';
+    const regStat = regionMap.get(matchedRegion);
+
+    if (isPtmInPeriod) {
+      regStat.ptmSub += 1; regStat.ptmDtpk += dtpk; regStat.totalSub += 1; regStat.totalDtpk += dtpk;
+      grandTotalNewTB += 1; grandTotalNewRevenue += dtpk;
+      const goiCuoc = String(row[indices.idxGoiCuoc] || 'Khác').trim().toUpperCase();
+      ptmPackageMap.set(goiCuoc, (ptmPackageMap.get(goiCuoc) || 0) + 1);
+    } else if (isRetainedInPeriod) {
+      regStat.currentSub += 1; regStat.currentDtpk += dtpk; regStat.totalSub += 1; regStat.totalDtpk += dtpk;
+      grandTotalOldTB += 1; grandTotalOldDtpk += dtpk;
     }
   }
-  
+
   return {
-    success: true,
-    updatedCustCount: updatedCustCount,
-    updatedFieldsCount: updatedFieldsCount,
-    insertedCount: insertedCount,
-    totalValidSourceRows: sourceDataRows.length,
-    newParamsCount: syncResult.newParamsCount,
-    syncDetails: syncResult.details
+    revenueCurrent: grandTotalOldDtpk, revenuePtm: grandTotalNewRevenue, totalRevenue: grandTotalOldDtpk + grandTotalNewRevenue,
+    subCurrent: grandTotalOldTB, subPtm: grandTotalNewTB, totalActiveSub: grandTotalOldTB + grandTotalNewTB,
+    subNeedRenew, subRealDebt, subKhyc, subCancelled, unrecoveredOnt, segGov, segBiz, segInd,
+    regionMap, ptmPackageMap
   };
 }
 
-function initLogSheet(ss) {
-  let logSheet = ss.getSheetByName(CONFIG.LOG_SHEET_NAME);
-  const expectedHeaders = [
-    'Thời gian xử lý', 'MÃ KHÁCH HÀNG', 'TÊN THUÊ BAO', 'Thao tác',
-    'Trường dữ liệu (Cột)', 'Tọa độ ô (Row, Column)', 'Before (Giá trị cũ)', 'After (Giá trị mới)'
-  ];
-  
-  if (!logSheet) {
-    logSheet = ss.insertSheet(CONFIG.LOG_SHEET_NAME);
-    logSheet.getRange(1, 1, 1, expectedHeaders.length).setValues([expectedHeaders])
-      .setFontWeight('bold').setBackground('#1B365D').setFontColor('#FFFFFF').setHorizontalAlignment('center');
-    logSheet.setFrozenRows(1);
-  }
-  return logSheet;
-}
-
-/**
- * HÀM TỰ ĐỘNG BẮT PHÁT SINH THAM SỐ MỚI (Đã sửa lỗi ghi đè cột G)
- */
-function autoDetectAndSyncNewParameters(newRowsToScan, colIndices) {
+function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const tsSheet = ss.getSheetByName('thamso_caidat');
-  if (!tsSheet || !newRowsToScan || newRowsToScan.length === 0) return { newParamsCount: 0, details: '' };
+  const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
+  if (!rawSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
+
+  const lastRow = rawSheet.getLastRow();
+  const lastCol = rawSheet.getLastColumn();
+  const yTarget = parseInt(selectedYear, 10) || new Date().getFullYear();
   
-  const lastRow = Math.max(tsSheet.getLastRow(), 4);
-  const tsData = tsSheet.getRange(4, 1, lastRow - 3, 13).getValues();
+  // Xác định các tháng thuộc kỳ báo cáo
+  let targetMonths = [];
+  let endMonthIndex = 0;
+  const sm = parseInt(selectedMonth, 10);
   
-  const existingCustTypes = new Set();
-  const existingModels    = new Set();
-  const existingStores    = new Set();
-  const existingStaff     = new Set();
-  
-  for (let i = 0; i < tsData.length; i++) {
-    const r = tsData[i];
-    if (r[0]) existingCustTypes.add(normalizeHeader(r[0])); 
-    if (r[3]) existingModels.add(normalizeHeader(r[3]));    
-    if (r[6]) existingStores.add(normalizeHeader(r[6]));    // Cột G - Cửa hàng
-    if (r[11]) existingStaff.add(normalizeHeader(r[11]));   
+  if (periodType === 'month') {
+    targetMonths = [sm]; endMonthIndex = sm;
+  } else if (periodType === 'quarter') {
+    if (sm === 1) { targetMonths = [0,1,2]; endMonthIndex = 2; }
+    else if (sm === 2) { targetMonths = [3,4,5]; endMonthIndex = 5; }
+    else if (sm === 3) { targetMonths = [6,7,8]; endMonthIndex = 8; }
+    else { targetMonths = [9,10,11]; endMonthIndex = 11; }
+  } else if (periodType === 'ytd') {
+    for (let i = 0; i < sm; i++) targetMonths.push(i);
+    endMonthIndex = sm - 1;
+  } else if (periodType === 'year') {
+    for (let i = 0; i < 12; i++) targetMonths.push(i);
+    endMonthIndex = 11;
   }
-  
-  const toAddCust = new Map();
-  const toAddModel = new Map();
-  const toAddStore = new Map();
-  const toAddStaff = new Map();
-  
-  for (let i = 0; i < newRowsToScan.length; i++) {
-    const row = newRowsToScan[i];
-  
-    if (colIndices.idxLoaiKH !== -1 && row[colIndices.idxLoaiKH]) {
-      const val = String(row[colIndices.idxLoaiKH]).trim();
-      const norm = normalizeHeader(val);
-      if (val && !existingCustTypes.has(norm) && !toAddCust.has(norm)) {
-        toAddCust.set(norm, [val, suggestShortCustType(val)]);
-      }
-    }
-  
-    if (colIndices.idxMoHinh !== -1 && row[colIndices.idxMoHinh]) {
-      const val = String(row[colIndices.idxMoHinh]).trim();
-      const norm = normalizeHeader(val);
-      if (val && !existingModels.has(norm) && !toAddModel.has(norm)) {
-        toAddModel.set(norm, [val, suggestShortModel(val)]);
-      }
-    }
-  
-    if (colIndices.idxTenCH !== -1 && row[colIndices.idxTenCH]) {
-      const val = String(row[colIndices.idxTenCH]).trim();
-      const norm = normalizeHeader(val);
-      if (val && !existingStores.has(norm) && !toAddStore.has(norm)) {
-        toAddStore.set(norm, [val, suggestShortStore(val)]);
-      }
-    }
-  
-    if (colIndices.idxMaNV !== -1 && row[colIndices.idxMaNV]) {
-      const maNV = String(row[colIndices.idxMaNV]).trim();
-      const norm = normalizeHeader(maNV);
-      if (maNV && !existingStaff.has(norm) && !toAddStaff.has(norm)) {
-        const maCH = colIndices.idxMaCH !== -1 ? String(row[colIndices.idxMaCH] || '').trim() : '';
-        const tenNV = colIndices.idxTenNV !== -1 ? String(row[colIndices.idxTenNV] || '').trim() : '';
-        toAddStaff.set(norm, {
-          khuVuc: '[Chưa phân bổ KV]',
-          maCH: maCH,
-          maNV: maNV,
-          tenNV: tenNV
-        });
-      }
-    }
-  }
-  
-  let totalNew = 0;
-  const detailList = [];
-  
-  if (toAddCust.size > 0) {
-    const rows = Array.from(toAddCust.values());
-    const nextRow = getNextEmptyRowInCol(tsSheet, 1);
-    tsSheet.getRange(nextRow, 1, rows.length, 2).setValues(rows);
-    totalNew += toAddCust.size;
-    detailList.push(`${toAddCust.size} Loại KH mới`);
-  }
-  
-  if (toAddModel.size > 0) {
-    const rows = Array.from(toAddModel.values());
-    const nextRow = getNextEmptyRowInCol(tsSheet, 4);
-    tsSheet.getRange(nextRow, 4, rows.length, 2).setValues(rows);
-    totalNew += toAddModel.size;
-    detailList.push(`${toAddModel.size} Mô hình mới`);
-  }
-  
-  // FIX: Ghi Cửa hàng mới vào chính xác Cột G (Cột số 7)
-  if (toAddStore.size > 0) {
-    const rows = Array.from(toAddStore.values());
-    const nextRow = getNextEmptyRowInCol(tsSheet, 7); 
-    tsSheet.getRange(nextRow, 7, rows.length, 2).setValues(rows);
-    totalNew += toAddStore.size;
-    detailList.push(`${toAddStore.size} Cửa hàng mới`);
-  }
-  
-  if (toAddStaff.size > 0) {
-    const staffArr = Array.from(toAddStaff.values());
-    const rows = staffArr.map(s => [s.khuVuc, "'" + s.maCH, "'" + s.maNV, '  ' + s.tenNV]);
-    const nextRow = getNextEmptyRowInCol(tsSheet, 10);
-    const range = tsSheet.getRange(nextRow, 10, rows.length, 4);
-    range.setValues(rows);
-  
-    tsSheet.getRange(nextRow, 10, rows.length, 1)
-      .setBackground('#FEF7E0')
-      .setFontColor('#B06000')
-      .setFontWeight('bold')
-      .setHorizontalAlignment('center');
-    tsSheet.getRange(nextRow, 11, rows.length, 2).setNumberFormat('@').setHorizontalAlignment('center');
-    tsSheet.getRange(nextRow, 13, rows.length, 1).setHorizontalAlignment('left');
-  
-    totalNew += toAddStaff.size;
-    detailList.push(`${toAddStaff.size} Nhân sự mới [Chưa phân bổ]`);
-  }
-  
-  return {
-    newParamsCount: totalNew,
-    details: detailList.join(', ')
+
+  if (lastRow < CONFIG.DATA_START_ROW_TARGET) return { success: false };
+
+  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
+  const indices = {
+    idxMaKH: headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME)),
+    idxLoaiKH: headers.findIndex(h => h === 'loại khách hàng'),
+    idxNhuCau: headers.findIndex(h => h === 'nhu cầu hòa mạng'),
+    idxGoiCuoc: headers.findIndex(h => h === 'gói cước'),
+    idxGiaCuoc: headers.findIndex(h => h === 'giá cước'),
+    idxChuKy: headers.findIndex(h => h === 'chu kỳ sử dụng'),
+    idxDtpk: headers.findIndex(h => h === 'dtpk'),
+    idxTinhTrangHD: headers.findIndex(h => h === 'tình trạng hợp đồng'),
+    idxChanCat: headers.findIndex(h => h === 'tình trạng chặn cắt'),
+    idxMaNV: headers.findIndex(h => h === 'mã nhân viên'),
+    idxNgayDauNoi: headers.findIndex(h => h === 'ngày đấu nối'),
+    idxNgayThiCong: headers.findIndex(h => h === 'ngày hoàn tất thi công'),
+    idxNgayBatDau: headers.findIndex(h => h === 'ngày băt đầu gói cước' || h === 'ngày bắt đầu gói cước'),
+    idxNgayKetThuc: headers.findIndex(h => h === 'ngày kết thúc gói cước'),
+    idxSerial: headers.findIndex(h => h === 'serial ont')
   };
+
+  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
+  const staffRegionMap = new Map();
+  const thamSoSheet = ss.getSheetByName('thamso_caidat');
+  if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
+    const tsData = thamSoSheet.getRange(4, 10, thamSoSheet.getLastRow() - 3, 4).getValues();
+    tsData.forEach(r => {
+      const kv = String(r[0] || '').trim();
+      const maNV = normalizeHeader(String(r[2] || ''));
+      if (maNV && kv) staffRegionMap.set(maNV, kv);
+    });
+  }
+
+  // Khởi tạo biến cộng dồn cho Kỳ Báo cáo
+  const monthlyTrend = [];
+  const aggregatedSummary = {
+    totalRevenue: 0, revenueCurrent: 0, revenuePtm: 0,
+    totalActiveSub: 0, subCurrent: 0, subPtm: 0,
+    subNeedRenew: 0, subRealDebt: 0, subKhyc: 0, subCancelled: 0, unrecoveredOnt: 0,
+    segGov: 0, segBiz: 0, segInd: 0, prevTotalRev: 0, prevTotalSub: 0, prevPtmSub: 0
+  };
+  
+  const aggregatedRegionMap = new Map();
+  STANDARD_REGIONS.forEach(reg => {
+    aggregatedRegionMap.set(reg, { currentSub: 0, currentDtpk: 0, ptmSub: 0, ptmDtpk: 0, totalSub: 0, totalDtpk: 0 });
+  });
+  const aggregatedPtmPackageMap = new Map();
+
+  // Chạy vòng lặp tính từng tháng để vẽ Trend 12 tháng, đồng thời cộng dồn vào aggregatedSummary
+  for (let m = 0; m < 12; m++) {
+    const mStart = new Date(yTarget, m, 1, 0, 0, 0);
+    const mEnd = new Date(yTarget, m + 1, 0, 23, 59, 59);
+    
+    // Tính số liệu riêng cho tháng m
+    const mRes = calculateDtpkForDateRange(rawData, indices, staffRegionMap, mStart, mEnd);
+    
+    monthlyTrend.push({
+      monthLabel: 'T' + (m + 1), monthIndex: m, hasData: true,
+      currentDtpk: mRes.revenueCurrent, ptmDtpk: mRes.revenuePtm, totalDtpk: mRes.totalRevenue,
+      currentSub: mRes.subCurrent, ptmSub: mRes.subPtm
+    });
+
+    // Nếu tháng m nằm trong kỳ báo cáo do người dùng chọn (Ví dụ Q1 -> tháng 1,2,3)
+    if (targetMonths.includes(m)) {
+      // 1. DOANH THU & PTM LÀ TỔNG CỘNG CỦA CÁC THÁNG TRONG KỲ
+      aggregatedSummary.revenueCurrent += mRes.revenueCurrent;
+      aggregatedSummary.revenuePtm += mRes.revenuePtm;
+      aggregatedSummary.totalRevenue += mRes.totalRevenue;
+      aggregatedSummary.subPtm += mRes.subPtm;
+      
+      for (const [pkg, count] of mRes.ptmPackageMap.entries()) {
+        aggregatedPtmPackageMap.set(pkg, (aggregatedPtmPackageMap.get(pkg) || 0) + count);
+      }
+      
+      for (const reg of STANDARD_REGIONS) {
+        const s1 = aggregatedRegionMap.get(reg);
+        const s2 = mRes.regionMap.get(reg);
+        s1.ptmSub += s2.ptmSub;
+        s1.ptmDtpk += s2.ptmDtpk;
+        s1.currentDtpk += s2.currentDtpk;
+        s1.totalDtpk += s2.totalDtpk;
+      }
+
+      // 2. THUÊ BAO HIỆN HỮU & CÁC TRẠNG THÁI LÀ LÁT CẮT (SNAPSHOT) CỦA THÁNG CUỐI KỲ
+      if (m === endMonthIndex) {
+        aggregatedSummary.subCurrent = mRes.subCurrent;
+        aggregatedSummary.totalActiveSub = mRes.totalActiveSub;
+        aggregatedSummary.subNeedRenew = mRes.subNeedRenew;
+        aggregatedSummary.subRealDebt = mRes.subRealDebt;
+        aggregatedSummary.subKhyc = mRes.subKhyc;
+        aggregatedSummary.subCancelled = mRes.subCancelled;
+        aggregatedSummary.unrecoveredOnt = mRes.unrecoveredOnt;
+        aggregatedSummary.segGov = mRes.segGov;
+        aggregatedSummary.segBiz = mRes.segBiz;
+        aggregatedSummary.segInd = mRes.segInd;
+
+        for (const reg of STANDARD_REGIONS) {
+          const s1 = aggregatedRegionMap.get(reg);
+          const s2 = mRes.regionMap.get(reg);
+          s1.currentSub = s2.currentSub;
+          s1.totalSub = s2.totalSub;
+        }
+      }
+    }
+  }
+
+  // Đóng gói mảng RegionStats
+  const regionStats = STANDARD_REGIONS.map(regName => {
+    const s = aggregatedRegionMap.get(regName);
+    return { name: regName, currentSub: s.currentSub, ptmSub: s.ptmSub, totalSub: s.totalSub, currentDtpk: s.currentDtpk, ptmDtpk: s.ptmDtpk, totalDtpk: s.totalDtpk };
+  });
+
+  const packagePtmDistribution = Array.from(aggregatedPtmPackageMap.entries())
+    .map(([pkg, count]) => ({ package: pkg, count: count, ratio: aggregatedSummary.subPtm > 0 ? ((count / aggregatedSummary.subPtm) * 100).toFixed(1) : 0 }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    success: true, period: periodType, selectedYear: yTarget, selectedMonth: selectedMonth,
+    summary: aggregatedSummary,
+    regionStats: regionStats, monthlyTrend: monthlyTrend, packagePtmDistribution: packagePtmDistribution,
+    lastUpdated: Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')
+  };
+}
+
+function apiSearchSubscriber(keyword) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
+  if (!rawSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
+  const lastRow = rawSheet.getLastRow();
+  const lastCol = rawSheet.getLastColumn();
+  if (lastRow < CONFIG.DATA_START_ROW_TARGET) return [];
+
+  const qClean = String(keyword || '').replace(/[\s\uFEFF\xA0]+/g, '').toLowerCase();
+  const qDigits = qClean.replace(/[^0-9]/g, '');
+  if (!qClean) return [];
+
+  const headers = rawSheet.getRange(CONFIG.HEADER_ROW_TARGET, 1, 1, lastCol).getValues()[0].map(h => normalizeHeader(h));
+  const idxMaKH = headers.findIndex(h => h === normalizeHeader(CONFIG.KEY_COLUMN_NAME));
+  const idxUser = headers.findIndex(h => h === 'user');
+  const idxTenTB = headers.findIndex(h => h === 'tên thuê bao');
+  const idxSDT = headers.findIndex(h => h === 'sđt liên hệ');
+  const idxDiaChi = headers.findIndex(h => h === 'địa chỉ lắp đặt');
+  const idxGoiCuoc = headers.findIndex(h => h === 'gói cước');
+  const idxGiaCuoc = headers.findIndex(h => h === 'giá cước');
+  const idxChuKy = headers.findIndex(h => h === 'chu kỳ sử dụng');
+  const idxDtpk = headers.findIndex(h => h === 'dtpk');
+  const idxNgayBatDau = headers.findIndex(h => h === 'ngày băt đầu gói cước' || h === 'ngày bắt đầu gói cước');
+  const idxNgayKetThuc = headers.findIndex(h => h === 'ngày kết thúc gói cước');
+  const idxTinhTrangHD = headers.findIndex(h => h === 'tình trạng hợp đồng');
+  const idxChanCat = headers.findIndex(h => h === 'tình trạng chặn cắt');
+  const idxLoaiONT = headers.findIndex(h => h === 'loại thiết bị ont');
+  const idxSerial = headers.findIndex(h => h === 'serial ont');
+  const idxTenCH = headers.findIndex(h => h === 'tên cửa hàng');
+  const idxTenNV = headers.findIndex(h => h === 'tên nhân viên');
+  const idxMaNV = headers.findIndex(h => h === 'mã nhân viên');
+
+  const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, lastRow - CONFIG.DATA_START_ROW_TARGET + 1, lastCol).getValues();
+  const staffRegionMap = new Map();
+  const thamSoSheet = ss.getSheetByName('thamso_caidat');
+  if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
+    const tsData = thamSoSheet.getRange(4, 10, thamSoSheet.getLastRow() - 3, 4).getValues();
+    tsData.forEach(r => {
+      const kv = String(r[0] || '').trim();
+      const maNV = normalizeHeader(String(r[2] || ''));
+      if (maNV && kv) staffRegionMap.set(maNV, kv);
+    });
+  }
+
+  const matched = [];
+  for (let i = 0; i < rawData.length; i++) {
+    const row = rawData[i];
+    let maKH = String(row[idxMaKH] || '').replace(/[\s\uFEFF\xA0]+/g, '').replace(/^'+/, '');
+    if (/^\d{8}$/.test(maKH)) maKH = '00' + maKH;
+
+    const userStr = idxUser !== -1 ? String(row[idxUser] || '').toLowerCase().trim() : '';
+    const sdt = String(row[idxSDT] || '').replace(/[^0-9]/g, '');
+    const serial = String(row[idxSerial] || '').replace(/[\s\uFEFF\xA0]+/g, '').toLowerCase();
+
+    if (qDigits && maKH.includes(qDigits) || userStr.includes(qClean) || qDigits && sdt.includes(qDigits) || qClean && serial.includes(qClean)) {
+      const giaCuoc = parseCurrencyToInteger(row[idxGiaCuoc]) || 0;
+      const chuKy = parseInt(row[idxChuKy], 10) || 1;
+      let dtpk = parseCurrencyToInteger(row[idxDtpk]) || (chuKy > 0 ? Math.round(giaCuoc / chuKy) : 0);
+
+      const dBatDau = parseToDate(row[idxNgayBatDau]);
+      const dKetThuc = parseToDate(row[idxNgayKetThuc]);
+      const rawMaNV = normalizeHeader(String(row[idxMaNV] || ''));
+      let khuVuc = 'TT.KDVT';
+      if (rawMaNV && staffRegionMap.has(rawMaNV)) khuVuc = staffRegionMap.get(rawMaNV);
+
+      matched.push({
+        maKH: maKH, user: idxUser !== -1 ? String(row[idxUser] || '').trim() : '',
+        tenTB: String(row[idxTenTB] || 'Chưa cập nhật').trim(), sdt: String(row[idxSDT] || '').replace(/^'+/, ''),
+        diaChi: String(row[idxDiaChi] || '---').trim(), goiCuoc: String(row[idxGoiCuoc] || '---').trim(),
+        giaCuoc: giaCuoc, chuKy: chuKy, dtpk: dtpk,
+        ngayBatDau: dBatDau ? Utilities.formatDate(dBatDau, 'Asia/Saigon', 'dd/MM/yyyy') : '---',
+        ngayKetThuc: dKetThuc ? Utilities.formatDate(dKetThuc, 'Asia/Saigon', 'dd/MM/yyyy') : '---',
+        tinhTrangHD: String(row[idxTinhTrangHD] || 'Đang hoạt động').trim(),
+        tinhTrangChan: String(row[idxChanCat] || 'Bình thường').trim(),
+        loaiONT: String(row[idxLoaiONT] || '---').trim(),
+        serial: String(row[idxSerial] || '---').replace(/^'+/, '').trim(),
+        khuVuc: khuVuc, tenCH: String(row[idxTenCH] || '---').trim(), tenNV: String(row[idxTenNV] || '---').trim()
+      });
+      if (matched.length >= 25) break;
+    }
+  }
+  return matched;
 }
