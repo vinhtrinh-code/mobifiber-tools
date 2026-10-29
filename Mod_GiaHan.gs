@@ -2,7 +2,8 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * MODULE       : KẾT XUẤT DANH SÁCH GIA HẠN CƯỚC MOBIFIBER
- * PHIÊN BẢN    : 2.4 (Fix lỗi parseCurrency thành parseCurrencyToInteger)
+ * PHIÊN BẢN    : 2.5 (Bổ sung cột Khu Vực & Tối ưu bố cục File Báo cáo)
+ * NGÀY CẬP NHẬT: 29/10/2026
  * TÁC GIẢ      : Trịnh Vũ Thế Vinh & AI Assistant
  * ============================================================================
  */
@@ -58,10 +59,23 @@ function processRenewalReport(params) {
   const idxChanCat     = headers.findIndex(h => h === 'tình trạng chặn cắt');
   const idxTenCH       = headers.findIndex(h => h === 'tên cửa hàng');
   const idxTenNV       = headers.findIndex(h => h === 'tên nhân viên');
+  const idxMaNV        = headers.findIndex(h => h === 'mã nhân viên'); // Thêm để load Khu Vực
   
   const numRows = lastRow - CONFIG.DATA_START_ROW_TARGET + 1;
   const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, numRows, lastCol).getValues();
   
+  // Tải danh mục Khu vực từ tham số
+  const staffRegionMap = new Map();
+  const thamSoSheet = ss.getSheetByName('thamso_caidat');
+  if (thamSoSheet && thamSoSheet.getLastRow() >= 4) {
+    const tsData = thamSoSheet.getRange(4, 10, thamSoSheet.getLastRow() - 3, 4).getValues();
+    tsData.forEach(r => {
+      const kv = String(r[0] || '').trim();
+      const maNV = normalizeHeader(String(r[2] || ''));
+      if (maNV && kv) staffRegionMap.set(maNV, kv);
+    });
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
@@ -99,10 +113,21 @@ function processRenewalReport(params) {
     let cleanSDT = String(row[idxSDT] || '').replace(/^'+/, '').trim();
     if (/^\d{9}$/.test(cleanSDT)) cleanSDT = '0' + cleanSDT;
   
-    // SỬ DỤNG ĐÚNG HÀM CHUẨN HÓA TIỀN TỆ MỚI NHẤT
     const giaCuoc = parseCurrencyToInteger(row[idxGiaCuoc]) || 0;
     totalRevenue += giaCuoc;
     const chuKy = row[idxChuKy] ? parseInt(row[idxChuKy], 10) : '';
+
+    // Lấy Khu Vực
+    const rawMaNV = normalizeHeader(String(row[idxMaNV] || ''));
+    let khuVuc = 'Chưa phân bổ KV';
+    if (rawMaNV && staffRegionMap.has(rawMaNV)) {
+      khuVuc = staffRegionMap.get(rawMaNV);
+    }
+
+    // Xử lý chuỗi ngày tháng cho chuẩn
+    const dBatDau = parseToDate(row[idxNgayBatDau]);
+    const strBatDau = dBatDau ? Utilities.formatDate(dBatDau, 'Asia/Saigon', 'dd/MM/yyyy') : (row[idxNgayBatDau] || '');
+    const strKetThuc = endDateVal ? Utilities.formatDate(endDateVal, 'Asia/Saigon', 'dd/MM/yyyy') : (row[idxNgayKetThuc] || '');
   
     matchedRows.push({
       diffDays: diffDays,
@@ -112,8 +137,10 @@ function processRenewalReport(params) {
         alertStatus,
         diffDays < 0 ? `Quá hạn ${Math.abs(diffDays)} ngày` : `Còn ${diffDays} ngày`,
         "'" + cleanMaKH, row[idxTenTB] || '', "'" + cleanSDT, row[idxDiaChi] || '', row[idxGoiCuoc] || '',
-        giaCuoc, chuKy, formatDateTimeStr(row[idxNgayBatDau]), formatDateTimeStr(row[idxNgayKetThuc]),
-        row[idxChanCat] || 'Bình thường', row[idxTenCH] || '', row[idxTenNV] || ''
+        giaCuoc, chuKy, strBatDau, strKetThuc,
+        row[idxChanCat] || 'Bình thường', 
+        khuVuc, // Bổ sung Cột Khu Vực
+        row[idxTenCH] || '', row[idxTenNV] || ''
       ]
     });
   }
@@ -128,47 +155,48 @@ function processRenewalReport(params) {
   const sheetId = destSheet.getSheetId();
   const directExportUrl = `https://docs.google.com/spreadsheets/d/${ssId}/export?format=xlsx&gid=${sheetId}`;
   
-  // DÒNG 1: Tiêu đề lớn
-  destSheet.getRange(1, 1, 1, 14).merge()
+  // DÒNG 1: Tiêu đề lớn (Gộp 15 cột)
+  destSheet.getRange(1, 1, 1, 15).merge()
     .setValue(`DANH SÁCH GIA HẠN MOBIFIBER - ${sheetTitleSuffix}`)
     .setFontWeight('bold').setFontSize(13).setBackground('#1B365D').setFontColor('#FFFFFF').setHorizontalAlignment('center');
   
-  // DÒNG 2: TỔNG THUÊ BAO
-  destSheet.getRange(2, 1, 1, 7).merge()
+  // DÒNG 2: TỔNG THUÊ BAO (Gộp 8 cột)
+  destSheet.getRange(2, 1, 1, 8).merge()
     .setValue(`📊 TỔNG THUÊ BAO ĐẾN HẠN: ${matchedRows.length} TB`)
     .setFontWeight('bold').setFontSize(11).setBackground('#D2E3FC').setFontColor('#174EA6').setHorizontalAlignment('left');
   
-  destSheet.getRange(2, 8, 1, 5).merge()
+  // Ngày lập (Gộp 5 cột tiếp theo)
+  destSheet.getRange(2, 9, 1, 5).merge()
     .setValue(`🕒 Ngày lập: ${Utilities.formatDate(new Date(), 'Asia/Saigon', 'dd/MM/yyyy HH:mm')}`)
     .setFontSize(10).setBackground('#D2E3FC').setFontColor('#5F6368').setHorizontalAlignment('right');
   
-  // DÒNG 3: DOANH THU GIA HẠN
-  destSheet.getRange(3, 1, 1, 12).merge()
+  // DÒNG 3: DOANH THU GIA HẠN (Gộp 13 cột)
+  destSheet.getRange(3, 1, 1, 13).merge()
     .setValue(`💰 DOANH THU GIA HẠN: ${totalRevenue.toLocaleString('vi-VN')} VNĐ`)
     .setFontWeight('bold').setFontSize(11).setBackground('#E8F0FE').setFontColor('#174EA6').setHorizontalAlignment('left');
   
-  // NÚT TẢI TRÊN SHEET
-  destSheet.getRange(2, 13, 2, 2).merge()
+  // NÚT TẢI TRÊN SHEET (2 cột cuối N-O)
+  destSheet.getRange(2, 14, 2, 2).merge()
     .setFormula(`=HYPERLINK("${directExportUrl}"; "📥 TẢI FILE EXCEL")`)
     .setFontWeight('bold').setFontSize(11).setBackground('#1A73E8').setFontColor('#FFFFFF')
     .setHorizontalAlignment('center').setVerticalAlignment('middle');
   
   // DÒNG 4: Thống kê 4 mức màu
   const kpiDetails = [
-    `🔴 Quá hạn: ${countExpired} TB`, '', '', `🟠 Khẩn cấp (≤ 7 ngày): ${countUrgent} TB`, '', '',
-    `🟡 Cận hạn (8 - 15 ngày): ${countWarning} TB`, '', '', `🟢 Trong hạn: ${countInMonth} TB`, '', '', '', ''
+    `🔴 Quá hạn: ${countExpired} TB`, '', '', `🟠 Khẩn cấp (≤ 7 ngày): ${countUrgent} TB`, '', '', '',
+    `🟡 Cận hạn (8 - 15 ngày): ${countWarning} TB`, '', '', '', `🟢 Trong hạn: ${countInMonth} TB`, '', '', ''
   ];
-  destSheet.getRange(4, 1, 1, 14).setValues([kpiDetails]);
+  destSheet.getRange(4, 1, 1, 15).setValues([kpiDetails]);
   destSheet.getRange(4, 1, 1, 3).merge().setBackground('#FCE8E6').setFontColor('#C5221F').setFontWeight('bold').setHorizontalAlignment('center');
-  destSheet.getRange(4, 4, 1, 3).merge().setBackground('#FEF7E0').setFontColor('#B06000').setFontWeight('bold').setHorizontalAlignment('center');
-  destSheet.getRange(4, 7, 1, 3).merge().setBackground('#FEF9E7').setFontColor('#7E5700').setFontWeight('bold').setHorizontalAlignment('center');
-  destSheet.getRange(4, 10, 1, 5).merge().setBackground('#E6F4EA').setFontColor('#137333').setFontWeight('bold').setHorizontalAlignment('center');
+  destSheet.getRange(4, 4, 1, 4).merge().setBackground('#FEF7E0').setFontColor('#B06000').setFontWeight('bold').setHorizontalAlignment('center');
+  destSheet.getRange(4, 8, 1, 4).merge().setBackground('#FEF9E7').setFontColor('#7E5700').setFontWeight('bold').setHorizontalAlignment('center');
+  destSheet.getRange(4, 12, 1, 4).merge().setBackground('#E6F4EA').setFontColor('#137333').setFontWeight('bold').setHorizontalAlignment('center');
   
-  // DÒNG 5: Headers
+  // DÒNG 5: Headers (Có thêm KHU VỰC)
   const tableHeaders = [
     'Trạng thái cảnh báo', 'Thời hạn còn lại', 'MÃ KHÁCH HÀNG', 'TÊN THUÊ BAO', 'SĐT LIÊN HỆ',
     'ĐỊA CHỈ LẮP ĐẶT', 'GÓI CƯỚC', 'GIÁ CƯỚC', 'CHU KỲ', 'NGÀY BẮT ĐẦU', 'NGÀY KẾT THÚC',
-    'TÌNH TRẠNG CHẶN CẮT', 'TÊN CỬA HÀNG', 'TÊN NHÂN VIÊN'
+    'TÌNH TRẠNG CHẶN CẮT', 'KHU VỰC', 'TÊN CỬA HÀNG', 'TÊN NHÂN VIÊN'
   ];
   destSheet.getRange(5, 1, 1, tableHeaders.length).setValues([tableHeaders])
     .setFontWeight('bold').setBackground('#00558F').setFontColor('#FFFFFF').setHorizontalAlignment('center');
@@ -183,14 +211,18 @@ function processRenewalReport(params) {
       destSheet.getRange(startRow + r, 1, 1, 2)
         .setBackground(matchedRows[r].bgColor).setFontColor(matchedRows[r].fgColor).setFontWeight('bold');
     }
+    
+    // Căn lề các cột
     destSheet.getRange(startRow, 1, outputData.length, 2).setHorizontalAlignment('center');
     destSheet.getRange(startRow, 3, outputData.length, 1).setNumberFormat('@').setHorizontalAlignment('center');
     destSheet.getRange(startRow, 5, outputData.length, 1).setNumberFormat('@').setHorizontalAlignment('center');
     destSheet.getRange(startRow, 8, outputData.length, 1).setNumberFormat('#,##0').setHorizontalAlignment('right');
     destSheet.getRange(startRow, 9, outputData.length, 1).setHorizontalAlignment('center');
-    destSheet.getRange(startRow, 10, outputData.length, 2).setHorizontalAlignment('center');
-    destSheet.getRange(startRow, 12, outputData.length, 1).setHorizontalAlignment('center');
+    destSheet.getRange(startRow, 10, outputData.length, 2).setHorizontalAlignment('center'); // Ngày BD - KT
+    destSheet.getRange(startRow, 12, outputData.length, 1).setHorizontalAlignment('center'); // Chặn cắt
+    destSheet.getRange(startRow, 13, outputData.length, 1).setHorizontalAlignment('center'); // Khu vực
   
+    // Tự động kéo rộng cột
     destSheet.autoResizeColumns(1, tableHeaders.length);
     for (let col = 1; col <= tableHeaders.length; col++) {
       const curWidth = destSheet.getColumnWidth(col);
@@ -234,9 +266,10 @@ function prepareCleanDownloadUrl(sheetName) {
       tempSs.deleteSheet(defaultSheet);
     }
   
-    copiedSheet.getRange('M2:N3').breakApart().clear().setBackground('#D2E3FC');
-    copiedSheet.getRange('H2:N2').merge().setValue(sourceSheet.getRange('H2').getValue()).setHorizontalAlignment('right');
-    copiedSheet.getRange('A3:N3').merge().setValue(sourceSheet.getRange('A3').getValue()).setHorizontalAlignment('left');
+    // Điều chỉnh cột do bảng giờ có 15 Cột (O)
+    copiedSheet.getRange('N2:O3').breakApart().clear().setBackground('#D2E3FC');
+    copiedSheet.getRange('I2:O2').merge().setValue(sourceSheet.getRange('I2').getValue()).setHorizontalAlignment('right');
+    copiedSheet.getRange('A3:O3').merge().setValue(sourceSheet.getRange('A3').getValue()).setHorizontalAlignment('left');
   
     SpreadsheetApp.flush();
   
@@ -298,7 +331,7 @@ function getRenewalDialogHtml() {
       <div class="opt-card">
         <label class="radio-label">
           <input type="radio" name="renewType" value="month" checked onchange="toggleRenewType()">
-          <strong>1. Kết xuất theo Tháng hết hạn</strong>
+          <strong>1. Kết xuất theo Tháng kế hoạch</strong>
         </label>
         <div class="inputs" id="boxMonth">
           <span>Tháng:</span>
@@ -436,7 +469,7 @@ function getRenewalDialogHtml() {
       function startCleanDownload() {
         const btn = document.getElementById('btnDlRenew');
         btn.disabled = true;
-        btn.innerText = '⏳ Đang chuẩn bị file Excel sạch...';
+        btn.innerText = '⏳ Đang chuẩn bị file Excel...';
   
         google.script.run
           .withSuccessHandler(function(res) {
