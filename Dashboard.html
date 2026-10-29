@@ -184,13 +184,25 @@
     .data-table tr:hover { background: #f8fafc; }
     .data-table tr:last-child { font-weight: bold; background: #f8fafc; }
     
+    /* CSS TRA CỨU 360 (Khôi phục CSS chia cột bị thiếu) */
     .search-big-input { width: 100%; padding: 18px 24px; font-size: 16px; border: 2px solid #cbd5e1; border-radius: 12px; outline: none; transition: 0.2s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     .search-big-input:focus { border-color: var(--mf-blue); box-shadow: 0 0 0 4px rgba(0,90,171,0.1); }
+    
+    .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; padding: 24px; }
+    .info-group { background: #f8fafc; padding: 18px; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .info-item { margin-bottom: 14px; display: flex; flex-direction: column; gap: 4px; }
+    .info-item:last-child { margin-bottom: 0; }
+    .info-label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; }
+    .info-value { font-size: 14px; color: #0f172a; font-weight: 500; }
     
     .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
     .badge-green { background: #dcfce7; color: #166534; }
     .badge-red { background: #fee2e2; color: #991b1b; }
     .badge-blue { background: #dbeafe; color: #1e40af; }
+    
+    .pkg-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; }
+    .pkg-bar-bg { height: 6px; background: #e2e8f0; border-radius: 3px; flex-grow: 1; margin: 0 12px; overflow: hidden; }
+    .pkg-bar-fill { height: 100%; background: #059669; border-radius: 3px; }
 
     #loadingOverlay { position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
     .spinner-border { width: 48px; height: 48px; border: 4px solid #cbd5e1; border-top-color: var(--mf-red); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
@@ -202,7 +214,6 @@
   <!-- LEFT SIDEBAR -->
   <div class="sidebar" data-html2canvas-ignore>
     <div class="brand-logo-container">
-      <!-- Logo MobiFiber vừa được tải lên -->
       <img src="https://drive.google.com/uc?export=view&id=1iROsN5GeodNsRo_KqeSQyDJ4W9v7u8xi" alt="MobiFiber Logo">
       <div class="brand-title">Executive Dashboard</div>
     </div>
@@ -747,11 +758,13 @@
               res.forEach(item => {
                 let badgeChan = item.tinhTrangChan === 'Bình thường' ? 'badge-green' : 'badge-red';
                 let badgeHD = item.tinhTrangHD.includes('Đang hoạt động') ? 'badge-blue' : 'badge-red';
+                
+                // === THIẾT KẾ GRID 2 CỘT TÍCH HỢP CSS CHI TIẾT TRỰC TIẾP === //
                 html += `
-                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-                  <div style="background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-                    <div><div style="font-weight: bold; color: var(--mf-blue); font-size: 16px;">${item.tenTB}</div><div style="font-family: monospace; color: #64748b; font-size: 13px; font-weight: 600; margin-top: 4px;">KH: ${item.maKH} ${item.user ? ' | User: ' + item.user : ''}</div></div>
-                    <div style="text-align: right; display: flex; gap: 8px;"><span class="badge ${badgeHD}">${item.tinhTrangHD}</span><span class="badge ${badgeChan}">${item.tinhTrangChan}</span></div>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                  <div style="background: #f8fafc; padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                    <div><div style="font-weight: bold; color: var(--mf-blue); font-size: 18px;">${item.tenTB}</div><div style="font-family: monospace; color: #64748b; font-size: 14px; font-weight: 600; margin-top: 6px;">KH: ${item.maKH} ${item.user ? ' | User: ' + item.user : ''}</div></div>
+                    <div style="text-align: right; display: flex; flex-direction: column; gap: 8px; align-items: flex-end;"><span class="badge ${badgeHD}">${item.tinhTrangHD}</span><span class="badge ${badgeChan}">${item.tinhTrangChan}</span></div>
                   </div>
                   <div class="detail-grid">
                     <div class="info-group">
