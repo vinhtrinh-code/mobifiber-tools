@@ -30,6 +30,11 @@ function processSpecialReport(params) {
   
   // 1. Nạp bản đồ tham số chuẩn hóa từ thamso_caidat
   const mapping = loadThamSoMapping();
+  // Bảng 5 (ngoại lệ) trong thamso_caidat + phân loại thống nhất với tab Thuê bao BCA / Nghiệp vụ
+  const dtTs = ss.getSheetByName(DT5.TS_SHEET);
+  dt5EnsureExceptionTable_(dtTs);
+  const dtEx = dt5ReadExceptions_(dtTs);
+  const dtNewXM = [];
   
   // 2. Phân tích đối tượng lọc
   const targetGroup = params.targetGroup || 'all';
@@ -113,15 +118,16 @@ function processSpecialReport(params) {
     const isCancelled = normStatusHD.includes('hủy') || normStatusHD.includes('huy') ||
                         normStatusHD.includes('thanh lý') || normStatusHD.includes('thanh ly') ||
                         normStatusHD.includes('chấm dứt') || normStatusHD.includes('cham dut');
-    if (isCancelled) continue;
+    if (isCancelled || rawStatusHD !== 'Đang hoạt động') continue;
   
     const rawLoaiKH = String(row[idxLoaiKH] || '').trim();
     const normLoaiKH = normalizeHeader(rawLoaiKH);
   
-    const isNghiepVu = normLoaiKH.includes('thuê bao nghiệp vụ') || normLoaiKH.includes('thue bao nghiep vu');
-    const isBCA = normLoaiKH.includes('bca') || normLoaiKH.includes('vũ trang') ||
-                  normLoaiKH.includes('vu trang') || normLoaiKH.includes('hành chính') ||
-                  normLoaiKH.includes('công an');
+    const dtC = dt5Classify_(row[idxMaKH], rawLoaiKH, row[idxTenTB], row[idxGoiCuoc], dtEx);
+    if (dtC.add) dtNewXM.push([String(row[idxMaKH] || '').replace(/^'+/, '').trim(), String(row[idxTenTB] || '')]);
+    if (dtC.skip) continue;
+    const isNghiepVu = dtC.grp === 'NV';
+    const isBCA = dtC.grp === 'BCA';
   
     if (targetGroup === 'nv' && !isNghiepVu) continue;
     if (targetGroup === 'bca' && !isBCA) continue;
@@ -213,6 +219,15 @@ function processSpecialReport(params) {
     });
   }
   
+  // Tự bắt thuê bao hành chính/LLVT chưa rõ vào Bảng 5 (Cần xác minh)
+  const dtSeen = {};
+  dtNewXM.forEach(function (x) {
+    const nid = normalizeCustomerId(x[0]);
+    if (dtEx[nid] || dtSeen[nid]) return;
+    dtSeen[nid] = true;
+    dt5AppendException_(dtTs, x[0], x[1], DT5.XL_XAC_MINH, 'Tự bắt: loại KH hành chính/LLVT, không có dấu hiệu công an');
+  });
+
   // Sắp xếp phân tầng 4 cấp
   specRowsData.sort((a, b) => {
     if (a.isNghiepVu !== b.isNghiepVu) return a.isNghiepVu - b.isNghiepVu;
@@ -666,4 +681,289 @@ function getSpecialDialogHtml() {
   </body>
   </html>
   `;
+}
+/* ===== MODULE THUE BAO DAC THU v5 (BCA / NGHIEP VU) - tab rieng, tu cap nhat, bang ngoai le trong thamso_caidat ===== */
+
+var DT5 = {
+  SHEET_BCA: 'Thuê bao BCA',
+  SHEET_NV: 'Thuê bao Nghiệp vụ',
+  TS_SHEET: 'thamso_caidat',
+  EX_COL: 15,
+  EX_TITLE_ROW: 2,
+  EX_HEAD_ROW: 3,
+  EX_FIRST_ROW: 4,
+  EX_HEADERS: ['MÃ KHÁCH HÀNG', 'TÊN THUÊ BAO', 'XỬ LÝ', 'LÝ DO', 'NGÀY CẬP NHẬT'],
+  XL_LOAI_TRU: 'Loại trừ',
+  XL_XAC_MINH: 'Cần xác minh',
+  XL_BCA: 'Tính BCA',
+  XL_NV: 'Tính Nghiệp vụ',
+  AREA_ORDER: ['TT.KDVT', 'KV Đà Lạt', 'KV Bảo Lộc', 'KV Gia Nghĩa', 'KV Phan Thiết']
+};
+
+function capNhatThuBaoDacThu() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var res = buildThuBaoDacThu_(ss);
+  SpreadsheetApp.getActive().toast('BCA: ' + res.bca + ' | Nghiệp vụ: ' + res.nv + ' | Loại trừ: ' + res.loaiTru + ' | Cần xác minh: ' + res.xacMinh, 'Thuê bao đặc thù', 8);
+  return res;
+}
+
+function dt5ReadExceptions_(ts) {
+  var map = {};
+  var last = ts.getLastRow();
+  if (last < DT5.EX_FIRST_ROW) return map;
+  var vals = ts.getRange(DT5.EX_FIRST_ROW, DT5.EX_COL, last - DT5.EX_FIRST_ROW + 1, 5).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    var id = normalizeCustomerId(String(vals[i][0] || '').replace(/^'+/, ''));
+    if (id === '' || id === '0') continue;
+    map[id] = { xuLy: String(vals[i][2] || '').trim(), ten: String(vals[i][1] || ''), row: DT5.EX_FIRST_ROW + i };
+  }
+  return map;
+}
+
+function dt5EnsureExceptionTable_(ts) {
+  var c = DT5.EX_COL;
+  var t = ts.getRange(DT5.EX_TITLE_ROW, c);
+  if (!t.getValue()) {
+    t.setValue('BẢNG 5: THUÊ BAO NGOẠI LỆ (LOẠI TRỪ / CẦN XÁC MINH / ÉP NHÓM)').setFontWeight('bold');
+    ts.getRange(DT5.EX_HEAD_ROW, c, 1, 5).setValues([DT5.EX_HEADERS]).setFontWeight('bold').setBackground('#1B365D').setFontColor('#FFFFFF');
+    ts.getRange(DT5.EX_FIRST_ROW, c, 500, 1).setNumberFormat('@');
+    var rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList([DT5.XL_LOAI_TRU, DT5.XL_XAC_MINH, DT5.XL_BCA, DT5.XL_NV], true).setAllowInvalid(false).build();
+    ts.getRange(DT5.EX_FIRST_ROW, c + 2, 500, 1).setDataValidation(rule);
+    ts.setColumnWidth(c, 120); ts.setColumnWidth(c + 1, 260); ts.setColumnWidth(c + 2, 120); ts.setColumnWidth(c + 3, 260); ts.setColumnWidth(c + 4, 110);
+  }
+}
+
+function dt5AppendException_(ts, id, ten, xuLy, lyDo) {
+  var last = ts.getLastRow();
+  var colVals = last >= DT5.EX_FIRST_ROW ? ts.getRange(DT5.EX_FIRST_ROW, DT5.EX_COL, last - DT5.EX_FIRST_ROW + 1, 1).getValues() : [];
+  var r = DT5.EX_FIRST_ROW;
+  for (var i = 0; i < colVals.length; i++) { if (String(colVals[i][0] || '').trim() !== '') r = DT5.EX_FIRST_ROW + i + 1; }
+  ts.getRange(r, DT5.EX_COL).setNumberFormat('@');
+  ts.getRange(r, DT5.EX_COL, 1, 5).setValues([[id, ten, xuLy, lyDo, Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy')]]);
+}
+
+function dt5SeedExceptions_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ts = ss.getSheetByName(DT5.TS_SHEET);
+  dt5EnsureExceptionTable_(ts);
+  var ex = dt5ReadExceptions_(ts);
+  var raw = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
+  var data = raw.getDataRange().getValues();
+  var h = data[CONFIG.HEADER_ROW_TARGET - 1].map(normalizeHeader);
+  var iId = h.indexOf(normalizeHeader('MÃ KHÁCH HÀNG')), iTen = h.indexOf(normalizeHeader('TÊN THUÊ BAO'));
+  var n = 0;
+  for (var i = CONFIG.DATA_START_ROW_TARGET - 1; i < data.length; i++) {
+    var ten = String(data[i][iTen] || '');
+    if (ten.toUpperCase().indexOf('VĂN PHÒNG HĐND VÀ UBND XÃ ĐẠ TẺH 2') === -1) continue;
+    var id = normalizeCustomerId(data[i][iId]);
+    if (ex[id]) continue;
+    dt5AppendException_(ts, String(data[i][iId]).trim(), ten, DT5.XL_LOAI_TRU, 'UBND xã, không phải công an');
+    n++;
+  }
+  return n;
+}
+
+function buildThuBaoDacThu_(ss) {
+  var raw = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
+  if (!raw) throw new Error('Không tìm thấy sheet raw_mobifiber');
+  var ts = ss.getSheetByName(DT5.TS_SHEET);
+  dt5EnsureExceptionTable_(ts);
+  var ex = dt5ReadExceptions_(ts);
+  var mapping = loadThamSoMapping();
+
+  var data = raw.getDataRange().getValues();
+  var h = data[CONFIG.HEADER_ROW_TARGET - 1].map(normalizeHeader);
+  function col(name) { var k = h.indexOf(normalizeHeader(name)); if (k === -1) throw new Error('Thiếu cột ' + name); return k; }
+  var iId = col('MÃ KHÁCH HÀNG'), iLoai = col('LOẠI KHÁCH HÀNG'), iTen = col('TÊN THUÊ BAO'), iGoi = col('GÓI CƯỚC'),
+      iTt = col('TÌNH TRẠNG HỢP ĐỒNG'), iNv = col('MÃ NHÂN VIÊN'), iDt = col('DTPK'), iCh = col('TÊN CỬA HÀNG');
+
+  var bca = [], nv = [], nBCAcho = 0, nNVhuy = 0, nLoaiTru = 0, nXM = 0, newXM = [];
+  for (var i = CONFIG.DATA_START_ROW_TARGET - 1; i < data.length; i++) {
+    var r = data[i];
+    var rawId = String(r[iId] || '').trim();
+    if (!rawId) continue;
+    var id = normalizeCustomerId(rawId);
+    var loai = String(r[iLoai] || '').toLowerCase();
+    var ten = String(r[iTen] || '');
+    var tenU = ten.toUpperCase();
+    var goi = String(r[iGoi] || '').toUpperCase();
+    var tt = String(r[iTt] || '').trim();
+
+    var cls = dt5Classify_(rawId, r[iLoai], ten, r[iGoi], ex);
+    var grp = cls.grp, pl = '';
+    if (cls.skip) {
+      if (cls.why === 'loaitru') nLoaiTru++;
+      else if (cls.why === 'xm') nXM++;
+      else if (cls.why === 'auto') { newXM.push([rawId, ten]); nXM++; }
+      continue;
+    }
+    if (!grp) continue;
+    if (grp === 'BCA') {
+      if (tenU.indexOf('CÔNG AN TỈNH') !== -1) pl = 'Công an tỉnh';
+      else if (/CÔNG AN (PHƯỜNG|XÃ)/.test(tenU)) pl = 'Công an phường/xã';
+      else if (tenU.indexOf('CÔNG AN') !== -1) pl = 'Công an (khác)';
+      else pl = 'CBCS / cá nhân';
+    }
+    if (tt !== 'Đang hoạt động') { if (grp === 'BCA') nBCAcho++; else nNVhuy++; continue; }
+
+    var maNv = String(r[iNv] || '').replace(/^'+/, '').trim();
+    var info = mapping.staffRegion.get(normalizeHeader(maNv));
+    var area = info && info.khuVuc ? info.khuVuc : 'Chưa phân bổ KV';
+    var rec = { area: area, pl: pl, dt: parseCurrencyToInteger(r[iDt]) || 0, ch: getShortValue(mapping.stores, r[iCh]), test: /test/i.test(ten) };
+    if (grp === 'BCA') bca.push(rec); else nv.push(rec);
+  }
+
+  var seen = {};
+  for (var k = 0; k < newXM.length; k++) {
+    var nid = normalizeCustomerId(newXM[k][0]);
+    if (ex[nid] || seen[nid]) continue;
+    seen[nid] = true;
+    dt5AppendException_(ts, newXM[k][0], newXM[k][1], DT5.XL_XAC_MINH, 'Tự bắt: loại KH hành chính/LLVT, không có dấu hiệu công an');
+  }
+
+  var stamp = Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy HH:mm');
+  dt5WriteBca_(ss, bca, stamp, nBCAcho, nLoaiTru, nXM);
+  dt5WriteNv_(ss, nv, stamp, nNVhuy, nLoaiTru);
+  return { bca: bca.length, nv: nv.length, loaiTru: nLoaiTru, xacMinh: nXM };
+}
+
+function dt5AreaList_(recs) {
+  var set = {};
+  recs.forEach(function (x) { set[x.area] = true; });
+  var out = DT5.AREA_ORDER.filter(function (a) { return set[a]; });
+  Object.keys(set).forEach(function (a) { if (out.indexOf(a) === -1) out.push(a); });
+  return out;
+}
+
+function dt5Sheet_(ss, name) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) sh = ss.insertSheet(name);
+  sh.clear(); sh.clearFormats();
+  sh.setHiddenGridlines(true);
+  return sh;
+}
+
+function dt5Head_(sh, row, vals) {
+  sh.getRange(row, 1, 1, vals.length).setValues([vals]).setFontWeight('bold').setBackground('#1B365D')
+    .setFontColor('#FFFFFF').setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(true);
+}
+
+function dt5WriteBca_(ss, recs, stamp, nCho, nLoaiTru, nXM) {
+  var sh = dt5Sheet_(ss, DT5.SHEET_BCA);
+  var cats = ['Công an tỉnh', 'Công an phường/xã', 'CBCS / cá nhân', 'Công an (khác)'];
+  sh.getRange('A1').setValue('THUÊ BAO BCA (CÔNG AN, CBCS) - THEO KHU VỰC').setFontSize(14).setFontWeight('bold').setFontColor('#174EA6');
+  sh.getRange('A2').setValue('Cập nhật: ' + stamp + '  |  Chỉ tính thuê bao Đang hoạt động  |  Nguồn: raw_mobifiber + Bảng 5 thamso_caidat').setFontColor('#5F6368').setFontStyle('italic');
+  var head = ['KHU VỰC'].concat(cats).concat(['TỔNG TB', 'TỶ TRỌNG TB (%)', 'DTPK (đ/tháng)', 'TỶ TRỌNG DTPK (%)']);
+  dt5Head_(sh, 4, head);
+  var areas = dt5AreaList_(recs);
+  var totTb = recs.length, totDt = recs.reduce(function (s, x) { return s + x.dt; }, 0);
+  var rows = [];
+  areas.forEach(function (a) {
+    var sub = recs.filter(function (x) { return x.area === a; });
+    var row = [a];
+    cats.forEach(function (c) { row.push(sub.filter(function (x) { return x.pl === c; }).length); });
+    var tb = sub.length, d = sub.reduce(function (s, x) { return s + x.dt; }, 0);
+    row.push(tb, totTb ? tb / totTb : 0, d, totDt ? d / totDt : 0);
+    rows.push(row);
+  });
+  rows.sort(function (a, b) { return b[7] - a[7]; });
+  var tot = ['TỔNG CỘNG'];
+  cats.forEach(function (c) { tot.push(recs.filter(function (x) { return x.pl === c; }).length); });
+  tot.push(totTb, totTb ? 1 : 0, totDt, totDt ? 1 : 0);
+  rows.push(tot);
+  var r0 = 5;
+  sh.getRange(r0, 1, rows.length, head.length).setValues(rows);
+  sh.getRange(r0, 6, rows.length, 1).setFontWeight('bold');
+  sh.getRange(r0, 7, rows.length, 1).setNumberFormat('0.0%');
+  sh.getRange(r0, 8, rows.length, 1).setNumberFormat('#,##0');
+  sh.getRange(r0, 9, rows.length, 1).setNumberFormat('0.0%');
+  sh.getRange(r0, 2, rows.length, 5).setHorizontalAlignment('center');
+  var last = r0 + rows.length - 1;
+  sh.getRange(last, 1, 1, head.length).setFontWeight('bold').setBackground('#E8F0FE');
+  sh.getRange(r0, 1, rows.length, head.length).setBorder(true, true, true, true, true, true, '#DADCE0', SpreadsheetApp.BorderStyle.SOLID);
+  var n = last + 2;
+  sh.getRange(n, 1).setValue('Ghi chú').setFontWeight('bold');
+  sh.getRange(n + 1, 1).setValue('• Thuê bao BCA đang chờ thi công (chưa tính): ' + nCho);
+  sh.getRange(n + 2, 1).setValue('• Thuê bao loại trừ theo Bảng 5 (thamso_caidat): ' + nLoaiTru);
+  sh.getRange(n + 3, 1).setValue('• Thuê bao cần xác minh (chưa tính vào BCA hay Nghiệp vụ): ' + nXM + '  →  xem Bảng 5, cột XỬ LÝ');
+  sh.getRange(n + 4, 1).setValue('• Nhận diện BCA: gói CBCS, hoặc loại KH BCA / Cán bộ chiến sĩ, hoặc tên chứa "Công an".');
+  sh.setColumnWidth(1, 150); for (var c = 2; c <= 9; c++) sh.setColumnWidth(c, 125);
+  sh.setRowHeight(4, 42); sh.setFrozenRows(4);
+}
+
+function dt5WriteNv_(ss, recs, stamp, nHuy, nLoaiTru) {
+  var sh = dt5Sheet_(ss, DT5.SHEET_NV);
+  sh.getRange('A1').setValue('THUÊ BAO NGHIỆP VỤ (PHỤC VỤ NỘI BỘ - KHÔNG GHI NHẬN DOANH THU)').setFontSize(14).setFontWeight('bold').setFontColor('#174EA6');
+  sh.getRange('A2').setValue('Cập nhật: ' + stamp + '  |  Chỉ tính thuê bao Đang hoạt động  |  Nguồn: raw_mobifiber + Bảng 5 thamso_caidat').setFontColor('#5F6368').setFontStyle('italic');
+  dt5Head_(sh, 4, ['KHU VỰC', 'SỐ THUÊ BAO', 'TỶ TRỌNG (%)', 'TRONG ĐÓ: THUÊ BAO TEST']);
+  var areas = dt5AreaList_(recs), tot = recs.length;
+  var rows = areas.map(function (a) {
+    var sub = recs.filter(function (x) { return x.area === a; });
+    return [a, sub.length, tot ? sub.length / tot : 0, sub.filter(function (x) { return x.test; }).length];
+  });
+  rows.sort(function (a, b) { return b[1] - a[1]; });
+  rows.push(['TỔNG CỘNG', tot, tot ? 1 : 0, recs.filter(function (x) { return x.test; }).length]);
+  sh.getRange(5, 1, rows.length, 4).setValues(rows);
+  sh.getRange(5, 3, rows.length, 1).setNumberFormat('0.0%');
+  sh.getRange(5, 2, rows.length, 3).setHorizontalAlignment('center');
+  var last = 5 + rows.length - 1;
+  sh.getRange(last, 1, 1, 4).setFontWeight('bold').setBackground('#E8F0FE');
+  sh.getRange(5, 1, rows.length, 4).setBorder(true, true, true, true, true, true, '#DADCE0', SpreadsheetApp.BorderStyle.SOLID);
+
+  var s2 = last + 2;
+  sh.getRange(s2, 1).setValue('THEO CỬA HÀNG / ĐƠN VỊ').setFontWeight('bold').setFontColor('#174EA6');
+  dt5Head_(sh, s2 + 1, ['CỬA HÀNG / ĐƠN VỊ', 'SỐ THUÊ BAO', 'TỶ TRỌNG (%)']);
+  var cnt = {};
+  recs.forEach(function (x) { var k = x.ch || '(không rõ)'; cnt[k] = (cnt[k] || 0) + 1; });
+  var r2 = Object.keys(cnt).map(function (k) { return [k, cnt[k], tot ? cnt[k] / tot : 0]; }).sort(function (a, b) { return b[1] - a[1]; });
+  if (r2.length) {
+    sh.getRange(s2 + 2, 1, r2.length, 3).setValues(r2);
+    sh.getRange(s2 + 2, 3, r2.length, 1).setNumberFormat('0.0%');
+    sh.getRange(s2 + 2, 2, r2.length, 2).setHorizontalAlignment('center');
+    sh.getRange(s2 + 2, 1, r2.length, 3).setBorder(true, true, true, true, true, true, '#DADCE0', SpreadsheetApp.BorderStyle.SOLID);
+  }
+  var n = s2 + 2 + r2.length + 1;
+  sh.getRange(n, 1).setValue('Ghi chú').setFontWeight('bold');
+  sh.getRange(n + 1, 1).setValue('• Thuê bao nghiệp vụ đã hủy (không tính): ' + nHuy);
+  sh.getRange(n + 2, 1).setValue('• Không hiển thị doanh thu: thuê bao nghiệp vụ phục vụ nội bộ, không ghi nhận doanh thu.');
+  sh.setColumnWidth(1, 260); for (var c = 2; c <= 4; c++) sh.setColumnWidth(c, 140);
+  sh.setRowHeight(4, 42); sh.setFrozenRows(4);
+}
+
+/* Chay 1 lan tren ban mau: khoi tao Bang 5 (9 thue bao Da Teh 2) roi cap nhat 2 tab */
+function chayThuNghiemDacThu() {
+  var n = dt5SeedExceptions_();
+  var res = capNhatThuBaoDacThu();
+  return 'Bảng 5 thêm ' + n + ' dòng; ' + JSON.stringify(res);
+}
+
+/* Phan loai thong nhat (giu dong bo voi buildThuBaoDacThu_): tra ve {grp: 'NV'|'BCA'|null, skip, add} */
+function dt5Classify_(rawId, loaiKH, tenTB, goi, ex) {
+  var id = normalizeCustomerId(String(rawId || '').replace(/^'+/, ''));
+  var loai = String(loaiKH || '').toLowerCase();
+  var tenU = String(tenTB || '').toUpperCase();
+  var g = String(goi || '').toUpperCase();
+  var e = ex[id];
+  if (e) {
+    if (e.xuLy === DT5.XL_LOAI_TRU) return { grp: null, skip: true, add: false, why: 'loaitru' };
+    if (e.xuLy === DT5.XL_XAC_MINH) return { grp: null, skip: true, add: false, why: 'xm' };
+    if (e.xuLy === DT5.XL_NV) return { grp: 'NV', skip: false, add: false };
+    if (e.xuLy === DT5.XL_BCA) return { grp: 'BCA', skip: false, add: false };
+  }
+  if (loai.indexOf('nghiệp vụ') !== -1) return { grp: 'NV', skip: false, add: false };
+  if (g.indexOf('CBCS') !== -1 || loai === 'bca' || loai.indexOf('cán bộ, chiến sĩ') === 0 || tenU.indexOf('CÔNG AN') !== -1) return { grp: 'BCA', skip: false, add: false };
+  if (loai.indexOf('vũ trang') !== -1 || loai.indexOf('hành chính') !== -1) return { grp: null, skip: true, add: true, why: 'auto' };
+  return { grp: null, skip: true, add: false, why: 'none' };
+}
+
+function kiemThuDacThuLuyKe() {
+  var r = processSpecialReport({ targetGroup: 'bca', timeType: 'all' });
+  return JSON.stringify(r);
+}
+
+
+function taoLichCapNhatDacThu() {
+  ScriptApp.getProjectTriggers().forEach(function(t) { if (t.getHandlerFunction() === 'capNhatThuBaoDacThu') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('capNhatThuBaoDacThu').timeBased().everyDays(1).atHour(7).nearMinute(30).create();
 }

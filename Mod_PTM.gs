@@ -67,6 +67,13 @@ function processPtmReport(params) {
   const idxTenCH = headers.findIndex(h => h === 'tên cửa hàng');
   const idxMaNV = headers.findIndex(h => h === 'mã nhân viên');
   const idxTenNV = headers.findIndex(h => h === 'tên nhân viên');
+  // Cột NEO PTM (chống trôi số khi gia hạn/đổi gói)
+  const idxNgayPtmGoc = headers.findIndex(h => h === 'ngày ptm gốc');
+  const idxGoiGoc = headers.findIndex(h => h === 'gói cước gốc');
+  const idxChuKyGoc = headers.findIndex(h => h === 'chu kỳ gốc');
+  const idxDtpkGoc = headers.findIndex(h => h === 'dtpk gốc');
+  const idxNguonNeo = headers.findIndex(h => h === 'nguồn neo');
+  let soDungNeo = 0, soDuPhongBD = 0;
 
   const numRows = lastRow - CONFIG.DATA_START_ROW_TARGET + 1;
   const rawData = rawSheet.getRange(CONFIG.DATA_START_ROW_TARGET, 1, numRows, lastCol).getValues();
@@ -79,8 +86,14 @@ function processPtmReport(params) {
   for (let i = 0; i < rawData.length; i++) {
     const row = rawData[i];
 
+    // Ưu tiên ngày PTM GỐC (neo); thuê bao chưa có neo mới xét theo Nhu cầu = Đăng ký mới
+    let anchorDate = null;
+    if (idxNgayPtmGoc !== -1) {
+      const nguonNeo = idxNguonNeo !== -1 ? normalizeHeader(row[idxNguonNeo]) : '';
+      if (nguonNeo !== 'chưa xác định') anchorDate = parseToDate(row[idxNgayPtmGoc]);
+    }
     const nhuCau = normalizeHeader(row[idxNhuCau]);
-    if (nhuCau !== 'đăng ký mới' && nhuCau !== 'dang ky moi') continue;
+    if (!anchorDate && nhuCau !== 'đăng ký mới' && nhuCau !== 'dang ky moi') continue;
 
     const loaiKH = normalizeHeader(row[idxLoaiKH]);
     if (loaiKH === 'thuê bao nghiệp vụ' || loaiKH === 'thue bao nghiep vu') continue;
@@ -88,7 +101,8 @@ function processPtmReport(params) {
     const tinhTrang = normalizeHeader(row[idxTinhTrangHD]);
     if (tinhTrang !== 'đang hoạt động' && tinhTrang !== 'dang hoat dong') continue;
 
-    const chuKyRaw = row[idxChuKy];
+    let chuKyRaw = row[idxChuKy];
+    if (anchorDate && idxChuKyGoc !== -1 && parseInt(row[idxChuKyGoc], 10) > 0) chuKyRaw = row[idxChuKyGoc];
     const chuKy = chuKyRaw ? parseInt(chuKyRaw, 10) : 0;
 
     let ptmDate = null;
@@ -106,11 +120,17 @@ function processPtmReport(params) {
       ptmDate = dBatDau;
     }
 
+    if (anchorDate) { ptmDate = anchorDate; soDungNeo++; } else { soDuPhongBD++; }
     if (!ptmDate) continue;
     if (ptmDate < startDate || ptmDate > endDate) continue;
 
-    const giaCuoc = parseCurrencyToInteger(row[idxGiaCuoc]) || 0;
-    const dtpk = parseCurrencyToInteger(row[idxDtpk]) || (chuKy > 0 ? Math.round(giaCuoc / chuKy) : 0);
+    let giaCuoc = parseCurrencyToInteger(row[idxGiaCuoc]) || 0;
+    let dtpk = parseCurrencyToInteger(row[idxDtpk]) || (chuKy > 0 ? Math.round(giaCuoc / chuKy) : 0);
+    if (anchorDate && idxDtpkGoc !== -1) {
+      const dtpkGoc = parseCurrencyToInteger(row[idxDtpkGoc]) || 0;
+      if (dtpkGoc > 0) { dtpk = dtpkGoc; if (chuKy > 0) giaCuoc = dtpkGoc * chuKy; }
+    }
+    const goiHienThi = (anchorDate && idxGoiGoc !== -1 && String(row[idxGoiGoc] || '').trim()) ? row[idxGoiGoc] : (row[idxGoiCuoc] || '');
 
     totalRevenue += giaCuoc;
     totalDtpk += dtpk;
@@ -160,12 +180,12 @@ function processPtmReport(params) {
         paddedTenTB,
         "'" + cleanSDT,
         paddedDiaChi,
-        row[idxGoiCuoc] || '',
+        goiHienThi,
         giaCuoc,
         chuKy > 0 ? chuKy : '',
         dtpk,
         formatDateTimeStr(row[idxNgayDauNoi]),
-        formatDateTimeStr(row[idxNgayBatDau]),
+        anchorDate ? formatDateTimeStr(anchorDate) : formatDateTimeStr(row[idxNgayBatDau]),
         paddedThietBi,
         "'" + cleanSerial,
         khuVuc,

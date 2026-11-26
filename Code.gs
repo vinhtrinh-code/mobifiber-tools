@@ -50,6 +50,7 @@ function onOpen() {
     .addItem('📈 Báo cáo Doanh thu Phân bổ (DTPK)', 'showRevenueAllocationDialog')
     .addItem('⏰ Kết xuất Danh sách Gia hạn', 'showRenewalPromptDialog')
     .addItem('🛡️ Báo cáo TB Nghiệp vụ/BCA', 'showSpecialReportDialog')
+    .addItem('🔄 Cập nhật tab Thuê bao BCA & Nghiệp vụ (v5)', 'capNhatThuBaoDacThu')
     .addItem('🎯 Trích xuất Danh sách Đa điều kiện', 'showQueryDialog')
     .addItem('📊 Báo cáo Bán hàng & Doanh thu theo Kênh', 'generateSalesReport')
     .addItem('🚫 Quản lý Chặn cắt & Thu hồi ONT', 'generateDisconnectionReport')

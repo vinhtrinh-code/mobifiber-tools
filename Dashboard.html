@@ -2,791 +2,772 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MobiFiber Executive Dashboard</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Thư viện chụp ảnh full content -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  
-  <style>
-    /* BỘ NHẬN DIỆN THƯƠNG HIỆU MOBIFONE */
-    :root { 
-      --mf-blue: #005AAB; 
-      --mf-red: #ED1C24; 
-      --mf-bg: #F4F6F9;
-      --mf-text: #202124;
-      --sidebar-width: 260px;
-    }
-    
-    body { 
-      font-family: 'UTM Mobifone KT', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
-      background-color: var(--mf-bg); 
-      color: var(--mf-text); 
-      margin: 0; 
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
-    }
-    
-    /* LEFT SIDEBAR NAVIGATION */
-    .sidebar {
-      width: var(--sidebar-width);
-      background-color: #ffffff;
-      border-right: 1px solid #e2e8f0;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 2px 0 8px rgba(0,0,0,0.04);
-      z-index: 100;
-    }
-    
-    .brand-logo-container {
-      padding: 24px 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      border-bottom: 1px solid #f1f5f9;
-    }
-    
-    .brand-logo-container img {
-      width: 180px;
-      height: auto;
-      margin-bottom: 12px;
-    }
-    
-    .brand-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--mf-blue);
-      text-align: center;
-      line-height: 1.3;
-    }
-    
-    .nav-menu {
-      padding: 20px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    
-    .nav-item {
-      padding: 14px 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      color: #64748b;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      transition: all 0.2s ease;
-    }
-    
-    .nav-item:hover {
-      background-color: #f8fafc;
-      color: var(--mf-blue);
-    }
-    
-    .nav-item.active {
-      background-color: rgba(0, 90, 171, 0.1);
-      color: var(--mf-blue);
-      border-left: 4px solid var(--mf-blue);
-    }
-    
-    /* MAIN CONTENT AREA */
-    .main-wrapper {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      overflow: hidden;
-    }
-    
-    /* STICKY FILTER BAR */
-    .filter-bar { 
-      background: #fff; 
-      padding: 16px 32px; 
-      display: flex; 
-      align-items: center; 
-      justify-content: space-between;
-      border-bottom: 1px solid #e2e8f0; 
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-      position: sticky; 
-      top: 0; 
-      z-index: 50; 
-    }
-    
-    .filter-group { display: flex; align-items: center; gap: 12px; font-size: 13px; }
-    .filter-label { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 12px; }
-    
-    .custom-select { 
-      border: 1px solid #cbd5e1; 
-      padding: 8px 12px; 
-      border-radius: 8px; 
-      outline: none; 
-      font-size: 13px; 
-      color: var(--mf-blue);
-      font-weight: 600;
-      background-color: #f8fafc;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-    .custom-select:hover { border-color: var(--mf-blue); }
-    
-    .action-btn { 
-      background: var(--mf-red); 
-      color: #fff; 
-      padding: 10px 20px; 
-      border-radius: 8px; 
-      font-size: 13px; 
-      font-weight: bold; 
-      cursor: pointer; 
-      border: none;
-      box-shadow: 0 4px 6px -1px rgba(237, 28, 36, 0.2);
-      transition: 0.2s;
-    }
-    .action-btn:hover { background: #d91620; transform: translateY(-1px); }
-    
-    /* SCROLLABLE DASHBOARD CONTENT */
-    .dashboard-scroll-area {
-      flex: 1;
-      overflow-y: auto;
-      padding: 32px;
-    }
-    
-    /* DASHBOARD CARD & GRID */
-    .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; }
-    
-    .sub-kpi-grid { display: grid; grid-template-columns: 2.5fr 2.5fr 1fr 1fr 1fr 1.5fr; gap: 16px; margin-bottom: 24px; }
-    .sub-kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; position: relative; display: flex; flex-direction: column; justify-content: space-between; }
-    
-    .kpi-tong { background: var(--mf-blue); color: white; border: none; }
-    .kpi-hienhuu { background: #0284c7; color: white; border: none; }
-    .kpi-ptm { background: #10b981; color: white; border: none; }
-    
-    .sub-kpi-value { font-size: 32px; font-weight: bold; margin: 4px 0; letter-spacing: -0.5px; }
-    .sub-kpi-label { font-size: 13px; text-transform: uppercase; font-weight: bold; opacity: 0.9; }
-    .sub-kpi-value-small { font-size: 26px; font-weight: bold; margin: 4px 0; }
-    .sub-kpi-label-small { font-size: 11px; text-transform: uppercase; font-weight: 800; }
-    .sub-kpi-subtext-small { font-size: 12px; color: #64748b; margin-top: 4px; line-height: 1.3; }
-    
-    .rev-kpi-grid { display: grid; grid-template-columns: 2fr 1.5fr 1.5fr; gap: 16px; margin-bottom: 24px; }
-    .rev-kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; position: relative; }
-    .rev-kpi-card.main { background: var(--mf-blue); color: white; border: none; }
-    .rev-kpi-value { font-size: 36px; font-weight: bold; margin: 8px 0; letter-spacing: -0.5px; }
-    .rev-kpi-label { font-size: 13px; text-transform: uppercase; font-weight: 700; }
-    
-    .chart-container { position: relative; height: 340px; width: 100%; margin-top: 20px; }
-    .chart-container-large { position: relative; height: 320px; width: 100%; margin-top: 20px; }
-    
-    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 20px; }
-    .data-table th { text-align: left; padding: 14px 16px; background: #f8fafc; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 11px; border-bottom: 2px solid #e2e8f0; }
-    .data-table td { padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #1e293b; }
-    .data-table tr:hover { background: #f8fafc; }
-    .data-table tr:last-child { font-weight: bold; background: #f8fafc; }
-    
-    /* CSS TRA CỨU 360 (Khôi phục CSS chia cột bị thiếu) */
-    .search-big-input { width: 100%; padding: 18px 24px; font-size: 16px; border: 2px solid #cbd5e1; border-radius: 12px; outline: none; transition: 0.2s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-    .search-big-input:focus { border-color: var(--mf-blue); box-shadow: 0 0 0 4px rgba(0,90,171,0.1); }
-    
-    .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; padding: 24px; }
-    .info-group { background: #f8fafc; padding: 18px; border-radius: 12px; border: 1px solid #e2e8f0; }
-    .info-item { margin-bottom: 14px; display: flex; flex-direction: column; gap: 4px; }
-    .info-item:last-child { margin-bottom: 0; }
-    .info-label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; }
-    .info-value { font-size: 14px; color: #0f172a; font-weight: 500; }
-    
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-    .badge-green { background: #dcfce7; color: #166534; }
-    .badge-red { background: #fee2e2; color: #991b1b; }
-    .badge-blue { background: #dbeafe; color: #1e40af; }
-    
-    .pkg-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; }
-    .pkg-bar-bg { height: 6px; background: #e2e8f0; border-radius: 3px; flex-grow: 1; margin: 0 12px; overflow: hidden; }
-    .pkg-bar-fill { height: 100%; background: #059669; border-radius: 3px; }
 
-    #loadingOverlay { position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
-    .spinner-border { width: 48px; height: 48px; border: 4px solid #cbd5e1; border-top-color: var(--mf-red); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+  <style>
+    :root {
+      --blue: #005AAB; --blue-700: #004785; --blue-50: #e8f1fa;
+      --red: #ED1C24; --red-50: #fdecec;
+      --green: #0f9d6b; --green-50: #e3f6ee;
+      --amber: #d97706; --amber-50: #fff4e0;
+      --ink: #0f172a; --ink-2: #475569; --ink-3: #64748b;
+      --line: #e2e8f0; --bg: #f3f6fa; --card: #ffffff;
+      --radius: 14px; --shadow: 0 1px 2px rgba(15,23,42,.04), 0 4px 16px rgba(15,23,42,.05);
+      --side: 244px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      font-family: 'Be Vietnam Pro', 'Segoe UI', Roboto, Arial, sans-serif;
+      background: var(--bg); color: var(--ink); font-size: 14px; line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, select, input { font: inherit; color: inherit; }
+    :focus-visible { outline: 3px solid rgba(0,90,171,.45); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+    /* ===== KHUNG ===== */
+    .app { display: grid; grid-template-columns: var(--side) 1fr; min-height: 100vh; }
+    .sidebar {
+      position: sticky; top: 0; height: 100vh; background: #fff; border-right: 1px solid var(--line);
+      display: flex; flex-direction: column;
+    }
+    .brand { padding: 22px 20px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+    .brand .logo { height: 40px; width: auto; max-width: 150px; object-fit: contain; display: block; }
+    .logo-fallback { font-weight: 700; font-size: 20px; letter-spacing: -.3px; color: var(--blue); }
+    .logo-fallback b { color: var(--red); }
+    .brand-sub { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); }
+    .nav { padding: 14px 12px; display: flex; flex-direction: column; gap: 4px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 0; background: transparent;
+      border-radius: 10px; color: var(--ink-2); font-weight: 600; cursor: pointer; text-align: left; transition: background .15s, color .15s;
+    }
+    .nav-item svg { width: 20px; height: 20px; flex: none; }
+    .nav-item:hover { background: var(--bg); color: var(--blue); }
+    .nav-item[aria-current="page"] { background: var(--blue-50); color: var(--blue); box-shadow: inset 3px 0 0 var(--blue); }
+    .side-foot { margin-top: auto; padding: 16px 20px; font-size: 11px; color: var(--ink-3); border-top: 1px solid var(--line); }
+
+    .main { min-width: 0; display: flex; flex-direction: column; }
+    .topbar {
+      position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line); padding: 12px 28px; display: flex; flex-wrap: wrap; gap: 12px 20px;
+      align-items: center; justify-content: space-between;
+    }
+    .topbar h1 { margin: 0; font-size: 18px; font-weight: 700; color: var(--ink); }
+    .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+    .seg button { border: 0; background: transparent; padding: 7px 14px; border-radius: 8px; font-weight: 600; color: var(--ink-2); cursor: pointer; font-size: 13px; }
+    .seg button[aria-pressed="true"] { background: #fff; color: var(--blue); box-shadow: 0 1px 3px rgba(15,23,42,.12); }
+    .select {
+      appearance: none; border: 1px solid var(--line); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+      padding: 8px 34px 8px 12px; border-radius: 10px; font-weight: 600; font-size: 13px; color: var(--blue); cursor: pointer;
+    }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer; font-weight: 600; font-size: 13px;
+      padding: 9px 16px; border-radius: 10px; background: var(--red); color: #fff; transition: filter .15s;
+    }
+    .btn:hover { filter: brightness(.93); }
+    .btn svg { width: 16px; height: 16px; }
+    .progress { position: sticky; top: 0; z-index: 30; height: 3px; background: transparent; overflow: hidden; }
+    .progress i { display: block; height: 100%; width: 35%; background: var(--red); border-radius: 3px; opacity: 0; }
+    body.loading .progress i { opacity: 1; animation: slide 1s ease-in-out infinite; }
+    @keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+    body.loading .content { opacity: .55; transition: opacity .2s; pointer-events: none; }
+
+    .content { padding: 24px 28px 48px; max-width: 1480px; width: 100%; margin: 0 auto; }
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .report-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; margin-bottom: 18px; }
+    .report-head h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.2px; }
+    .report-head .meta { font-size: 12px; color: var(--ink-3); }
+    .chip { display: inline-block; background: var(--blue-50); color: var(--blue); font-weight: 700; font-size: 12px; padding: 4px 12px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+
+    /* ===== THẺ ===== */
+    .grid { display: grid; gap: 16px; margin-bottom: 16px; }
+    .g-rev { grid-template-columns: 1.6fr 1fr 1fr; }
+    .g-sub { grid-template-columns: 1.4fr 1fr 1fr; }
+    .g-alert { grid-template-columns: repeat(3, 1fr); }
+    .g-2 { grid-template-columns: 1fr 1fr; }
+    .g-3 { grid-template-columns: 1.1fr 1fr 1fr; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 22px; min-width: 0; }
+    .card h3 { margin: 0; font-size: 15px; font-weight: 700; }
+    .card .sub { margin: 2px 0 0; font-size: 12px; color: var(--ink-3); }
+    .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+
+    .kpi { display: flex; flex-direction: column; justify-content: space-between; gap: 10px; min-height: 132px; }
+    .kpi .label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
+    .kpi .value { font-size: 30px; font-weight: 700; letter-spacing: -.5px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+    .kpi .hint { font-size: 12px; color: var(--ink-3); }
+    .kpi.hero { background: linear-gradient(135deg, var(--blue) 0%, var(--blue-700) 100%); color: #fff; border: 0; }
+    .kpi.hero .label, .kpi.hero .hint { color: rgba(255,255,255,.82); }
+    .kpi.hero .value { font-size: 34px; }
+    .kpi.accent-blue .value { color: var(--blue); }
+    .kpi.accent-green .value { color: var(--green); }
+    .kpi.accent-amber { border-top: 4px solid var(--amber); } .kpi.accent-amber .value { color: var(--amber); }
+    .kpi.accent-red { border-top: 4px solid var(--red); } .kpi.accent-red .value { color: var(--red); }
+    .kpi.accent-slate { border-top: 4px solid var(--ink-2); } .kpi.accent-slate .value { color: var(--ink); }
+    .split { height: 8px; border-radius: 999px; background: rgba(255,255,255,.25); overflow: hidden; display: flex; }
+    .split i { display: block; height: 100%; }
+    .split-legend { display: flex; gap: 16px; font-size: 12px; color: rgba(255,255,255,.9); flex-wrap: wrap; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+
+    .chart-box { position: relative; height: 300px; margin-top: 8px; }
+    .chart-box.lg { height: 320px; }
+    .chart-box.sm { height: 220px; }
+
+    /* ===== BẢNG ===== */
+    .table-wrap { overflow-x: auto; margin-top: 8px; }
+    table.data { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+    table.data th { text-align: left; padding: 12px 14px; background: #f8fafc; color: var(--ink-2); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    table.data td { padding: 13px 14px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+    table.data tbody tr:hover { background: #f8fafc; }
+    table.data tfoot td { font-weight: 700; background: #f8fafc; border-bottom: 0; }
+    .r { text-align: right !important; } .c { text-align: center !important; }
+    .share { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .share .bar { width: 64px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+    .share .bar i { display: block; height: 100%; background: var(--blue); }
+    .rank { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--bg); font-size: 12px; font-weight: 700; color: var(--ink-2); }
+
+    /* ===== GÓI / PHÂN KHÚC / TRẠNG THÁI ===== */
+    .pkg-list { max-height: 270px; overflow-y: auto; padding-right: 6px; margin-top: 10px; }
+    .pkg-row { display: grid; grid-template-columns: 110px 1fr 86px; align-items: center; gap: 10px; margin-bottom: 11px; font-size: 13px; }
+    .pkg-row .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pkg-row .bar { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
+    .pkg-row .bar i { display: block; height: 100%; background: var(--green); border-radius: 4px; }
+    .pkg-row .num { text-align: right; font-weight: 600; color: var(--green); }
+    .pkg-row .num small { color: var(--ink-3); font-weight: 500; }
+    .seg-legend { display: grid; gap: 8px; margin-top: 12px; font-size: 13px; }
+    .seg-legend div { display: flex; justify-content: space-between; align-items: center; }
+    .status-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; border-radius: 12px; margin-top: 12px; }
+    .status-row .t { font-weight: 700; } .status-row .d { font-size: 12px; opacity: .8; }
+    .status-row .n { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .st-slate { background: #f1f5f9; color: #334155; } .st-red { background: var(--red-50); color: #991b1b; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .b-green { background: var(--green-50); color: #086b49; } .b-red { background: var(--red-50); color: #991b1b; } .b-blue { background: var(--blue-50); color: var(--blue-700); }
+    .empty { text-align: center; color: var(--ink-3); padding: 28px 12px; }
+
+    /* ===== TRA CỨU ===== */
+    .search-card { max-width: 920px; margin: 0 auto; }
+    .search-box { position: relative; margin-top: 18px; }
+    .search-box svg { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--ink-3); }
+    .search-box input { width: 100%; padding: 16px 20px 16px 50px; font-size: 16px; border: 2px solid var(--line); border-radius: 12px; outline: none; background: #fff; transition: border-color .15s, box-shadow .15s; }
+    .search-box input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(0,90,171,.12); }
+    .search-status { margin: 14px 2px 0; font-weight: 600; color: var(--ink-2); min-height: 22px; }
+    .result { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-top: 16px; background: #fff; box-shadow: var(--shadow); }
+    .result-head { background: #f8fafc; padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+    .result-head .name { font-weight: 700; font-size: 17px; color: var(--blue); }
+    .result-head .id { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+    .result-head .badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
+    .result-body { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px 20px; }
+    .info { background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 12px; align-content: start; }
+    .info dt { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); margin: 0; }
+    .info dd { margin: 2px 0 0; font-weight: 500; word-break: break-word; }
+    .info dd.big { color: var(--blue); font-weight: 700; font-size: 16px; }
+    .skeleton { height: 120px; border-radius: 12px; background: linear-gradient(90deg,#eef2f7 25%,#f8fafc 37%,#eef2f7 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; margin-top: 16px; }
+    @keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+    .toast { position: fixed; right: 20px; bottom: 20px; max-width: 360px; background: #1e293b; color: #fff; padding: 14px 18px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 100; display: none; }
+    .toast.show { display: block; }
+    .toast b { color: #fca5a5; }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 1180px) {
+      .g-rev, .g-sub, .g-3 { grid-template-columns: 1fr 1fr; }
+      .g-rev > :first-child, .g-sub > :first-child { grid-column: 1 / -1; }
+      .g-3 > :first-child { grid-column: 1 / -1; }
+    }
+    @media (max-width: 860px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); }
+      .brand { border-bottom: 0; padding: 12px 16px; }
+      .brand-sub, .side-foot { display: none; }
+      .nav { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; flex-direction: row; justify-content: space-around; background: #fff; border-top: 1px solid var(--line); padding: 6px; gap: 2px; }
+      .nav-item { flex: 1; flex-direction: column; gap: 2px; font-size: 11px; padding: 8px 4px; align-items: center; text-align: center; }
+      .nav-item[aria-current="page"] { box-shadow: none; }
+      .topbar { padding: 10px 16px; position: static; }
+      .content { padding: 16px 16px 90px; }
+      .g-rev, .g-sub, .g-3, .g-2, .g-alert { grid-template-columns: 1fr; }
+      .g-alert { grid-template-columns: 1fr 1fr 1fr; }
+      .g-alert .kpi { min-height: 110px; padding: 14px; } .g-alert .kpi .value { font-size: 22px; }
+      .result-body { grid-template-columns: 1fr; }
+      .kpi.hero .value { font-size: 28px; }
+    }
+    @media (max-width: 520px) { .g-alert { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
+  <div class="progress" aria-hidden="true" data-html2canvas-ignore><i></i></div>
 
-  <!-- LEFT SIDEBAR -->
-  <div class="sidebar" data-html2canvas-ignore>
-    <div class="brand-logo-container">
-      <img src="https://lh3.googleusercontent.com/d/FILE_ID" alt="MobiFiber Logo" style="height: 40px;">
-      <div class="brand-title">Executive Dashboard</div>
-    </div>
-    
-    <div class="nav-menu">
-      <div id="btnNavRevenue" class="nav-item active" onclick="switchDashboard('revenue')">
-        <span style="font-size: 18px;">📈</span> Báo cáo Doanh thu
+  <div class="app">
+    <!-- ===== THANH ĐIỀU HƯỚNG ===== -->
+    <aside class="sidebar" data-html2canvas-ignore>
+      <div class="brand">
+        <? if (logoSrc) { ?>
+          <img class="logo" src="<?!= logoSrc ?>" alt="MobiFiber">
+        <? } else { ?>
+          <div class="logo-fallback">Mobi<b>Fiber</b></div>
+        <? } ?>
+        <div class="brand-sub">Executive<br>Dashboard</div>
       </div>
-      <div id="btnNavSub" class="nav-item" onclick="switchDashboard('subscriber')">
-        <span style="font-size: 18px;">👥</span> Báo cáo Thuê bao
-      </div>
-      <div id="btnNavSearch" class="nav-item" onclick="switchDashboard('search')">
-        <span style="font-size: 18px;">🔍</span> Tra cứu 360°
-      </div>
-    </div>
-    
-    <div style="margin-top: auto; padding: 20px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9;">
-      TTKD Viễn thông Lâm Đồng<br>Version 14.0 Enterprise
+      <nav class="nav" aria-label="Chức năng">
+        <button class="nav-item" data-view="revenue" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+          <span>Doanh thu</span>
+        </button>
+        <button class="nav-item" data-view="subscriber">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+          <span>Thuê bao</span>
+        </button>
+        <button class="nav-item" data-view="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <span>Tra cứu 360°</span>
+        </button>
+      </nav>
+      <div class="side-foot">TTKD Viễn thông Lâm Đồng<br>Phiên bản 15.0</div>
+    </aside>
+
+    <div class="main">
+      <!-- ===== THANH LỌC ===== -->
+      <header class="topbar" id="topbar" data-html2canvas-ignore>
+        <h1 id="pageTitle">Báo cáo Doanh thu</h1>
+        <div class="filters" id="filters">
+          <div class="seg" role="group" aria-label="Loại kỳ báo cáo">
+            <button type="button" data-period="month" aria-pressed="true">Tháng</button>
+            <button type="button" data-period="quarter" aria-pressed="false">Quý</button>
+            <button type="button" data-period="ytd" aria-pressed="false">Lũy kế</button>
+            <button type="button" data-period="year" aria-pressed="false">Cả năm</button>
+          </div>
+          <select id="detailSelect" class="select" aria-label="Chọn kỳ"></select>
+          <select id="yearSelect" class="select" aria-label="Chọn năm"></select>
+          <button type="button" class="btn" id="btnSnap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+            Xuất ảnh báo cáo
+          </button>
+        </div>
+      </header>
+
+      <main class="content" id="content" aria-live="polite">
+
+        <!-- ================= DOANH THU ================= -->
+        <section class="view active" id="view-revenue">
+          <div class="report-head">
+            <h2>Doanh thu DTPK <span class="chip" id="periodChipRev">—</span></h2>
+            <div class="meta">Cập nhật: <span class="updatedAt">—</span></div>
+          </div>
+
+          <div class="grid g-rev">
+            <div class="card kpi hero">
+              <div class="label">Tổng doanh thu DTPK toàn tỉnh</div>
+              <div class="value" id="kpiTotalDtpk">—</div>
+              <div>
+                <div class="split" aria-hidden="true"><i id="splitOld" style="background:#fff;width:0"></i><i id="splitNew" style="background:#6ee7b7;width:0"></i></div>
+                <div class="split-legend" style="margin-top:10px">
+                  <span><span class="dot" style="background:#fff"></span>Hiện hữu <b id="pctOld">0%</b></span>
+                  <span><span class="dot" style="background:#6ee7b7"></span>PTM mới <b id="pctNew">0%</b></span>
+                </div>
+              </div>
+            </div>
+            <div class="card kpi accent-blue">
+              <div class="label">Doanh thu hiện hữu</div>
+              <div class="value" id="kpiOldDtpk">—</div>
+              <div class="hint" id="kpiOldDtpkFull">Duy trì từ hợp đồng đang hoạt động</div>
+            </div>
+            <div class="card kpi accent-green">
+              <div class="label">Doanh thu PTM mới</div>
+              <div class="value" id="kpiNewDtpk">—</div>
+              <div class="hint" id="kpiNewDtpkFull">Phát sinh mới trong kỳ</div>
+            </div>
+          </div>
+
+          <div class="grid g-2">
+            <div class="card">
+              <h3 style="color:var(--blue)">DT hiện hữu theo địa bàn</h3>
+              <p class="sub">Dòng tiền nền từ khách hàng đang duy trì</p>
+              <div class="chart-box"><canvas id="chartRevOld"></canvas></div>
+            </div>
+            <div class="card">
+              <h3 style="color:var(--green)">DT PTM theo địa bàn</h3>
+              <p class="sub">Doanh thu phát sinh từ thuê bao PTM của kỳ</p>
+              <div class="chart-box"><canvas id="chartRevNew"></canvas></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:16px">
+            <h3>Xu hướng doanh thu 12 tháng</h3>
+            <p class="sub">Cột chồng: hiện hữu + PTM</p>
+            <div class="chart-box lg"><canvas id="chartRevTrend"></canvas></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div><h3>Doanh thu phân kỳ và ARPU theo địa bàn</h3><p class="sub">ARPU = tổng DTPK / số thuê bao hoạt động</p></div>
+            </div>
+            <div class="table-wrap">
+              <table class="data">
+                <thead><tr>
+                  <th style="width:48px">#</th><th>Khu vực / cụm</th>
+                  <th class="r">DT hiện hữu</th><th class="r">DT PTM</th><th class="r">Tổng DTPK</th>
+                  <th class="r">ARPU (đ/TB)</th><th class="r">Tỷ trọng</th>
+                </tr></thead>
+                <tbody id="tblRevenue"></tbody>
+                <tfoot id="tfRevenue"></tfoot>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= THUÊ BAO ================= -->
+        <section class="view" id="view-subscriber">
+          <div class="report-head">
+            <h2>Thuê bao <span class="chip" id="periodChipSub">—</span></h2>
+            <div class="meta">Cập nhật: <span class="updatedAt">—</span></div>
+          </div>
+
+          <div class="grid g-sub">
+            <div class="card kpi hero">
+              <div class="label">Tổng thuê bao đang hoạt động</div>
+              <div class="value" id="kpiTotalSub">—</div>
+              <div class="hint">Quy mô tổng hợp tại thời điểm cuối kỳ</div>
+            </div>
+            <div class="card kpi accent-blue">
+              <div class="label">TB hiện hữu</div>
+              <div class="value" id="kpiOldSub">—</div>
+              <div class="hint">Duy trì ổn định</div>
+            </div>
+            <div class="card kpi accent-green">
+              <div class="label">TB PTM mới</div>
+              <div class="value" id="kpiNewSub">—</div>
+              <div class="hint">Phát triển mới (cộng dồn trong kỳ)</div>
+            </div>
+          </div>
+
+          <div class="grid g-alert">
+            <div class="card kpi accent-amber">
+              <div class="label" style="color:var(--amber)">Tư vấn gia hạn</div>
+              <div class="value" id="kpiNeedRenew">—</div>
+              <div class="hint">Hết hạn gói dài kỳ</div>
+            </div>
+            <div class="card kpi accent-red">
+              <div class="label" style="color:var(--red)">Thu hồi nợ cước</div>
+              <div class="value" id="kpiRealDebt">—</div>
+              <div class="hint">Nợ cước gói đơn kỳ</div>
+            </div>
+            <div class="card kpi accent-slate">
+              <div class="label">Cảnh báo ONT</div>
+              <div class="value" id="kpiUnt">—</div>
+              <div class="hint">TB đã hủy chưa thu hồi ONT</div>
+            </div>
+          </div>
+
+          <div class="grid g-2">
+            <div class="card">
+              <h3 style="color:var(--blue)">TB hiện hữu theo địa bàn</h3>
+              <p class="sub">Khách hàng đang duy trì hợp đồng</p>
+              <div class="chart-box"><canvas id="chartSubOld"></canvas></div>
+            </div>
+            <div class="card">
+              <h3 style="color:var(--green)">TB PTM theo địa bàn</h3>
+              <p class="sub">Năng lực phát triển mới của từng địa bàn</p>
+              <div class="chart-box"><canvas id="chartSubNew"></canvas></div>
+            </div>
+          </div>
+
+          <div class="grid g-2">
+            <div class="card">
+              <h3>Tăng trưởng tổng thuê bao 12 tháng</h3>
+              <p class="sub">Hiện hữu + PTM</p>
+              <div class="chart-box lg"><canvas id="chartSubTrend"></canvas></div>
+            </div>
+            <div class="card">
+              <h3 style="color:var(--green)">Thuê bao PTM theo tháng</h3>
+              <p class="sub">Số TB phát triển mới mỗi tháng</p>
+              <div class="chart-box lg"><canvas id="chartPtmSubTrend"></canvas></div>
+            </div>
+          </div>
+
+          <div class="grid g-3">
+            <div class="card">
+              <div class="card-head">
+                <div><h3>Cơ cấu gói PTM</h3><p class="sub">Tỷ trọng gói cước bán ra</p></div>
+                <span class="badge b-green" id="lblTotalPkgPtm">0 TB</span>
+              </div>
+              <div class="pkg-list" id="pkgList"></div>
+            </div>
+            <div class="card">
+              <h3>Phân khúc khách hàng</h3>
+              <p class="sub">Tính trên tổng thuê bao hoạt động</p>
+              <div class="chart-box sm"><canvas id="chartSegments"></canvas></div>
+              <div class="seg-legend" id="segLegend"></div>
+            </div>
+            <div class="card">
+              <h3>Trạng thái khác</h3>
+              <div class="status-row st-slate"><div><div class="t">Tạm ngưng KHYC</div><div class="d">Khách chủ động ngưng dịch vụ</div></div><div class="n" id="kpiKhyc">0</div></div>
+              <div class="status-row st-red"><div><div class="t">Thuê bao đã hủy</div><div class="d">Thanh lý / chấm dứt hợp đồng</div></div><div class="n" id="kpiCancelled">0</div></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Số lượng thuê bao theo địa bàn</h3>
+            <div class="table-wrap">
+              <table class="data">
+                <thead><tr>
+                  <th style="width:48px">#</th><th>Khu vực / cụm</th>
+                  <th class="c">TB hiện hữu</th><th class="c">TB PTM</th><th class="c">Tổng TB hoạt động</th><th class="r">Tỷ trọng</th>
+                </tr></thead>
+                <tbody id="tblSubscriber"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= TRA CỨU ================= -->
+        <section class="view" id="view-search">
+          <div class="card search-card">
+            <h2 style="margin:0;font-size:22px;color:var(--blue)">Tra cứu hồ sơ khách hàng 360°</h2>
+            <p class="sub" style="font-size:13px;margin-top:4px">Tìm theo Mã KH, số điện thoại, user PPPoE hoặc serial thiết bị (tối thiểu 3 ký tự).</p>
+            <div class="search-box" data-html2canvas-ignore>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input type="search" id="searchInput" placeholder="Nhập từ khóa rồi nhấn Enter…" autocomplete="off" aria-label="Từ khóa tra cứu">
+            </div>
+            <div class="search-status" id="searchStatus" role="status"></div>
+            <div id="searchResults"></div>
+          </div>
+        </section>
+
+      </main>
     </div>
   </div>
 
-  <!-- MAIN CONTENT WRAPPER -->
-  <div class="main-wrapper">
-    
-    <!-- TOP STICKY FILTER BAR -->
-    <div class="filter-bar" id="filterBarContainer" data-html2canvas-ignore>
-      <div class="filter-group">
-        <span class="filter-label">Kỳ báo cáo:</span>
-        <select id="periodTypeSelect" class="custom-select" onchange="handlePeriodTypeChange()">
-          <option value="month">Theo Tháng</option>
-          <option value="quarter">Theo Quý</option>
-          <option value="ytd">Lũy kế Đầu năm</option>
-          <option value="year">Cả năm</option>
-        </select>
-        
-        <select id="periodDetailSelect" class="custom-select" onchange="triggerLoad()"></select>
-        
-        <select id="yearSelect" class="custom-select" onchange="triggerLoad()">
-          <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
-        </select>
-      </div>
-      
-      <div style="display: flex; align-items: center; gap: 16px;">
-        <div id="filterStatus" style="font-weight: 700; color: var(--mf-blue); background: #e0e7ff; padding: 8px 16px; border-radius: 20px; font-size: 13px;"></div>
-        <button onclick="takeSnapshot()" class="action-btn">📸 Xuất Ảnh Báo Cáo</button>
-      </div>
-    </div>
-
-    <!-- SCROLLABLE DASHBOARD AREA -->
-    <div class="dashboard-scroll-area" id="dashboardContent">
-      
-      <!-- TAB: TRA CỨU 360 -->
-      <div id="viewSearch" style="display: none;">
-        <div class="card" style="max-width: 900px; margin: 0 auto; text-align: center;">
-          <h2 style="font-size: 26px; font-weight: bold; color: var(--mf-blue); margin-bottom: 8px;">Tra cứu Hồ sơ Khách hàng (360°)</h2>
-          <p style="color: #64748b; margin-bottom: 32px;">Hỗ trợ tìm kiếm theo Mã KH, Số điện thoại, User PPPoE, hoặc Serial Thiết bị.</p>
-          <input type="text" id="searchInputMain" class="search-big-input" placeholder="Nhập từ khóa tìm kiếm (nhấn Enter để tìm)..." onkeypress="handleSearchMain(event)" data-html2canvas-ignore>
-          <div id="searchCountMain" style="margin-top: 16px; font-weight: 600; color: var(--mf-red);"></div>
-          <div id="searchResultsMain" style="margin-top: 32px; text-align: left;"></div>
-        </div>
-      </div>
-
-      <!-- TAB: DASHBOARD DOANH THU -->
-      <div id="viewRevenue">
-        <!-- KPI Doanh thu -->
-        <div class="rev-kpi-grid">
-          <div class="rev-kpi-card main">
-            <div class="rev-kpi-label">TỔNG DOANH THU DTPK TOÀN TỈNH</div>
-            <div class="rev-kpi-value" id="kpiTotalDtpk">0 đ</div>
-            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 12px; font-weight: 500;">Dòng tiền Thực tế Ghi nhận trong kỳ</div>
-          </div>
-          <div class="rev-kpi-card">
-            <div class="rev-kpi-label" style="color: #64748b;">DOANH THU HIỆN HỮU (DTPK)</div>
-            <div class="rev-kpi-value" id="kpiOldDtpk" style="color: var(--mf-blue);">0 đ</div>
-            <div class="rev-kpi-subtext">Duy trì từ các hợp đồng đang hoạt động</div>
-          </div>
-          <div class="rev-kpi-card">
-            <div class="rev-kpi-label" style="color: #059669;">DOANH THU PTM MỚI (DTPK)</div>
-            <div class="rev-kpi-value" style="color: #059669;" id="kpiNewDtpk">0 đ</div>
-            <div class="rev-kpi-subtext">Đóng góp phát sinh mới trong kỳ</div>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-          <div class="card">
-            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue);">Doanh thu Hiện hữu (DTPK) theo 6 Địa bàn</h3>
-            <p style="font-size: 12px; color: #64748b;">Dòng tiền nền tảng từ khách hàng đang duy trì</p>
-            <div class="chart-container"><canvas id="chartRevOld"></canvas></div>
-          </div>
-          <div class="card">
-            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-red);">Doanh thu PTM (DTPK) theo 6 Địa bàn</h3>
-            <p style="font-size: 12px; color: #64748b;">Doanh thu phát sinh mới từ thuê bao PTM kỳ này</p>
-            <div class="chart-container"><canvas id="chartRevNew"></canvas></div>
-          </div>
-        </div>
-        
-        <div class="card" style="margin-bottom: 24px;">
-          <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue);">Xu hướng Tổng Doanh thu qua 12 Tháng</h3>
-          <p style="font-size: 12px; color: #64748b;">Quỹ đạo tăng trưởng dòng tiền</p>
-          <div class="chart-container-large"><canvas id="chartRevTrend"></canvas></div>
-        </div>
-
-        <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue);">Bảng Tổng Hợp Doanh Thu Phân Kỳ & Chỉ số ARPU</h3>
-            <span style="font-size: 12px; color: #64748b; font-style: italic;">*ARPU: Doanh thu bình quân / 1 Khách hàng</span>
-          </div>
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 50px;">STT</th>
-                <th>KHU VỰC / CỤM</th>
-                <th style="text-align: right;">DT HIỆN HỮU</th>
-                <th style="text-align: right; color: #059669;">DT PTM MỚI</th>
-                <th style="text-align: right; color: var(--mf-blue);">TỔNG DTPK</th>
-                <th style="text-align: right; color: var(--mf-red);">ARPU (VNĐ/TB)</th>
-                <th style="text-align: right;">TỶ TRỌNG (%)</th>
-              </tr>
-            </thead>
-            <tbody id="tblRevenue"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- TAB: DASHBOARD THUÊ BAO -->
-      <div id="viewSubscriber" style="display: none;">
-        
-        <div class="sub-kpi-grid">
-          <div class="sub-kpi-card kpi-tong">
-            <div><div class="sub-kpi-label">TỔNG TB ĐANG HĐ</div><div class="sub-kpi-value" id="kpiTotalSub">0</div></div>
-            <div class="sub-kpi-subtext" style="border: none;">Lát cắt quy mô tổng hợp mạng lưới</div>
-          </div>
-          <div class="sub-kpi-card kpi-hienhuu">
-            <div><div class="sub-kpi-label">TB HIỆN HỮU</div><div class="sub-kpi-value" id="kpiOldSub">0</div></div>
-            <div class="sub-kpi-subtext" style="border: none;">Duy trì ổn định</div>
-          </div>
-          <div class="sub-kpi-card kpi-ptm">
-            <div><div class="sub-kpi-label">TB PTM MỚI</div><div class="sub-kpi-value" id="kpiNewSub">0</div></div>
-            <div class="sub-kpi-subtext" style="border: none;">Phát triển mới</div>
-          </div>
-          <div class="sub-kpi-card" style="border-top: 5px solid #d97706;">
-            <div><div class="sub-kpi-label-small" style="color: #d97706;">TƯ VẤN GIA HẠN</div><div class="sub-kpi-value-small" style="color: #d97706;" id="kpiNeedRenew">0</div></div>
-            <div class="sub-kpi-subtext-small">Hết hạn gói Dài kỳ</div>
-          </div>
-          <div class="sub-kpi-card" style="border-top: 5px solid var(--mf-red);">
-            <div><div class="sub-kpi-label-small" style="color: var(--mf-red);">THU HỒI NỢ CƯỚC</div><div class="sub-kpi-value-small" style="color: var(--mf-red);" id="kpiRealDebt">0</div></div>
-            <div class="sub-kpi-subtext-small">Nợ gói Đơn kỳ</div>
-          </div>
-          <div class="sub-kpi-card" style="border-top: 5px solid #475569; background: #f8fafc;">
-            <div><div class="sub-kpi-label-small" style="color: #475569;">CẢNH BÁO ONT</div><div class="sub-kpi-value-small" style="color: #334155;" id="kpiUnt">0</div></div>
-            <div class="sub-kpi-subtext-small">TB đã Hủy chưa thu ONT</div>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-          <div class="card">
-            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue);">Quy mô Thuê bao Hiện hữu theo 6 Địa bàn</h3>
-            <p style="font-size: 12px; color: #64748b;">Số lượng khách hàng đang duy trì hợp đồng</p>
-            <div class="chart-container"><canvas id="chartSubOld"></canvas></div>
-          </div>
-          <div class="card">
-            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-red);">Chiến dịch Thuê bao PTM theo 6 Địa bàn</h3>
-            <p style="font-size: 12px; color: #64748b;">Đánh giá năng lực phát triển mới độc lập</p>
-            <div class="chart-container"><canvas id="chartSubNew"></canvas></div>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-          <div class="card">
-            <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue);">Tăng trưởng Tổng Thuê bao qua 12 Tháng</h3>
-            <p style="font-size: 12px; color: #64748b;">Quy mô tổng hợp mạng lưới (Hiện hữu + PTM)</p>
-            <div class="chart-container-large"><canvas id="chartSubTrend"></canvas></div>
-          </div>
-          <div class="card">
-            <h3 style="font-size: 16px; font-weight: bold; color: #10b981;">Xu hướng Thuê bao PTM Mới qua 12 Tháng</h3>
-            <p style="font-size: 12px; color: #64748b;">Năng lực phát triển mới theo từng tháng</p>
-            <div class="chart-container-large"><canvas id="chartPtmSubTrend"></canvas></div>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 3fr 3.5fr 3.5fr; gap: 24px;">
-          <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <div>
-                <h3 style="font-size: 15px; font-weight: bold; color: var(--mf-blue);">Cơ cấu Gói PTM</h3>
-                <p style="font-size: 11px; color: #64748b;">Tỷ trọng gói cước bán ra</p>
-              </div>
-              <span class="badge badge-green" id="lblTotalPkgPtm">0 PTM</span>
-            </div>
-            <div id="pkgList" style="max-height: 250px; overflow-y: auto; padding-right: 8px;"></div>
-          </div>
-          
-          <div class="card" style="text-align: center;">
-            <h3 style="font-size: 15px; font-weight: bold; color: var(--mf-blue);">Cơ cấu Phân khúc Khách hàng</h3>
-            <p style="font-size: 11px; color: #64748b; margin-bottom: 16px;">(Tính trên Tổng TB Hoạt động)</p>
-            <div style="position: relative; height: 210px; width: 100%;"><canvas id="chartSegments"></canvas></div>
-            <div style="display: flex; justify-content: space-around; margin-top: 16px; font-size: 12px; font-weight: bold;">
-              <div style="color: #3b82f6;">Cá nhân/Hộ GĐ</div>
-              <div style="color: #f59e0b;">Doanh nghiệp</div>
-              <div style="color: var(--mf-red);">Cơ quan/HCSN</div>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3 style="font-size: 15px; font-weight: bold; color: var(--mf-blue); margin-bottom: 20px;">Theo dõi Trạng thái Khác</h3>
-            
-            <div style="background: #f1f5f9; padding: 20px; border-radius: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <div style="font-weight: bold; font-size: 15px; color: #475569;">Tạm ngưng KHYC</div>
-                <div style="font-size: 12px; color: #64748b; margin-top:4px;">Chủ động ngưng dịch vụ</div>
-              </div>
-              <div style="font-size: 28px; font-weight: bold; color: #475569;" id="kpiKhyc">0</div>
-            </div>
-            
-            <div style="background: #fee2e2; padding: 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <div style="font-weight: bold; font-size: 15px; color: #991b1b;">Thuê bao Đã Hủy</div>
-                <div style="font-size: 12px; color: #b91c1c; margin-top:4px;">Thanh lý hợp đồng</div>
-              </div>
-              <div style="font-size: 28px; font-weight: bold; color: #991b1b;" id="kpiCancelled">0</div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="card" style="margin-top: 24px;">
-          <h3 style="font-size: 16px; font-weight: bold; color: var(--mf-blue); margin-bottom: 16px;">Bảng Tổng Hợp Số Lượng Thuê Bao theo Địa Bàn</h3>
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 50px;">STT</th>
-                <th>KHU VỰC / CỤM</th>
-                <th style="text-align: center;">TB HIỆN HỮU</th>
-                <th style="text-align: center; color: #059669;">TB PTM MỚI</th>
-                <th style="text-align: center; color: var(--mf-blue);">TỔNG TB HOẠT ĐỘNG</th>
-                <th style="text-align: right;">TỶ TRỌNG TB (%)</th>
-              </tr>
-            </thead>
-            <tbody id="tblSubscriber"></tbody>
-          </table>
-        </div>
-      </div>
-      
-    </div>
-  </div>
-
-  <!-- Loading Overlay -->
-  <div id="loadingOverlay">
-    <div class="spinner-border"></div>
-    <div style="font-weight: bold; color: var(--mf-blue); font-size: 16px;">Đang tính toán dữ liệu Đa kỳ...</div>
-    <div style="font-size: 13px; color: #64748b; margin-top: 8px;">Vui lòng đợi trong giây lát</div>
-  </div>
+  <div class="toast" id="toast" role="alert"></div>
 
   <script>
-    let currentView = 'revenue';
-    let charts = {};
-    let gData = null;
+  (function () {
+    'use strict';
 
-    Chart.defaults.font.family = "'UTM Mobifone KT', 'Segoe UI', Roboto, sans-serif";
-    Chart.defaults.color = '#64748b';
-
-    window.onload = () => {
-      handlePeriodTypeChange();
-      const now = new Date();
-      document.getElementById('periodDetailSelect').value = now.getMonth();
-      document.getElementById('yearSelect').value = now.getFullYear();
-      loadData();
-    };
-
-    function handlePeriodTypeChange() {
-      const pType = document.getElementById('periodTypeSelect').value;
-      const detailSelect = document.getElementById('periodDetailSelect');
-      detailSelect.innerHTML = '';
-      
-      if (pType === 'month') {
-        for (let i = 0; i < 12; i++) detailSelect.innerHTML += `<option value="${i}">Tháng ${i+1}</option>`;
-        detailSelect.style.display = 'inline-block';
-      } else if (pType === 'quarter') {
-        for (let i = 1; i <= 4; i++) detailSelect.innerHTML += `<option value="${i}">Quý ${i}</option>`;
-        detailSelect.style.display = 'inline-block';
-      } else if (pType === 'ytd') {
-        for (let i = 1; i <= 12; i++) detailSelect.innerHTML += `<option value="${i}">${i} Tháng đầu năm</option>`;
-        detailSelect.style.display = 'inline-block';
-      } else if (pType === 'year') {
-        detailSelect.style.display = 'none';
-        detailSelect.innerHTML = `<option value="12">Cả năm</option>`;
-      }
-      triggerLoad();
-    }
-
-    function triggerLoad() { loadData(); }
-
-    function switchDashboard(view) {
-      currentView = view;
-      document.getElementById('btnNavSearch').className = (view === 'search') ? 'nav-item active' : 'nav-item';
-      document.getElementById('btnNavRevenue').className = (view === 'revenue') ? 'nav-item active' : 'nav-item';
-      document.getElementById('btnNavSub').className = (view === 'subscriber') ? 'nav-item active' : 'nav-item';
-      
-      document.getElementById('viewSearch').style.display = (view === 'search') ? 'block' : 'none';
-      document.getElementById('viewRevenue').style.display = (view === 'revenue') ? 'block' : 'none';
-      document.getElementById('viewSubscriber').style.display = (view === 'subscriber') ? 'block' : 'none';
-      document.getElementById('filterBarContainer').style.display = (view === 'search') ? 'none' : 'flex';
-    }
-
-    function formatVND(val) { return !val ? '0 đ' : Math.round(val).toLocaleString('vi-VN') + ' đ'; }
-    function formatNumCompact(val) {
-      if (!val) return '0';
-      if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
-      if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
-      return val.toString();
-    }
-
-    // Chụp FULL nội dung dashboard cuộn
-    function takeSnapshot() {
-      document.getElementById('loadingOverlay').style.display = 'flex';
-      document.querySelector('#loadingOverlay div:nth-child(2)').innerText = 'Đang trích xuất ảnh báo cáo toàn trang...';
-      
-      const targetElement = document.getElementById('dashboardContent');
-      html2canvas(targetElement, { 
-        scale: 2,
-        scrollY: -window.scrollY,
-        useCORS: true 
-      }).then(canvas => {
-        let a = document.createElement('a');
-        a.href = canvas.toDataURL('image/jpeg', 0.9);
-        a.download = `MobiFiber_Executive_Report.jpg`;
-        a.click();
-        document.getElementById('loadingOverlay').style.display = 'none';
+    /* ---------- Tiện ích ---------- */
+    var $ = function (id) { return document.getElementById(id); };
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
       });
     }
-
-    function loadData() {
-      document.getElementById('loadingOverlay').style.display = 'flex';
-      document.querySelector('#loadingOverlay div:nth-child(2)').innerText = 'Đang tính toán dữ liệu Đa kỳ...';
-      
-      const pType = document.getElementById('periodTypeSelect').value;
-      const detail = document.getElementById('periodDetailSelect').value;
-      const year = document.getElementById('yearSelect').value;
-
-      google.script.run
-        .withSuccessHandler(res => {
-          gData = res; updateUI(); document.getElementById('loadingOverlay').style.display = 'none';
-        })
-        .withFailureHandler(err => {
-          alert('Lỗi tải dữ liệu: ' + err.message); document.getElementById('loadingOverlay').style.display = 'none';
-        })
-        .getDashboardMetrics(pType, year, detail);
+    function nf(v) { return (Number(v) || 0).toLocaleString('vi-VN'); }
+    function vnd(v) { return nf(Math.round(v || 0)) + ' đ'; }
+    function compactVND(v) {
+      v = Number(v) || 0; var a = Math.abs(v);
+      if (a >= 1e9) return (v / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' tỷ';
+      if (a >= 1e6) return (v / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + ' tr';
+      if (a >= 1e3) return (v / 1e3).toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' k';
+      return String(Math.round(v));
+    }
+    function pct(part, whole) { return whole > 0 ? (part / whole * 100) : 0; }
+    function pctText(p) { return p.toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + '%'; }
+    function toast(msg) {
+      var t = $('toast'); t.innerHTML = '<b>Lỗi:</b> ' + esc(msg); t.classList.add('show');
+      clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('show'); }, 7000);
     }
 
-    function updateUI() {
-      if (!gData || !gData.summary) return;
-      const d = gData;
-      
-      let pText = '';
-      if (d.period === 'month') pText = `Tháng ${parseInt(d.selectedMonth)+1}/${d.selectedYear}`;
-      else if (d.period === 'quarter') pText = `Quý ${d.selectedMonth}/${d.selectedYear}`;
-      else if (d.period === 'ytd') pText = `Lũy kế ${d.selectedMonth} Tháng Đầu năm ${d.selectedYear}`;
-      else pText = `Cả năm ${d.selectedYear}`;
-      
-      document.getElementById('filterStatus').innerText = `BÁO CÁO: ${pText.toUpperCase()}`;
-      
-      document.getElementById('kpiTotalDtpk').innerText = formatVND(d.summary.totalRevenue);
-      document.getElementById('kpiOldDtpk').innerText = formatVND(d.summary.revenueCurrent);
-      document.getElementById('kpiNewDtpk').innerText = formatVND(d.summary.revenuePtm);
-      
-      document.getElementById('kpiTotalSub').innerText = (d.summary.totalActiveSub || 0).toLocaleString('vi-VN');
-      document.getElementById('kpiOldSub').innerText = (d.summary.subCurrent || 0).toLocaleString('vi-VN');
-      document.getElementById('kpiNewSub').innerText = (d.summary.subPtm || 0).toLocaleString('vi-VN');
-      document.getElementById('kpiNeedRenew').innerText = (d.summary.subNeedRenew || 0).toLocaleString('vi-VN');
-      document.getElementById('kpiRealDebt').innerText = (d.summary.subRealDebt || 0).toLocaleString('vi-VN');
-      document.getElementById('kpiUnt').innerText = (d.summary.unrecoveredOnt || 0).toLocaleString('vi-VN');
-      document.getElementById('kpiKhyc').innerText = (d.summary.subKhyc || 0).toLocaleString('vi-VN') + ' TB';
-      document.getElementById('kpiCancelled').innerText = (d.summary.subCancelled || 0).toLocaleString('vi-VN') + ' TB';
-      document.getElementById('lblTotalPkgPtm').innerText = `${d.summary.subPtm || 0} TB PTM`;
+    /* ---------- Màu & cấu hình biểu đồ ---------- */
+    var C = { blue: '#005AAB', red: '#ED1C24', green: '#0f9d6b', grid: '#eef2f7', text: '#64748b' };
+    Chart.defaults.font.family = "'Be Vietnam Pro','Segoe UI',Roboto,sans-serif";
+    Chart.defaults.color = C.text;
 
-      const sortedByDtpk = [...d.regionStats].sort((a, b) => b.totalDtpk - a.totalDtpk);
-      const labels = sortedByDtpk.map(i => i.name);
-      renderBarChart('chartRevOld', labels, sortedByDtpk.map(i => i.currentDtpk), '#005AAB', formatNumCompact);
-      renderBarChart('chartRevNew', labels, sortedByDtpk.map(i => i.ptmDtpk), '#ED1C24', formatNumCompact);
-      
-      const sortedBySub = [...d.regionStats].sort((a, b) => b.totalSub - a.totalSub);
-      const subLabels = sortedBySub.map(i => i.name);
-      renderBarChart('chartSubOld', subLabels, sortedBySub.map(i => i.currentSub), '#005AAB', v => v + ' TB');
-      renderBarChart('chartSubNew', subLabels, sortedBySub.map(i => i.ptmSub), '#ED1C24', v => v + ' TB');
-
-      // Bảng Doanh Thu
-      let htmlRev = '';
-      sortedByDtpk.forEach((r, idx) => {
-        const share = d.summary.totalRevenue > 0 ? (r.totalDtpk / d.summary.totalRevenue * 100).toFixed(1) : 0;
-        const arpu = r.totalSub > 0 ? Math.round(r.totalDtpk / r.totalSub) : 0;
-        htmlRev += `<tr>
-          <td>${idx+1}</td>
-          <td style="font-weight: 600;">${r.name}</td>
-          <td style="text-align: right;">${formatVND(r.currentDtpk)}</td>
-          <td style="text-align: right; color: #059669; font-weight: 500;">${formatVND(r.ptmDtpk)}</td>
-          <td style="text-align: right; color: #005AAB; font-weight: bold;">${formatVND(r.totalDtpk)}</td>
-          <td style="text-align: right; color: #ED1C24; font-weight: bold;">${arpu.toLocaleString('vi-VN')} đ</td>
-          <td style="text-align: right;">${share}%</td>
-        </tr>`;
-      });
-      const sumArpu = d.summary.totalActiveSub > 0 ? Math.round(d.summary.totalRevenue / d.summary.totalActiveSub) : 0;
-      htmlRev += `<tr>
-        <td colspan="2">TỔNG CỘNG LŨY KẾ KỲ</td>
-        <td style="text-align: right;">${formatVND(d.summary.revenueCurrent)}</td>
-        <td style="text-align: right; color: #059669;">${formatVND(d.summary.revenuePtm)}</td>
-        <td style="text-align: right; color: #005AAB;">${formatVND(d.summary.totalRevenue)}</td>
-        <td style="text-align: right; color: #ED1C24;">${sumArpu.toLocaleString('vi-VN')} đ</td>
-        <td style="text-align: right;">100%</td>
-      </tr>`;
-      document.getElementById('tblRevenue').innerHTML = htmlRev;
-
-      // Bảng Thuê Bao
-      let htmlSub = '';
-      sortedBySub.forEach((r, idx) => {
-        const share = d.summary.totalActiveSub > 0 ? (r.totalSub / d.summary.totalActiveSub * 100).toFixed(1) : 0;
-        htmlSub += `<tr>
-          <td>${idx+1}</td>
-          <td style="font-weight: 600;">${r.name}</td>
-          <td style="text-align: center;">${r.currentSub} TB</td>
-          <td style="text-align: center; color: #059669; font-weight: 500;">${r.ptmSub} TB</td>
-          <td style="text-align: center; color: #005AAB; font-weight: bold;">${r.totalSub} TB</td>
-          <td style="text-align: right;">${share}%</td>
-        </tr>`;
-      });
-      document.getElementById('tblSubscriber').innerHTML = htmlSub;
-
-      let htmlPkg = '';
-      if (d.packagePtmDistribution.length === 0) {
-        htmlPkg = '<div style="text-align: center; color: #94a3b8; padding: 20px;">Không có PTM trong kỳ</div>';
-      } else {
-        d.packagePtmDistribution.forEach(p => {
-          htmlPkg += `
-            <div class="pkg-row">
-              <div style="width: 120px; font-weight: 600; color: #0f172a; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${p.package}">${p.package}</div>
-              <div class="pkg-bar-bg"><div class="pkg-bar-fill" style="width: ${p.ratio}%;"></div></div>
-              <div style="width: 75px; text-align: right;"><span style="color: #059669; font-weight: 500;">${p.count} TB</span> <span style="color: #94a3b8; font-size: 11px;">| ${p.ratio}%</span></div>
-            </div>`;
+    // Plugin ghi nhãn giá trị trên cột / điểm (thay cho onComplete cũ, không bị vẽ chồng khi cập nhật)
+    Chart.register({
+      id: 'valueLabels',
+      afterDatasetsDraw: function (chart, args, o) {
+        if (!o || !o.format) return;
+        var ctx = chart.ctx; ctx.save();
+        ctx.fillStyle = '#334155'; ctx.font = '600 11px "Be Vietnam Pro", sans-serif';
+        chart.data.datasets.forEach(function (ds, i) {
+          chart.getDatasetMeta(i).data.forEach(function (el, idx) {
+            var v = ds.data[idx]; if (v == null || v === 0) return;
+            if (o.horizontal) { ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(o.format(v), el.x + 6, el.y); }
+            else { ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(o.format(v), el.x, el.y - 6); }
+          });
         });
+        ctx.restore();
       }
-      document.getElementById('pkgList').innerHTML = htmlPkg;
+    });
 
-      renderTrendChart(d.monthlyTrend);
-      renderSegmentChart(d.summary.segInd, d.summary.segBiz, d.summary.segGov);
+    var charts = {};
+    function mount(id, cfg) {
+      if (charts[id]) charts[id].destroy();
+      charts[id] = new Chart($(id).getContext('2d'), cfg);
     }
-
-    function renderBarChart(canvasId, labels, data, color, fmtFunc) {
-      if (charts[canvasId]) charts[canvasId].destroy();
-      const ctx = document.getElementById(canvasId).getContext('2d');
-      charts[canvasId] = new Chart(ctx, {
+    function hBar(id, labels, data, color, fmt) {
+      mount(id, {
         type: 'bar',
-        data: { labels: labels, datasets: [{ data: data, backgroundColor: color, borderRadius: 4, barPercentage: 0.5 }] },
+        data: { labels: labels, datasets: [{ data: data, backgroundColor: color, borderRadius: 6, barThickness: 18 }] },
         options: {
-          layout: { padding: { top: 30 } },
-          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-          animation: {
-            onComplete: function() {
-              const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#475569'; ctx.font = 'bold 12px "UTM Mobifone KT", sans-serif';
-              this.data.datasets.forEach(function (dataset, i) {
-                const meta = this.getDatasetMeta(i);
-                meta.data.forEach(function (bar, index) {
-                  const dataVal = dataset.data[index];
-                  if (dataVal > 0) ctx.fillText(fmtFunc(dataVal), bar.x, bar.y - 6);
-                });
-              }, this);
-            }
-          },
-          scales: { y: { beginAtZero: true, grace: '20%', border: { display: false }, grid: { color: '#f1f5f9' }, ticks: { callback: function(v) { return fmtFunc(v); } } }, x: { border: { display: false }, grid: { display: false } } }
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          layout: { padding: { right: 56 } },
+          plugins: { legend: { display: false }, valueLabels: { format: fmt, horizontal: true },
+            tooltip: { callbacks: { label: function (c) { return fmt === compactVND ? vnd(c.raw) : nf(c.raw) + ' TB'; } } } },
+          scales: { x: { beginAtZero: true, grid: { color: C.grid }, border: { display: false }, ticks: { callback: function (v) { return fmt(v); } } },
+                    y: { grid: { display: false }, border: { display: false } } }
         }
       });
     }
 
-    function renderTrendChart(trendData) {
-      if (charts['trendRev']) charts['trendRev'].destroy();
-      if (charts['trendSub']) charts['trendSub'].destroy();
-      if (charts['trendPtmSub']) charts['trendPtmSub'].destroy();
+    /* ---------- Trạng thái ---------- */
+    var NOW = new Date();
+    var state = { view: 'revenue', period: 'month', detail: NOW.getMonth(), year: NOW.getFullYear() };
+    var reqId = 0, data = null;
 
-      const labels = trendData.map(t => t.monthLabel);
-      
-      const revData = trendData.map(t => t.hasData ? t.totalDtpk : null);
-      charts['trendRev'] = new Chart(document.getElementById('chartRevTrend').getContext('2d'), {
-        type: 'line',
-        data: { labels: labels, datasets: [{ data: revData, borderColor: '#005AAB', backgroundColor: 'rgba(0, 90, 171, 0.1)', borderWidth: 3, pointBackgroundColor: '#005AAB', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, fill: true, tension: 0.4, spanGaps: true }] },
-        options: {
-          layout: { padding: { top: 30 } },
-          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return 'Tổng DTPK: ' + Math.round(c.raw).toLocaleString('vi-VN') + ' đ'; } } } },
-          animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#005AAB'; ctx.font = 'bold 11px "UTM Mobifone KT", sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(formatNumCompact(val), point.x, point.y - 8); }); }, this); } },
-          scales: { y: { beginAtZero: true, grace: '20%', border: { display: false }, grid: { color: '#f1f5f9' }, ticks: { callback: function(v) { return formatNumCompact(v); } } }, x: { border: { display: false }, grid: { display: false } } }
-        }
+    var TITLES = { revenue: 'Báo cáo Doanh thu', subscriber: 'Báo cáo Thuê bao', search: 'Tra cứu 360°' };
+
+    function defaultDetail(p) {
+      var m = NOW.getMonth();
+      if (p === 'month') return m;
+      if (p === 'quarter') return Math.floor(m / 3) + 1;
+      if (p === 'ytd') return m + 1;
+      return 12;
+    }
+    function buildDetailOptions() {
+      var s = $('detailSelect'), h = '', i;
+      if (state.period === 'month') for (i = 0; i < 12; i++) h += '<option value="' + i + '">Tháng ' + (i + 1) + '</option>';
+      else if (state.period === 'quarter') for (i = 1; i <= 4; i++) h += '<option value="' + i + '">Quý ' + i + '</option>';
+      else if (state.period === 'ytd') for (i = 1; i <= 12; i++) h += '<option value="' + i + '">' + i + ' tháng đầu năm</option>';
+      else h = '<option value="12">Cả năm</option>';
+      s.innerHTML = h; s.value = String(state.detail);
+      s.style.display = state.period === 'year' ? 'none' : '';
+    }
+    function buildYears() {
+      var y = NOW.getFullYear(), h = '';
+      for (var i = y; i >= 2022; i--) h += '<option value="' + i + '">' + i + '</option>';
+      $('yearSelect').innerHTML = h; $('yearSelect').value = String(state.year);
+    }
+
+    /* ---------- Điều hướng ---------- */
+    function showView(v) {
+      state.view = v;
+      document.querySelectorAll('.nav-item').forEach(function (b) {
+        if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+      });
+      ['revenue', 'subscriber', 'search'].forEach(function (k) { $('view-' + k).classList.toggle('active', k === v); });
+      $('filters').style.visibility = v === 'search' ? 'hidden' : 'visible';
+      $('pageTitle').textContent = TITLES[v];
+      if (v === 'search') setTimeout(function () { $('searchInput').focus(); }, 50);
+      else if (data) setTimeout(function () { Object.keys(charts).forEach(function (k) { charts[k].resize(); }); }, 30);
+    }
+
+    /* ---------- Tải dữ liệu ---------- */
+    function load() {
+      var id = ++reqId;
+      document.body.classList.add('loading');
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (id !== reqId) return;               // bỏ qua phản hồi cũ khi người dùng đổi lọc liên tục
+          document.body.classList.remove('loading');
+          if (!res || !res.success) { toast('Không có dữ liệu cho kỳ đã chọn.'); return; }
+          data = res; render();
+        })
+        .withFailureHandler(function (err) {
+          if (id !== reqId) return;
+          document.body.classList.remove('loading');
+          toast((err && err.message) || 'Không tải được dữ liệu.');
+        })
+        .getDashboardMetrics(state.period, state.year, state.detail);
+    }
+
+    function periodText(d) {
+      var m = parseInt(d.selectedMonth, 10);
+      if (d.period === 'month') return 'Tháng ' + (m + 1) + '/' + d.selectedYear;
+      if (d.period === 'quarter') return 'Quý ' + m + '/' + d.selectedYear;
+      if (d.period === 'ytd') return 'Lũy kế ' + m + ' tháng đầu năm ' + d.selectedYear;
+      return 'Cả năm ' + d.selectedYear;
+    }
+
+    /* ---------- Hiển thị ---------- */
+    function render() {
+      var d = data, s = d.summary, txt = periodText(d);
+      $('periodChipRev').textContent = txt; $('periodChipSub').textContent = txt;
+      document.querySelectorAll('.updatedAt').forEach(function (e) { e.textContent = d.lastUpdated || '—'; });
+
+      // Doanh thu
+      $('kpiTotalDtpk').textContent = vnd(s.totalRevenue);
+      $('kpiOldDtpk').textContent = compactVND(s.revenueCurrent);
+      $('kpiNewDtpk').textContent = compactVND(s.revenuePtm);
+      $('kpiOldDtpkFull').textContent = vnd(s.revenueCurrent);
+      $('kpiNewDtpkFull').textContent = vnd(s.revenuePtm);
+      var pOld = pct(s.revenueCurrent, s.totalRevenue), pNew = pct(s.revenuePtm, s.totalRevenue);
+      $('splitOld').style.width = pOld + '%'; $('splitNew').style.width = pNew + '%';
+      $('pctOld').textContent = pctText(pOld); $('pctNew').textContent = pctText(pNew);
+
+      // Thuê bao
+      $('kpiTotalSub').textContent = nf(s.totalActiveSub);
+      $('kpiOldSub').textContent = nf(s.subCurrent);
+      $('kpiNewSub').textContent = nf(s.subPtm);
+      $('kpiNeedRenew').textContent = nf(s.subNeedRenew);
+      $('kpiRealDebt').textContent = nf(s.subRealDebt);
+      $('kpiUnt').textContent = nf(s.unrecoveredOnt);
+      $('kpiKhyc').textContent = nf(s.subKhyc);
+      $('kpiCancelled').textContent = nf(s.subCancelled);
+      $('lblTotalPkgPtm').textContent = nf(s.subPtm) + ' TB PTM';
+
+      var byRev = d.regionStats.slice().sort(function (a, b) { return b.totalDtpk - a.totalDtpk; });
+      var bySub = d.regionStats.slice().sort(function (a, b) { return b.totalSub - a.totalSub; });
+      var lr = byRev.map(function (r) { return r.name; }), ls = bySub.map(function (r) { return r.name; });
+      hBar('chartRevOld', lr, byRev.map(function (r) { return r.currentDtpk; }), C.blue, compactVND);
+      hBar('chartRevNew', lr, byRev.map(function (r) { return r.ptmDtpk; }), C.green, compactVND);
+      hBar('chartSubOld', ls, bySub.map(function (r) { return r.currentSub; }), C.blue, nf);
+      hBar('chartSubNew', ls, bySub.map(function (r) { return r.ptmSub; }), C.green, nf);
+
+      // Bảng doanh thu
+      var h = '';
+      byRev.forEach(function (r, i) {
+        var share = pct(r.totalDtpk, s.totalRevenue), arpu = r.totalSub > 0 ? Math.round(r.totalDtpk / r.totalSub) : 0;
+        h += '<tr><td><span class="rank">' + (i + 1) + '</span></td><td><b>' + esc(r.name) + '</b></td>' +
+          '<td class="r">' + vnd(r.currentDtpk) + '</td>' +
+          '<td class="r" style="color:var(--green);font-weight:600">' + vnd(r.ptmDtpk) + '</td>' +
+          '<td class="r" style="color:var(--blue);font-weight:700">' + vnd(r.totalDtpk) + '</td>' +
+          '<td class="r">' + vnd(arpu) + '</td>' +
+          '<td class="r"><span class="share"><span class="bar"><i style="width:' + share.toFixed(1) + '%"></i></span>' + pctText(share) + '</span></td></tr>';
+      });
+      $('tblRevenue').innerHTML = h;
+      var sumArpu = s.totalActiveSub > 0 ? Math.round(s.totalRevenue / s.totalActiveSub) : 0;
+      $('tfRevenue').innerHTML = '<tr><td></td><td>Tổng cộng kỳ</td><td class="r">' + vnd(s.revenueCurrent) + '</td><td class="r">' + vnd(s.revenuePtm) +
+        '</td><td class="r">' + vnd(s.totalRevenue) + '</td><td class="r">' + vnd(sumArpu) + '</td><td class="r">100%</td></tr>';
+
+      // Bảng thuê bao
+      h = '';
+      bySub.forEach(function (r, i) {
+        var share = pct(r.totalSub, s.totalActiveSub);
+        h += '<tr><td><span class="rank">' + (i + 1) + '</span></td><td><b>' + esc(r.name) + '</b></td>' +
+          '<td class="c">' + nf(r.currentSub) + '</td><td class="c" style="color:var(--green);font-weight:600">' + nf(r.ptmSub) + '</td>' +
+          '<td class="c" style="color:var(--blue);font-weight:700">' + nf(r.totalSub) + '</td>' +
+          '<td class="r"><span class="share"><span class="bar"><i style="width:' + share.toFixed(1) + '%"></i></span>' + pctText(share) + '</span></td></tr>';
+      });
+      $('tblSubscriber').innerHTML = h;
+
+      // Cơ cấu gói PTM
+      var pk = d.packagePtmDistribution || [];
+      $('pkgList').innerHTML = pk.length ? pk.map(function (p) {
+        return '<div class="pkg-row"><div class="name" title="' + esc(p.package) + '">' + esc(p.package) + '</div>' +
+          '<div class="bar"><i style="width:' + Number(p.ratio) + '%"></i></div>' +
+          '<div class="num">' + nf(p.count) + ' <small>· ' + Number(p.ratio) + '%</small></div></div>';
+      }).join('') : '<div class="empty">Không có PTM trong kỳ</div>';
+
+      renderTrends(d.monthlyTrend);
+      renderSegments(s.segInd, s.segBiz, s.segGov);
+    }
+
+    function renderTrends(t) {
+      var labels = t.map(function (x) { return x.monthLabel; });
+      var base = { responsive: true, maintainAspectRatio: false,
+        scales: { x: { stacked: true, grid: { display: false }, border: { display: false } },
+                  y: { stacked: true, beginAtZero: true, grid: { color: C.grid }, border: { display: false } } } };
+
+      mount('chartRevTrend', { type: 'bar',
+        data: { labels: labels, datasets: [
+          { label: 'Hiện hữu', data: t.map(function (x) { return x.currentDtpk; }), backgroundColor: C.blue, borderRadius: 4, stack: 's' },
+          { label: 'PTM mới', data: t.map(function (x) { return x.ptmDtpk; }), backgroundColor: C.green, borderRadius: 4, stack: 's' } ] },
+        options: Object.assign({}, base, {
+          plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+            tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + vnd(c.raw); },
+                                    footer: function (items) { return 'Tổng: ' + vnd(items.reduce(function (a, i) { return a + i.raw; }, 0)); } } } },
+          scales: { x: base.scales.x, y: Object.assign({}, base.scales.y, { ticks: { callback: function (v) { return compactVND(v); } } }) } })
       });
 
-      const subData = trendData.map(t => t.hasData ? (t.currentSub + t.ptmSub) : null);
-      charts['trendSub'] = new Chart(document.getElementById('chartSubTrend').getContext('2d'), {
-        type: 'line',
-        data: { labels: labels, datasets: [{ data: subData, borderColor: '#005AAB', backgroundColor: 'rgba(0, 90, 171, 0.1)', borderWidth: 3, pointBackgroundColor: '#005AAB', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, fill: true, tension: 0.4, spanGaps: true }] },
-        options: {
-          layout: { padding: { top: 30 } },
-          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-          animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#005AAB'; ctx.font = 'bold 11px "UTM Mobifone KT", sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(val + ' TB', point.x, point.y - 8); }); }, this); } },
-          scales: { y: { beginAtZero: true, grace: '20%', border: { display: false }, grid: { color: '#f1f5f9' } }, x: { border: { display: false }, grid: { display: false } } }
-        }
+      mount('chartSubTrend', { type: 'line',
+        data: { labels: labels, datasets: [{ data: t.map(function (x) { return x.currentSub + x.ptmSub; }), borderColor: C.blue, backgroundColor: 'rgba(0,90,171,.1)',
+          borderWidth: 3, pointBackgroundColor: '#fff', pointBorderColor: C.blue, pointBorderWidth: 2, pointRadius: 4, fill: true, tension: .35 }] },
+        options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 24 } },
+          plugins: { legend: { display: false }, valueLabels: { format: nf }, tooltip: { callbacks: { label: function (c) { return nf(c.raw) + ' TB'; } } } },
+          scales: { x: { grid: { display: false }, border: { display: false } }, y: { beginAtZero: false, grace: '15%', grid: { color: C.grid }, border: { display: false } } } }
       });
 
-      const ptmSubData = trendData.map(t => t.hasData ? t.ptmSub : null);
-      charts['trendPtmSub'] = new Chart(document.getElementById('chartPtmSubTrend').getContext('2d'), {
-        type: 'line',
-        data: { labels: labels, datasets: [{ data: ptmSubData, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 3, pointBackgroundColor: '#10b981', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 5, fill: true, tension: 0.4, spanGaps: true }] },
-        options: {
-          layout: { padding: { top: 30 } },
-          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-          animation: { onComplete: function() { const ctx = this.ctx; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#059669'; ctx.font = 'bold 11px "UTM Mobifone KT", sans-serif'; this.data.datasets.forEach(function (ds, i) { const meta = this.getDatasetMeta(i); meta.data.forEach(function (point, idx) { const val = ds.data[idx]; if (val !== null) ctx.fillText(val + ' TB', point.x, point.y - 8); }); }, this); } },
-          scales: { y: { beginAtZero: true, grace: '20%', border: { display: false }, grid: { color: '#f1f5f9' } }, x: { border: { display: false }, grid: { display: false } } }
-        }
+      mount('chartPtmSubTrend', { type: 'bar',
+        data: { labels: labels, datasets: [{ data: t.map(function (x) { return x.ptmSub; }), backgroundColor: C.green, borderRadius: 6, maxBarThickness: 28 }] },
+        options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 24 } },
+          plugins: { legend: { display: false }, valueLabels: { format: nf }, tooltip: { callbacks: { label: function (c) { return nf(c.raw) + ' TB PTM'; } } } },
+          scales: { x: { grid: { display: false }, border: { display: false } }, y: { beginAtZero: true, grace: '10%', grid: { color: C.grid }, border: { display: false } } } }
       });
     }
 
-    function renderSegmentChart(ind, biz, gov) {
-      if (charts['chartSeg']) charts['chartSeg'].destroy();
-      const ctx = document.getElementById('chartSegments').getContext('2d');
-      charts['chartSeg'] = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Cá nhân/Hộ GĐ', 'Doanh nghiệp', 'Cơ quan/HCSN'],
-          datasets: [{ data: [ind, biz, gov], backgroundColor: ['#3b82f6', '#f59e0b', '#ED1C24'], borderWidth: 0, hoverOffset: 4 }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } }
-      });
+    function renderSegments(ind, biz, gov) {
+      var vals = [ind || 0, biz || 0, gov || 0], names = ['Cá nhân / Hộ gia đình', 'Doanh nghiệp', 'Cơ quan / HCSN'], cols = ['#3b82f6', '#f59e0b', C.red];
+      var total = vals[0] + vals[1] + vals[2];
+      mount('chartSegments', { type: 'doughnut',
+        data: { labels: names, datasets: [{ data: vals, backgroundColor: cols, borderWidth: 2, borderColor: '#fff', hoverOffset: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: function (c) { return c.label + ': ' + nf(c.raw) + ' (' + pctText(pct(c.raw, total)) + ')'; } } } } } });
+      $('segLegend').innerHTML = names.map(function (n, i) {
+        return '<div><span><span class="dot" style="background:' + cols[i] + '"></span>' + n + '</span><b>' + nf(vals[i]) + ' <small style="color:var(--ink-3);font-weight:500">· ' + pctText(pct(vals[i], total)) + '</small></b></div>';
+      }).join('');
     }
 
-    function handleSearchMain(e) {
-      if (e.key === 'Enter') {
-        const val = document.getElementById('searchInputMain').value.trim();
-        if (val.length < 3) { alert('Vui lòng nhập ít nhất 3 ký tự (Mã KH, Số ĐT, User hoặc Serial).'); return; }
-        document.getElementById('searchCountMain').innerText = 'Đang tiến hành truy vấn cơ sở dữ liệu...';
-        document.getElementById('searchResultsMain').innerHTML = '<div style="text-align: center; padding: 40px;"><div class="spinner-border"></div></div>';
-        
-        google.script.run
-          .withSuccessHandler(res => {
-            document.getElementById('searchCountMain').innerText = `✅ Đã tìm thấy ${res.length} kết quả khớp với "${val}"`;
-            let html = '';
-            if (res.length === 0) {
-              html = '<div style="text-align: center; color: #64748b; padding: 40px;">Không tìm thấy khách hàng nào.</div>';
-            } else {
-              res.forEach(item => {
-                let badgeChan = item.tinhTrangChan === 'Bình thường' ? 'badge-green' : 'badge-red';
-                let badgeHD = item.tinhTrangHD.includes('Đang hoạt động') ? 'badge-blue' : 'badge-red';
-                
-                // === THIẾT KẾ GRID 2 CỘT TÍCH HỢP CSS CHI TIẾT TRỰC TIẾP === //
-                html += `
-                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-                  <div style="background: #f8fafc; padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-                    <div><div style="font-weight: bold; color: var(--mf-blue); font-size: 18px;">${item.tenTB}</div><div style="font-family: monospace; color: #64748b; font-size: 14px; font-weight: 600; margin-top: 6px;">KH: ${item.maKH} ${item.user ? ' | User: ' + item.user : ''}</div></div>
-                    <div style="text-align: right; display: flex; flex-direction: column; gap: 8px; align-items: flex-end;"><span class="badge ${badgeHD}">${item.tinhTrangHD}</span><span class="badge ${badgeChan}">${item.tinhTrangChan}</span></div>
-                  </div>
-                  <div class="detail-grid">
-                    <div class="info-group">
-                      <div class="info-item"><span class="info-label">Khu vực & Địa chỉ</span><span class="info-value">📍 ${item.khuVuc} - ${item.diaChi}</span></div>
-                      <div class="info-item"><span class="info-label">Liên hệ</span><span class="info-value">📞 ${item.sdt}</span></div>
-                      <div class="info-item"><span class="info-label">Gói cước</span><span class="info-value">📦 ${item.goiCuoc} (${item.chuKy}T) - ${formatVND(item.giaCuoc)}</span></div>
-                      <div class="info-item"><span class="info-label">Chu kỳ cước</span><span class="info-value">🗓️ ${item.ngayBatDau} ➔ ${item.ngayKetThuc}</span></div>
-                    </div>
-                    <div class="info-group">
-                      <div class="info-item"><span class="info-label">Doanh thu phân kỳ</span><span class="info-value" style="color: var(--mf-blue); font-size: 16px; font-weight: bold;">💰 ${formatVND(item.dtpk)} / tháng</span></div>
-                      <div class="info-item"><span class="info-label">Thiết bị ONT</span><span class="info-value">⚙️ ${item.loaiONT} (SN: ${item.serial})</span></div>
-                      <div class="info-item"><span class="info-label">Phát triển bởi</span><span class="info-value">🧑‍💼 ${item.tenNV}</span></div>
-                      <div class="info-item"><span class="info-label">Điểm bán</span><span class="info-value">🏪 ${item.tenCH}</span></div>
-                    </div>
-                  </div>
-                </div>`;
-              });
-            }
-            document.getElementById('searchResultsMain').innerHTML = html;
-          }).withFailureHandler(err => { document.getElementById('searchResultsMain').innerHTML = `<div style="color: var(--mf-red); padding: 20px;">Lỗi: ${err.message}</div>`; }).apiSearchSubscriber(val);
-      }
+    /* ---------- Xuất ảnh ---------- */
+    function snapshot() {
+      var el = $('view-' + state.view);
+      document.body.classList.add('loading');
+      html2canvas(el, { scale: 2, backgroundColor: '#f3f6fa', useCORS: true }).then(function (cv) {
+        var a = document.createElement('a');
+        a.href = cv.toDataURL('image/jpeg', 0.92);
+        a.download = 'MobiFiber_' + state.view + '_' + state.year + '.jpg';
+        a.click();
+      }).catch(function () { toast('Không xuất được ảnh.'); })
+        .then(function () { document.body.classList.remove('loading'); });
     }
+
+    /* ---------- Tra cứu 360° ---------- */
+    function renderResult(i) {
+      var chan = i.tinhTrangChan === 'Bình thường' ? 'b-green' : 'b-red';
+      var hd = String(i.tinhTrangHD).indexOf('Đang hoạt động') >= 0 ? 'b-blue' : 'b-red';
+      return '<article class="result"><div class="result-head"><div><div class="name">' + esc(i.tenTB) + '</div>' +
+        '<div class="id">KH: ' + esc(i.maKH) + (i.user ? ' · User: ' + esc(i.user) : '') + '</div></div>' +
+        '<div class="badges"><span class="badge ' + hd + '">' + esc(i.tinhTrangHD) + '</span><span class="badge ' + chan + '">' + esc(i.tinhTrangChan) + '</span></div></div>' +
+        '<div class="result-body"><dl class="info" style="margin:0">' +
+        '<div><dt>Khu vực và địa chỉ</dt><dd>' + esc(i.khuVuc) + ' – ' + esc(i.diaChi) + '</dd></div>' +
+        '<div><dt>Liên hệ</dt><dd>' + esc(i.sdt) + '</dd></div>' +
+        '<div><dt>Gói cước</dt><dd>' + esc(i.goiCuoc) + ' (' + esc(i.chuKy) + ' tháng) – ' + vnd(i.giaCuoc) + '</dd></div>' +
+        '<div><dt>Chu kỳ cước</dt><dd>' + esc(i.ngayBatDau) + ' → ' + esc(i.ngayKetThuc) + '</dd></div></dl>' +
+        '<dl class="info" style="margin:0">' +
+        '<div><dt>Doanh thu phân kỳ</dt><dd class="big">' + vnd(i.dtpk) + ' / tháng</dd></div>' +
+        '<div><dt>Thiết bị ONT</dt><dd>' + esc(i.loaiONT) + ' (SN: ' + esc(i.serial) + ')</dd></div>' +
+        '<div><dt>Nhân viên phát triển</dt><dd>' + esc(i.tenNV) + '</dd></div>' +
+        '<div><dt>Điểm bán</dt><dd>' + esc(i.tenCH) + '</dd></div></dl></div></article>';
+    }
+    function doSearch() {
+      var val = $('searchInput').value.trim();
+      if (val.length < 3) { $('searchStatus').textContent = 'Vui lòng nhập ít nhất 3 ký tự.'; return; }
+      $('searchStatus').textContent = 'Đang tra cứu…';
+      $('searchResults').innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          $('searchStatus').textContent = res.length ? 'Tìm thấy ' + res.length + ' kết quả cho "' + val + '"' + (res.length >= 25 ? ' (hiển thị tối đa 25)' : '') : '';
+          $('searchResults').innerHTML = res.length ? res.map(renderResult).join('') : '<div class="empty">Không tìm thấy khách hàng phù hợp với "' + esc(val) + '".</div>';
+        })
+        .withFailureHandler(function (err) {
+          $('searchStatus').textContent = ''; $('searchResults').innerHTML = '';
+          toast((err && err.message) || 'Lỗi tra cứu.');
+        })
+        .apiSearchSubscriber(val);
+    }
+
+    /* ---------- Gắn sự kiện & khởi động ---------- */
+    document.querySelectorAll('.nav-item').forEach(function (b) { b.addEventListener('click', function () { showView(b.dataset.view); }); });
+    document.querySelectorAll('[data-period]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.period = b.dataset.period; state.detail = defaultDetail(state.period);
+        document.querySelectorAll('[data-period]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+        buildDetailOptions(); load();
+      });
+    });
+    $('detailSelect').addEventListener('change', function (e) { state.detail = parseInt(e.target.value, 10); load(); });
+    $('yearSelect').addEventListener('change', function (e) { state.year = parseInt(e.target.value, 10); load(); });
+    $('btnSnap').addEventListener('click', snapshot);
+    $('searchInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') doSearch(); });
+
+    buildYears(); buildDetailOptions(); showView('revenue'); load();   // chỉ gọi máy chủ 1 lần khi mở trang
+  })();
   </script>
 </body>
 </html>

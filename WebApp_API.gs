@@ -2,8 +2,8 @@
  * ============================================================================
  * HỆ THỐNG QUẢN LÝ DỮ LIỆU MOBIFIBER - TTKD VIỄN THÔNG LÂM ĐỒNG
  * FILE        : WebApp_API.gs
- * PHIÊN BẢN   : 14.0 (Thuật toán Lũy Kế Đa Kỳ, Tổng hợp Doanh thu chính xác)
- * NGÀY CẬP NHẬT: 29/10/2026
+ * PHIÊN BẢN   : 15.0 (Giữ nguyên thuật toán v14; thêm nạp logo base64, kiểm tra tham số đầu vào)
+ * NGÀY CẬP NHẬT: 08/11/2026
  * ============================================================================
  */
 
@@ -17,12 +17,54 @@ function safeParseCurrency(val) {
   return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0;
 }
 
+/**
+ * Nạp logo thành chuỗi base64 (data URI) để nhúng thẳng vào trang.
+ * Cách này không cần chia sẻ file công khai, không phụ thuộc link lh3.googleusercontent.com.
+ * Ưu tiên: Script Properties "LOGO_FILE_ID" (nếu có) -> tìm theo tên file LOGO_FILE_NAME trong Drive của người triển khai.
+ * Trả về chuỗi rỗng nếu không tìm thấy (trang sẽ hiển thị logo chữ dự phòng, không bị ảnh vỡ).
+ */
+const LOGO_FILE_NAME = 'logo_mobifiber.png';
+
+function getLogoDataUri_() {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'logo_data_uri_v1';
+  try {
+    const hit = cache.get(cacheKey);
+    if (hit) return hit;
+
+    let file = null;
+    const fileId = PropertiesService.getScriptProperties().getProperty('LOGO_FILE_ID');
+    if (fileId) {
+      file = DriveApp.getFileById(fileId);
+    } else {
+      const it = DriveApp.getFilesByName(LOGO_FILE_NAME);
+      if (it.hasNext()) file = it.next();
+    }
+    if (!file) return '';
+
+    const blob = file.getBlob();
+    const uri = 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+    if (uri.length < 95000) cache.put(cacheKey, uri, 21600); // giới hạn 100KB/giá trị của CacheService
+    return uri;
+  } catch (err) {
+    console.error('Không nạp được logo: ' + err.message);
+    return '';
+  }
+}
+
 function doGet(e) {
-  return HtmlService.createTemplateFromFile('Dashboard')
-    .evaluate()
+  const tpl = HtmlService.createTemplateFromFile('Dashboard');
+  tpl.logoSrc = getLogoDataUri_();
+  return tpl.evaluate()
     .setTitle('MobiFiber Executive Dashboard')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/** Chạy tay 1 lần trong trình soạn thảo để kiểm tra logo: xem Nhật ký thực thi. */
+function testLogo() {
+  const uri = getLogoDataUri_();
+  console.log(uri ? 'OK - đã nạp logo, độ dài chuỗi: ' + uri.length : 'KHÔNG TÌM THẤY logo "' + LOGO_FILE_NAME + '" trong Drive của tài khoản triển khai.');
 }
 
 // Tính toán lát cắt dữ liệu cho 1 khoảng thời gian cố định
@@ -142,6 +184,7 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
   const lastRow = rawSheet.getLastRow();
   const lastCol = rawSheet.getLastColumn();
   const yTarget = parseInt(selectedYear, 10) || new Date().getFullYear();
+  if (['month', 'quarter', 'ytd', 'year'].indexOf(periodType) === -1) periodType = 'month';
   
   // Xác định các tháng thuộc kỳ báo cáo
   let targetMonths = [];
@@ -288,6 +331,7 @@ function getDashboardMetrics(periodType = 'month', selectedYear, selectedMonth) 
 }
 
 function apiSearchSubscriber(keyword) {
+  if (String(keyword || '').replace(/\s+/g, '').length < 3) return []; // chặn tìm kiếm quá ngắn (tránh quét toàn bộ dữ liệu)
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName(CONFIG.TARGET_SHEET_NAME);
   if (!rawSheet) throw new Error(`Không tìm thấy sheet "${CONFIG.TARGET_SHEET_NAME}"!`);
